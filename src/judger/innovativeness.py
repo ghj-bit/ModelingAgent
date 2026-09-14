@@ -2,6 +2,10 @@ import json
 import ast
 import os
 from openai import OpenAI
+try:
+    from .response_parser import parse_json_object
+except ImportError:
+    from response_parser import parse_json_object
 
 class InnovativenessJudger:
     SYS_PROMPT = """You are currently evaluating mathematical modeling papers. Your task is to assess the innovativeness and originality of the solution approach. You should evaluate based on the role you are given.
@@ -129,15 +133,14 @@ Your Response:
         ]
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-v4-flash",
             messages=messages,
             temperature=0.0,
             n=1,
         )
         
         content = response.choices[0].message.content
-        json_str = content.split("```json")[1].split("```")[0].strip()
-        result =  ast.literal_eval(json_str) 
+        result = parse_json_object(content)
         
         scores = [result[aspect]["score"] for aspect in [
             "methodological_innovation", "problem_framing", "solution_creativity", 

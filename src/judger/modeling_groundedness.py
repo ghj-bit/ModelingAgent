@@ -2,6 +2,10 @@ import json
 import ast
 import os
 from openai import OpenAI
+try:
+     from .response_parser import parse_json_object
+except ImportError:
+     from response_parser import parse_json_object
 
 class ModelingGroundednessJudger:
      SYS_PROMPT = """You are currently evaluating mathematical modeling papers. Your task is to assess how well the solution's modeling approach is grounded in mathematical and scientific principles. You should evaluate based on the role you are given.
@@ -129,15 +133,14 @@ Your Response:
           ]
 
           response = self.client.chat.completions.create(
-               model="gpt-4o-mini",
+               model="deepseek-v4-flash",
                messages=messages,
                temperature=0.0,
                n=1,
           )
         
           content = response.choices[0].message.content
-          json_str = content.split("```json")[1].split("```")[0].strip()
-          result = ast.literal_eval(json_str)
+          result = parse_json_object(content)
           
           if "implementation_quality" in result:
                result["implementation"] = result.pop("implementation_quality")
@@ -150,4 +153,4 @@ Your Response:
           result["calculated_overall"] = sum(scores) / len(scores)
           result["role"] = role
           
-          return result 
+          return result

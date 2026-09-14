@@ -1,10 +1,18 @@
 model:
-  type: local
-  name: QwQ-32B
+  type: openai
+  name: deepseek-v4-flash
   openai_api_key: YOUR_OPENAI_API_KEY
-  openai_base_url: https://api.openai.com/v1
+  openai_base_url: https://api.deepseek.com
   max_len: 8192
+  max_tokens: 32768             # Includes high-effort reasoning plus function-call arguments
   temperature: 0
+  request_timeout: 450          # Bound each API call; long code generations currently take about 330-400s
+  sdk_max_retries: 0            # Keep retries visible at the agent layer
+  agent_managed_function_retries: true
+  tool_choice: auto              # DeepSeek thinking mode rejects tool_choice=required
+  # Thinking mode: 'enabled' keeps the model default (thinking on for deepseek-v4);
+  # 'disabled' sends {"thinking": {"type": "disabled"}} to the API.
+  thinking: enabled
 
 data:
   # API Key Configuration
@@ -41,7 +49,7 @@ modeling:
 
 simulation:
   # —— LLM Call Related ——
-  max_api_retries: 5            # ← new: Number of automatic retries for LLM 429/500 errors
+  max_api_retries: 1            # One visible retry after a failed or timed-out request
   api_base_wait_time: 10        # ← new: Base seconds for exponential backoff
   
   # —— Single Component Modeling Loop ——

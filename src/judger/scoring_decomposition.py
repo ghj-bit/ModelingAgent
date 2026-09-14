@@ -2,6 +2,10 @@ import json
 import ast
 import os
 from openai import OpenAI
+try:
+    from .response_parser import parse_json_object
+except ImportError:
+    from response_parser import parse_json_object
 
 class ScoringDecompositionJudger:
     SYS_PROMPT = """You are an expert judge evaluating mathematical modeling papers. Your task is to assess if each requirement of the problem is faithfully fulfilled based on the provided grading points.
@@ -109,18 +113,17 @@ Your Response:
         ]
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-v4-flash",
             messages=messages,
             temperature=0.0,
             n=1,
         )
         
         content = response.choices[0].message.content
-        json_str = content.split("```json")[1].split("```")[0].strip()
-        result = ast.literal_eval(json_str)
+        result = parse_json_object(content)
         total_score = sum(result["scores"].values())
         result["total_score"] = total_score
         average_score = total_score / len(result["scores"])
         result["calculated_overall"] = average_score
         
-        return result 
+        return result

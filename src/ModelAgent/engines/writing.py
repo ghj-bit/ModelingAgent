@@ -41,18 +41,20 @@ class WritingEngine:
         
         return background, restatement
 
-    def get_restatement(self):
+    def get_restatement(self, advice=None):
         """
         Get a comprehensive background analysis and restatement of the mathematical modeling problem.
         This is the first step in the modeling process.
         """
-        if "problem_background" in self.shared_context.context and "problem_restatement" in self.shared_context.context:
+        if "problem_background" in self.shared_context.context and "problem_restatement" in self.shared_context.context and not advice:
             print("Already finish the restatement, skip!!")
             return
-        
+
         print("Getting problem background and restatement")
         system = RESTATEMENT_SYS
         user = RESTATEMENT_USER.format(original_text=self.query)
+        if advice:
+            user += "\n\n## Expert Advice (must be incorporated)\n" + advice
         messages = form_message(system, user)
         response = self.core.execute(messages)
         
@@ -74,8 +76,8 @@ class WritingEngine:
         return background, restatement
 
     
-    def write_data(self, subtask_idx=0, approach_idx=0):
-        if f"writing_data_{subtask_idx}_{approach_idx}" in self.shared_context.context:
+    def write_data(self, subtask_idx=0, approach_idx=0, advice=None):
+        if f"writing_data_{subtask_idx}_{approach_idx}" in self.shared_context.context and not advice:
             print("Already finish the data writing, skip!!")
             return
         
@@ -86,9 +88,7 @@ class WritingEngine:
         modeling_implementation = modeling_history["modeling_implementation"]
         all_modeling_str = f"- Modeling Objective: {modeling_objective}\n\n- Modeling Approach: {modeling_approach}\n\n- Modeling Application: {modeling_application}"
         
-        gold_id = self.config["gold_id"]
-        model_name = self.config["model"]["name"]
-        simulation_dir = f"../../output_workspace_modelagent/{model_name}/{gold_id}/workspace/simulation"
+        simulation_dir = os.path.join(self.config["work_dir"], "simulation")
         if "modeling_default" in os.listdir(simulation_dir):
             simulation_dir = os.path.join(simulation_dir, "modeling_default")
         data_dir = os.path.join(simulation_dir, f"modeling_{subtask_idx}_{approach_idx}", "data")
@@ -97,7 +97,7 @@ class WritingEngine:
         report_str = ""
         report_path = os.path.join(results_dir, "report.md")
         if os.path.exists(report_path):
-            with open(report_path, "r") as f:
+            with open(report_path, "r", encoding="utf-8") as f:
                 report_str = f.read()
         if report_str == "":
             report_str = "No report file found in the directory."
@@ -115,7 +115,7 @@ class WritingEngine:
         all_data_history = []
         try:
             simulation_context = os.path.join(simulation_dir, f"modeling_{subtask_idx}_{approach_idx}", "context.json")
-            with open(simulation_context, "r") as f:
+            with open(simulation_context, "r", encoding="utf-8") as f:
                 all_data_history = json.load(f)["data_collection_history"]
         except:
             pass
@@ -123,9 +123,9 @@ class WritingEngine:
         all_data_str = ""
         for data_description_path, data_path in all_data_paths:
             try:
-                with open(data_description_path, "r") as f:
+                with open(data_description_path, "r", encoding="utf-8") as f:
                     data_description = f.read().replace("\n\n", "\n")
-                with open(data_path, "r") as f:
+                with open(data_path, "r", encoding="utf-8") as f:
                     data = f.read().strip()
                     if len(data.split("\n")) > 8:
                         data = "\n".join(data.split("\n")[:5]) + "\n...\n" + "\n".join(data.split("\n")[-3:]).strip()
@@ -162,7 +162,9 @@ class WritingEngine:
             all_history=all_history_str,
             report_file=report_str,
         )
-        
+        if advice:
+            user += "\n\n## Expert Advice (must be incorporated)\n" + advice
+
         messages = form_message(system, user)
         response = self.core.execute(messages)
         # Parse the markdown response
@@ -172,8 +174,8 @@ class WritingEngine:
         print(">> Data writing:\n", response)
         return data
     
-    def write_simulation(self, subtask_idx=0, approach_idx=0):
-        if f"writing_simulation_{subtask_idx}_{approach_idx}" in self.shared_context.context:
+    def write_simulation(self, subtask_idx=0, approach_idx=0, advice=None):
+        if f"writing_simulation_{subtask_idx}_{approach_idx}" in self.shared_context.context and not advice:
             print("Already finish the simulation writing, skip!!")
             return
         
@@ -186,9 +188,7 @@ class WritingEngine:
         
         all_data_str = self.shared_context.get_context(f"writing_data_{subtask_idx}_{approach_idx}")
         
-        gold_id = self.config["gold_id"]
-        model_name = self.config["model"]["name"]
-        simulation_dir = f"../../output_workspace_modelagent/{model_name}/{gold_id}/workspace/simulation"
+        simulation_dir = os.path.join(self.config["work_dir"], "simulation")
         if "modeling_default" in os.listdir(simulation_dir):
             simulation_dir = os.path.join(simulation_dir, "modeling_default")
         
@@ -196,7 +196,7 @@ class WritingEngine:
         report_str = ""
         report_path = os.path.join(results_dir, "report.md")
         if os.path.exists(report_path):
-            with open(report_path, "r") as f:
+            with open(report_path, "r", encoding="utf-8") as f:
                 report_str = f.read()
         if report_str == "":
             report_str = "No report file found in the directory."
@@ -204,7 +204,7 @@ class WritingEngine:
         all_simulation_history = []
         try:
             simulation_context = os.path.join(simulation_dir, f"modeling_{subtask_idx}_{approach_idx}", "context.json")
-            with open(simulation_context, "r") as f:
+            with open(simulation_context, "r", encoding="utf-8") as f:
                 all_simulation_history = json.load(f)["data_collection_history"]
         except:
             pass
@@ -236,7 +236,9 @@ class WritingEngine:
             all_history=all_history_str,
             report_file=report_str,
         )
-        
+        if advice:
+            user += "\n\n## Expert Advice (must be incorporated)\n" + advice
+
         messages = form_message(system, user)
         response = self.core.execute(messages)
         # Parse the markdown response
@@ -246,9 +248,9 @@ class WritingEngine:
         return simulation
 
 
-    def write_solution(self):
+    def write_solution(self, advice=None):
         try:
-            if f"writing_combined" in self.shared_context.context:
+            if f"writing_combined" in self.shared_context.context and not advice:
                 print("Already finish the solution writing, skip!!")
                 return
             
@@ -293,7 +295,9 @@ class WritingEngine:
         user = SOLUTION_USER.format(
             writing=writing,
         )
-        
+        if advice:
+            user += "\n\n## Expert Advice (must be incorporated)\n" + advice
+
         messages = form_message(system, user)
         response = self.core.execute(messages)
         # Parse the markdown response

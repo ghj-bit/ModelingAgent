@@ -9,6 +9,7 @@ from typing import Any
 from src.ModelAgent.engines.core import Core
 from src.ModelAgent.utils.shared_context import SharedContext
 from src.ModelAgent.utils.tool_handler import ToolHandler
+from src.ModelAgent.utils.tool_call_parser import parse_json_arguments
 from src.ModelAgent.prompts.simulation_critic import (
             MODELING_CRITIC_SYS, MODELING_CRITIC_USER, MODELING_CRITIQUE_FUNCTION_SCHEMA
         )
@@ -25,6 +26,43 @@ class SimulationAgent:
         "tool":"\033[33m","critic":"\033[36m",
         "warn":"\033[33m","error":"\033[31m","info":"\033[0m",
     }
+
+    _MISSING = object()
+
+    @staticmethod
+    def _reasoning_content(message):
+        """Read DeepSeek thinking content across OpenAI SDK response shapes."""
+        reasoning = getattr(message, "reasoning_content", None)
+        if reasoning is not None:
+            return reasoning
+
+        model_extra = getattr(message, "model_extra", None)
+        if isinstance(model_extra, dict) and "reasoning_content" in model_extra:
+            return model_extra["reasoning_content"]
+
+        model_dump = getattr(message, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump()
+            if isinstance(dumped, dict):
+                return dumped.get("reasoning_content")
+        return None
+
+    @classmethod
+    def _assistant_history_message(cls, message, tool_calls=_MISSING):
+        """Preserve provider-specific fields required by thinking-mode APIs."""
+        history_message = {
+            "role": getattr(message, "role", "assistant"),
+            "content": getattr(message, "content", None) or "",
+        }
+        if tool_calls is cls._MISSING:
+            tool_calls = getattr(message, "tool_calls", None)
+        if tool_calls is not None:
+            history_message["tool_calls"] = tool_calls
+
+        reasoning = cls._reasoning_content(message)
+        if reasoning is not None:
+            history_message["reasoning_content"] = reasoning
+        return history_message
     
     def __init__(
         self,
@@ -312,6 +350,8 @@ class SimulationAgent:
             tools_schema: list[dict],
             *,
             model: str | None = None,
+            tool_choice: str | None = None,
+            thinking: str | None = None,
     ) -> 'Any':  # Return type depends on actual model API used
         """
         Unified LLM tool call entry:
@@ -358,6 +398,8 @@ class SimulationAgent:
                     resp = self.core.function_call_execute(
                         messages=trimmed,
                         functions=tools_schema,
+                        tool_choice=tool_choice,
+                        thinking=thinking,
                     )
 
                 else:
@@ -366,6 +408,8 @@ class SimulationAgent:
                     resp = self.core.function_call_execute(
                         messages=trimmed,
                         functions=tools_schema,
+                        tool_choice=tool_choice,
+                        thinking=thinking,
                     )
                     
                 self._log_print(
@@ -380,7 +424,7 @@ class SimulationAgent:
                         summary = {}
                         for tc in msg.tool_calls:
                             try:
-                                args = json.loads(tc.function.arguments)
+                                args = parse_json_arguments(tc.function.arguments)
                                 clean = {k:v for k,v in args.items() if k not in ("thinking","finish")}
                                 summary[tc.function.name] = clean
                             except Exception:
@@ -880,6 +924,13 @@ class SimulationAgent:
                 grading_points=grading_points
             )
             
+            # Inject expert consultation advice (set by the AskExpert interaction
+            # operator) so a re-run of the simulation follows the expert's guidance.
+            expert_advice = self.context_dict.get("expert_advice")
+            if expert_advice:
+                user_prompt += "\n\n## Expert Consultation Advice (must be incorporated)\n" + json.dumps(
+                    expert_advice, ensure_ascii=False, indent=2)
+
             # Add workspace file information
             user_prompt += "\n\n## Workspace Files\n" + workspace_info
             
@@ -929,18 +980,14 @@ class SimulationAgent:
                 # Check for tool_calls
                 if hasattr(msg, "tool_calls") and msg.tool_calls:
                     # Add assistant message to history
-                    messages.append({
-                        "role": msg.role,
-                        "content": msg.content or "",
-                        "tool_calls": getattr(msg, "tool_calls", None),
-                    })
+                    messages.append(self._assistant_history_message(msg))
                     
                     # Process all tool_calls - no longer filter by name, process all tool calls
                     tool_recorded = False  # Mark if current iteration has recorded tool call
                     for tool_call in msg.tool_calls:
                         try:
                             # Parse arguments
-                            call_args = json.loads(tool_call.function.arguments)
+                            call_args = parse_json_arguments(tool_call.function.arguments)
                             
                             # Handle list-type arguments
                             if isinstance(call_args, list):
@@ -1045,7 +1092,7 @@ class SimulationAgent:
                     func_name = msg.function_call.name
                     try:
                         # Parse arguments
-                        call_args = json.loads(msg.function_call.arguments)
+                        call_args = parse_json_arguments(msg.function_call.arguments)
                         
                         # Handle list-type arguments
                         if isinstance(call_args, list):
@@ -1054,18 +1101,14 @@ class SimulationAgent:
                         
                         # Add assistant message, but convert to tool_calls format
                         tool_call_id = f"call_{int(time.time())}_{iter_idx}"
-                        messages.append({
-                            "role": msg.role,
-                            "content": msg.content or "",
-                            "tool_calls": [{
+                        messages.append(self._assistant_history_message(msg, [{
                                 "id": tool_call_id,
                                 "type": "function",
                                 "function": {
                                     "name": func_name,
                                     "arguments": msg.function_call.arguments
                                 }
-                            }]
-                        })
+                            }]))
                         
                         # Execute tool call
                         self._log_print("tool", f"Executing tool: {func_name} for group {group_suffix}")
@@ -1112,17 +1155,11 @@ class SimulationAgent:
                     except Exception as e:
                         self._log_print("error", f"Failed to parse or execute function call: {e}")
                         # Try to add failure message
-                        messages.append({
-                            "role": msg.role,
-                            "content": msg.content or ""
-                        })
+                        messages.append(self._assistant_history_message(msg, None))
                         # Don't set func_name, will trigger retry logic
                 else:
                     # No tool calls, just add regular message
-                    messages.append({
-                        "role": msg.role,
-                        "content": msg.content or ""
-                    })
+                    messages.append(self._assistant_history_message(msg, None))
                 
                 # After processing all tool_calls, check if it was an empty call
                 if empty_call:
@@ -1629,7 +1666,7 @@ class SimulationAgent:
             return "No critique available", 0
     
         try:
-            data = json.loads(tool_msg.tool_calls[0].function.arguments)
+            data = parse_json_arguments(tool_msg.tool_calls[0].function.arguments)
             raw_response = tool_msg.tool_calls[0].function.arguments
             
             # Get feedback text and total score
@@ -2305,7 +2342,7 @@ class SimulationAgent:
                     for tool_call in msg.tool_calls:
                         try:
                             # Parse arguments
-                            call_args = json.loads(tool_call.function.arguments)
+                            call_args = parse_json_arguments(tool_call.function.arguments)
                             
                             # Handle list-type parameters
                             if isinstance(call_args, list):
@@ -2344,11 +2381,7 @@ class SimulationAgent:
                                 self._log_print("info", f"Simulation finished at iteration {iter_idx+1} (tool_out.finish=True) for group {group_suffix}")
                             
                             # Add messages to original message list
-                            messages.append({
-                                "role": msg.role,
-                                "content": msg.content or "",
-                                "tool_calls": getattr(msg, "tool_calls", None)
-                            })
+                            messages.append(self._assistant_history_message(msg))
                             messages.append({
                                 "role": "tool",
                                 "tool_call_id": tool_call.id,
@@ -2367,7 +2400,7 @@ class SimulationAgent:
                     func_name = msg.function_call.name
                     try:
                         # Parse arguments
-                        call_args = json.loads(msg.function_call.arguments)
+                        call_args = parse_json_arguments(msg.function_call.arguments)
                         
                         # Handle list-type parameters
                         if isinstance(call_args, list):
@@ -2406,18 +2439,14 @@ class SimulationAgent:
                             self._log_print("info", f"Simulation finished at iteration {iter_idx+1} (tool_out.finish=True) for group {group_suffix}")
                         
                         tool_call_id = f"call_{int(time.time())}_{iter_idx}"
-                        messages.append({
-                            "role": msg.role,
-                            "content": msg.content or "",
-                            "tool_calls": [{
+                        messages.append(self._assistant_history_message(msg, [{
                                 "id": tool_call_id,
                                 "type": "function",
                                 "function": {
                                     "name": func_name,
                                     "arguments": msg.function_call.arguments
                                 }
-                            }]
-                        })
+                            }]))
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call_id,

@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import time
+import uuid
 import datetime
 import shutil
 import tempfile
@@ -17,7 +18,7 @@ from src.ModelAgent.engines.core import Core
 from src.ModelAgent.utils.utils import form_message
 from src.ModelAgent.utils.shared_context import SharedContext
 from src.ModelAgent.utils.tool_handler import ToolHandler
-from utils.tool_call_parser import extract_tool_call
+from utils.tool_call_parser import extract_tool_call, parse_json_arguments
 # Import prompts for data acquisition and evaluation
 from src.ModelAgent.prompts.data_acquire import DATA_ACQUIRE_SYS, DATA_ACQUIRE_USER
 from src.ModelAgent.prompts.data_critic import DATA_CRITIC_SYS, DATA_CRITIC_USER, PROCESS_CRITIQUE_SYS, PROCESS_CRITIQUE_USER, CRITIQUE_FUNCTION_SCHEMA
@@ -186,6 +187,36 @@ class DataAgent:
         """Add an entry to the history file"""
         with open(self.history_file, "a", encoding="utf-8") as hf:
             hf.write(text + "\n")
+
+    def _collect_tool_calls(self, msg_obj):
+        """
+        Collect tool calls from an assistant message.
+
+        Tool calls MUST go through ``multi_tools_executor``; any other named
+        call (a direct tool call such as ``file_reader_tool``, or a
+        hallucinated name) is classified as ``"reject"`` and is answered with a
+        rejection message instead of being executed.
+
+        Returns a list of ``(kind, tool_call_obj, name, arguments_str)`` tuples,
+        where kind is ``"executor"`` or ``"reject"``.
+        """
+        raw_calls = []
+        if hasattr(msg_obj, 'function_call') and msg_obj.function_call:
+            fc = msg_obj.function_call
+            raw_calls.append((fc, getattr(fc, 'name', None), getattr(fc, 'arguments', '{}')))
+        elif hasattr(msg_obj, 'tool_calls') and msg_obj.tool_calls:
+            for tc in msg_obj.tool_calls:
+                fn = getattr(tc, 'function', None)
+                raw_calls.append((tc, getattr(fn, 'name', None) if fn else None,
+                                  getattr(fn, 'arguments', '{}') if fn else '{}'))
+
+        usable = []
+        for call_obj, name, args_str in raw_calls:
+            if name == "multi_tools_executor":
+                usable.append(("executor", call_obj, name, args_str))
+            elif name:
+                usable.append(("reject", call_obj, name, args_str))
+        return usable
 
     def handle_call(self, call_data: dict, data_point=None) -> dict:
         """
@@ -452,8 +483,8 @@ class DataAgent:
             # Only keep latest 10 user messages
             user_messages = user_messages[-10:]
         
-        # Get function and assistant messages
-        function_messages = [m for m in messages if m.get("role") == "function"]
+        # Get tool/function and assistant messages
+        function_messages = [m for m in messages if m.get("role") in ("function", "tool")]
         assistant_messages = [m for m in messages if m.get("role") == "assistant"]
         
         # Get current data point name (assuming processing some data point)
@@ -478,6 +509,13 @@ class DataAgent:
         
         # If there are function messages and we can determine the data point, use _build_compact_history
         if function_messages and current_data_point:
+            # Tool results are compacted away, so drop the assistant tool_calls that
+            # reference them — the API requires every tool_call to have a matching
+            # tool message.
+            optimized_messages = [
+                m for m in optimized_messages
+                if not (m.get("role") == "assistant" and m.get("tool_calls"))
+            ]
             # Add a system message, containing compressed function call history
             compact_history = self._build_compact_history(current_data_point, keep_detailed=5)
             optimized_messages.append({
@@ -577,6 +615,8 @@ class DataAgent:
 
         # -------- Recursive dict → SimpleNamespace helper --------
         def to_ns(obj):
+            if hasattr(obj, "model_dump"):
+                obj = obj.model_dump()
             if isinstance(obj, dict):
                 return SimpleNamespace(**{k: to_ns(v) for k, v in obj.items()})
             if isinstance(obj, list):
@@ -590,7 +630,12 @@ class DataAgent:
         # 2. Only patch the first assistant message
         if response.choices:
             first_msg = response.choices[0].message          # ← Get first
-            response.choices[0].message = extract_tool_call(first_msg)
+            # Preserve thinking-mode reasoning_content: the API requires it to be
+            # passed back on later turns, and the patched message drops it.
+            reasoning_content = getattr(first_msg, "reasoning_content", None)
+            patched = to_ns(extract_tool_call(first_msg))
+            patched.reasoning_content = reasoning_content
+            response.choices[0].message = patched
 
         return response
     def run_single_collection(self, data_point, shared_context=None):
@@ -756,7 +801,13 @@ Overall Score: {processed_feedback.get('scores', {}).get('overall_score', 'N/A')
                 workspace_content=workspace_content,
                 critic_feedback=critic_feedback
             )
-            
+
+            # Inject expert consultation advice (set by the AskExpert interaction
+            # operator) so a re-run of the collection follows the expert's guidance.
+            if context.get("expert_advice"):
+                user_content += "\n\n## Expert Consultation Advice (must be incorporated)\n" + json.dumps(
+                    context["expert_advice"], ensure_ascii=False, indent=2)
+
             # Create messages
             messages = form_message(DATA_ACQUIRE_SYS, user_content)
             
@@ -849,26 +900,14 @@ Overall Score: {processed_feedback.get('scores', {}).get('overall_score', 'N/A')
                         return {"success": False, "error": str(e), "score": 0}
                     
                     msg_obj = response.choices[0].message
-                    
-                    # Compatible with both old and new API formats
-                    function_call_obj = None
-                    if hasattr(msg_obj, 'function_call') and msg_obj.function_call:
-                        function_call_obj = msg_obj.function_call
-                    
-                    # Support for new API format tool_calls
-                    elif hasattr(msg_obj, 'tool_calls') and msg_obj.tool_calls and len(msg_obj.tool_calls) > 0:
-                        # Find multi_tools_executor tool call
-                        for tool_call in msg_obj.tool_calls:
-                            if tool_call.function and tool_call.function.name == "multi_tools_executor":
-                                # Create compatible old API function_call_obj
-                                function_call_obj = type('FunctionCall', (), {
-                                    'name': tool_call.function.name,
-                                    'arguments': tool_call.function.arguments
-                                })
-                                break
-                    
-                    # Check if there's a tool call object
-                    if not function_call_obj:
+
+                    # Accept both the multi_tools_executor nested payload and
+                    # direct tool calls (the model often calls file_reader_tool
+                    # etc. directly under thinking mode).
+                    tool_calls = self._collect_tool_calls(msg_obj)
+
+                    # Check if there's a usable tool call
+                    if not tool_calls:
                         # Add retry logic, retry 5 times
                         max_retry = 5
                         retry_count = 0
@@ -896,10 +935,12 @@ Overall Score: {processed_feedback.get('scores', {}).get('overall_score', 'N/A')
                                 if hasattr(tc, 'function') and tc.function:
                                     print(f"   Function name: {tc.function.name if hasattr(tc.function, 'name') else 'unknown'}")
                         
-                        # Add this response to the message history
+                        # Add this response to the message history.
+                        # reasoning_content must be passed back in thinking mode.
                         messages.append({
                             "role": "assistant",
-                            "content": msg_obj.content or "No response content."
+                            "content": msg_obj.content or "No response content.",
+                            "reasoning_content": getattr(msg_obj, "reasoning_content", None) or ""
                         })
                         
                         # Add system prompt to explicitly require tool use
@@ -909,41 +950,29 @@ Overall Score: {processed_feedback.get('scores', {}).get('overall_score', 'N/A')
                         }
                         messages.append(retry_message)
                         
-                        while retry_count < max_retry and not function_call_obj:
+                        while retry_count < max_retry and not tool_calls:
                             retry_count += 1
                             print(f"[DataAgent] Retrying attempt {retry_count}/{max_retry}...")
-                            
+
                             try:
                                 # Modify retry call, add function_call parameter, force tool use
                                 retry_response = self._call_core_function_call_execute(
-                                    messages, 
+                                    messages,
                                     tools_definition
                                 )
                                 retry_msg = retry_response.choices[0].message
-                                
-                                # Check if there's a function_call
-                                if hasattr(retry_msg, 'function_call') and retry_msg.function_call:
-                                    function_call_obj = retry_msg.function_call
-                                    print(f"[DataAgent] Successfully obtained tool call in retry {retry_count}")
+
+                                retry_calls = self._collect_tool_calls(retry_msg)
+                                if retry_calls:
+                                    tool_calls = retry_calls
+                                    print(f"[DataAgent] Successfully obtained {len(tool_calls)} tool call(s) in retry {retry_count}")
                                     # Save successful response for further processing
                                     response = retry_response
+                                    msg_obj = retry_msg
                                     break
-                                # Check if there's tool_calls
-                                elif hasattr(retry_msg, 'tool_calls') and retry_msg.tool_calls and len(retry_msg.tool_calls) > 0:
-                                    # Find multi_tools_executor tool call
-                                    for tool_call in retry_msg.tool_calls:
-                                        if tool_call.function and tool_call.function.name == "multi_tools_executor":
-                                            # Create compatible old API function_call_obj
-                                            function_call_obj = type('FunctionCall', (), {
-                                                'name': tool_call.function.name,
-                                                'arguments': tool_call.function.arguments
-                                            })
-                                            print(f"[DataAgent] Successfully obtained tool_calls tool call in retry {retry_count}")
-                                            response = retry_response
-                                            break
-                                
+
                                 # If still no tool call, print detailed information
-                                if not function_call_obj:
+                                if not tool_calls:
                                     print(f"[DataAgent] Failed to obtain tool call in retry {retry_count}")
                                     print(f"[DataAgent] Detailed response for retry {retry_count}:")
                                     print(f"- ID: {retry_response.id}")
@@ -962,44 +991,75 @@ Overall Score: {processed_feedback.get('scores', {}).get('overall_score', 'N/A')
                                 print(f"[DataAgent] Error during retry {retry_count}: {e}")
                         
                         # If all retries fail, return failure
-                        if not function_call_obj:
+                        if not tool_calls:
                             print(f"[DataAgent] All {max_retry} retry attempts failed. Exiting collection loop.")
                             return {"success": False, "error": "Failed to get tool call after retries", "score": 0}
                     
-                    # Parse function call parameters
-                    function_args_str = function_call_obj.arguments
-                    try:
-                        # Fix JSON parsing error, if already a dictionary, use directly
-                        if isinstance(function_args_str, dict):
-                            tool_call_dict = function_args_str
-                        else:
-                            tool_call_dict = json.loads(function_args_str)
-                    except json.JSONDecodeError as e:
-                        print(f"[DataAgent] JSON parsing error: {e}")
-                        return {"success": False, "error": f"JSON parse error: {e}", "score": 0}
-                    
-                    # Call handle_call to execute tool
-                    handle_res = self.handle_call(tool_call_dict, data_point)
-                    last_tool_call_result = json.dumps(handle_res.get("tool_results", {}), ensure_ascii=False)
-                    self._color_print("tool", json.dumps(handle_res, ensure_ascii=False))
-                    
-                    # Store function call and result for evaluation
-                    function_call_record = {
-                        "function_call": tool_call_dict,
-                        "result": handle_res
-                    }
-                    recent_function_calls.append(function_call_record)
-                    # Only keep last 5 function calls
-                    if len(recent_function_calls) > 5:
-                        recent_function_calls = recent_function_calls[-5:]
-                    
-                    # Update intermediate collection results
-                    for tool_name, tool_result in handle_res.get("tool_results", {}).items():
-                        if tool_result is not None:
-                            if tool_name not in intermediate_collection_results:
-                                intermediate_collection_results[tool_name] = []
-                            intermediate_collection_results[tool_name].append(tool_result)
-                    
+                    # All tool calls must go through multi_tools_executor.
+                    # Non-executor calls are rejected with feedback that tells
+                    # the model to re-issue the request through the executor.
+                    executor_calls = [(o, n, a) for (k, o, n, a) in tool_calls if k == "executor"]
+                    rejected_calls = [(o, n, a) for (k, o, n, a) in tool_calls if k == "reject"]
+
+                    executed_calls = []   # (tool_call_id, tool_name, args_str)
+                    aggregate_results = {}
+                    finish = False
+                    new_function_call_records = []
+
+                    for call_obj, call_name, args_str in executor_calls:
+                        try:
+                            call_args = parse_json_arguments(args_str)
+                        except (ValueError, json.JSONDecodeError) as e:
+                            print(f"[DataAgent] JSON parsing error for {call_name}: {e}; skipping this call")
+                            continue
+
+                        call_id = getattr(call_obj, 'id', None) or f"call_{uuid.uuid4().hex[:8]}"
+
+                        # Nested multi-tool payload (the required format).
+                        handle_res = self.handle_call(call_args, data_point)
+                        finish = finish or handle_res.get("finish", False)
+                        tool_results = handle_res.get("tool_results", {})
+                        self._color_print("tool", json.dumps(handle_res, ensure_ascii=False))
+                        record = {"function_call": call_args, "result": handle_res}
+
+                        executed_calls.append((call_id, call_name, args_str))
+                        aggregate_results.update(tool_results)
+                        new_function_call_records.append(record)
+
+                        # Update intermediate collection results
+                        for tool_name, tool_result in tool_results.items():
+                            if tool_result is not None:
+                                if tool_name not in intermediate_collection_results:
+                                    intermediate_collection_results[tool_name] = []
+                                intermediate_collection_results[tool_name].append(tool_result)
+
+                    # Rejected calls still need a tool result message so the
+                    # conversation stays valid for the API; the result tells
+                    # the model how to re-issue the request correctly.
+                    rejected_executed = []
+                    rejected_results = {}
+                    for call_obj, call_name, args_str in rejected_calls:
+                        call_id = getattr(call_obj, 'id', None) or f"call_{uuid.uuid4().hex[:8]}"
+                        rejected_executed.append((call_id, call_name, args_str))
+                        rejected_results[call_id] = (
+                            f"[REJECTED] Direct tool calls are not allowed. You must call "
+                            f"`multi_tools_executor` and issue the tool request as a nested "
+                            f"parameter of it, e.g. {{\"{call_name}\": {{\"use_tool\": true, "
+                            f"\"tool_params\": {{...}}}}}}."
+                        )
+                        print(f"[DataAgent] Rejected direct tool call: {call_name}; model must use multi_tools_executor")
+
+                    if not executed_calls and not rejected_executed:
+                        print("[DataAgent] Tool calls present but none processable; retrying next round.")
+                        continue
+
+                    last_tool_call_result = json.dumps(aggregate_results, ensure_ascii=False)
+                    if executed_calls:
+                        recent_function_calls.extend(new_function_call_records)
+                        # Only keep last 5 function calls
+                        if len(recent_function_calls) > 5:
+                            recent_function_calls = recent_function_calls[-5:]
+
                     # 增加函数调用计数器
                     function_call_count += 1
                     
@@ -1072,27 +1132,34 @@ Overall Score: {processed_critique.get('scores', {}).get('overall_score', 9)}/15
                         # Pass the modified context to _save_context
                         self._save_context(context)
                     
-                    # Check if finished
-                    finish = handle_res.get("finish", False)
-                    
                     # Update the message for the next iteration
                     if not finish:
-                        # Add the assistant's response and function result to the conversation
+                        # Add the assistant's response and the tool results to the
+                        # conversation. Use the modern tool_calls/tool format (the
+                        # legacy `function` role is rejected by the API) and pass
+                        # reasoning_content back — the thinking-mode API requires
+                        # it on assistant messages with tool_calls. Executed calls
+                        # get the real aggregated result; rejected calls get the
+                        # rejection feedback.
+                        all_calls = executed_calls + rejected_executed
                         messages.append({
-                            "role": "assistant", 
-                            "content": None,
-                            "function_call": {
-                                "name": function_call_obj.name,
-                                "arguments": function_args_str
-                            }
+                            "role": "assistant",
+                            "content": msg_obj.content or "",
+                            "reasoning_content": getattr(msg_obj, "reasoning_content", None) or "",
+                            "tool_calls": [{
+                                "id": call_id,
+                                "type": "function",
+                                "function": {"name": call_name, "arguments": args_str}
+                            } for (call_id, call_name, args_str) in all_calls]
                         })
-                        
-                        
-                        messages.append({
-                            "role": "function",
-                            "name": function_call_obj.name,
-                            "content": last_tool_call_result
-                        })
+
+                        for (call_id, _call_name, _args_str) in all_calls:
+                            content = rejected_results.get(call_id, last_tool_call_result)
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": call_id,
+                                "content": content
+                            })
                         
                         # If we just added critic feedback, add it to the message
                         if function_call_count % self.critic_interval == 0 and function_call_count > 0:
@@ -1237,6 +1304,11 @@ Overall Score: {processed_critique.get('scores', {}).get('overall_score', 9)}/15
                         workspace_content=workspace_content,
                         critic_feedback=""
                     )
+                    # Inject expert consultation advice (set by the AskExpert
+                    # interaction operator) into the fallback collection as well.
+                    if context.get("expert_advice"):
+                        user_content += "\n\n## Expert Consultation Advice (must be incorporated)\n" + json.dumps(
+                            context["expert_advice"], ensure_ascii=False, indent=2)
                     
                     # Create message - use guess prompt system message
                     messages = form_message(GUESS_ACQUIRE_SYS, user_content)
@@ -1441,7 +1513,7 @@ Overall Score: {processed_critique.get('scores', {}).get('overall_score', 9)}/15
                         break
             
             if function_call_obj and function_call_obj.name == "process_critique":
-                processed = json.loads(function_call_obj.arguments)
+                processed = parse_json_arguments(function_call_obj.arguments)
             else:
                 raise Exception("Function call response not returned as expected")
             

@@ -12,13 +12,14 @@ class BasePlanner:
 
         self.model_name = planner_config.get("model_name", "gpt-4o-mini")
         openai_api_key = planner_config.get("openai_api_key", "")
+        self.base_url = planner_config.get("base_url")
         self.use_scratch_board = False
 
         self.planner_name = planner_config.get("planner_name", "BasePlanner")
         self.log_planner_steps = planner_config.get("log_planner_steps", True)
 
-        if "gpt" in self.model_name.lower():
-            self.client = OpenAI(api_key=openai_api_key)
+        if self.base_url or "gpt" in self.model_name.lower():
+            self.client = OpenAI(api_key=openai_api_key, base_url=self.base_url)
             print(f"[BasePlanner] Initialized with model_name={self.model_name}, openai_api_key length={len(openai_api_key)}")
         else:
             port = planner_config["port"]
@@ -99,7 +100,7 @@ class BasePlanner:
                 )
                 self._append_planner_log(log_text)
 
-                if "gpt" in self.model_name.lower() or "gemini" in self.model_name.lower():
+                if self.base_url or "gpt" in self.model_name.lower() or "gemini" in self.model_name.lower():
                     response = self.client.chat.completions.create(
                         model=self.model_name,
                         messages=messages,
@@ -134,7 +135,7 @@ class BasePlanner:
                     raise Exception(f"[Planner] GPT plan call failed too many times: {e}")
     
     def plan(self, status_text: str) -> str:
-        prompt_path = "./planner_prompt.yaml"
+        prompt_path = os.path.join(os.path.dirname(__file__), "planner_prompt.yaml")
         try:
             with open(prompt_path, "r", encoding="utf-8") as pf:
                 prompt_data = yaml.safe_load(pf)

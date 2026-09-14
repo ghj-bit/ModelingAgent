@@ -63,12 +63,63 @@ Also, set the output directory and other paths properly in the respective entry 
 cd ModelBase # For running Vanilla Generation
 python baseline.py
 
-cd ModelTool # For running Tool Agent
-python baseline.py
+cd src/ModelTool # For running Tool Agent
+python baseline.py 2013_Bank_Service_Problem # Run one problem by ID
+python baseline.py # Run all problems
+
+cd ../.. # Run one Tool Agent problem and evaluate it end to end
+python run_and_evaluate.py 2013_Bank_Service_Problem
 
 cd ModelAgent # For running ModelingAgent
 python mathmodel.py
+
+# Run OpenClaw and evaluate only its final solution report
+cd ../OpenClaw
+python baseline.py 2013_Bank_Service_Problem
+python baseline.py --all
+
+# Render the benchmark-adapted prompt without calling OpenClaw or the judge
+python baseline.py 2013_Bank_Service_Problem --prepare-only
+
+# Evolve only the Required Workflow section for five scored rounds
+python run_evolution.py --max_rounds 5 --problem_id 2013_Bank_Service_Problem
+
+# Preview five prompt workflow rounds without running the benchmark or judge
+python run_prompt_evolution.py --max_rounds 5
+
+# Resume one specific evolution experiment
+python run_evolution.py --max_rounds 5 \
+  --problem_id 2013_Bank_Service_Problem \
+  --exp ../../openclaw_experiments/run_YYYYMMDD_HHMMSS
 ```
+
+The OpenClaw baseline requires a configured `openclaw` CLI. Each run is written
+to `output_workspace_openclaw/<model>/<problem_id>_<timestamp>/`. OpenClaw must
+write its final answer to `output/results/solution_report.md`; the runner copies
+only that file into `final_submission/` and submits only that directory to
+ModelingJudge. Judge results are written under `output_judge/OpenClaw/`.
+After OpenClaw prints its agent-completion marker, the runner allows the CLI five
+minutes to exit normally. If the completed CLI still does not exit, the runner
+terminates that CLI process and continues with artifact checks and judging.
+Sub-agent completion markers are ignored until a non-empty final report exists,
+so an `AskExpert` sub-agent cannot prematurely trigger the CLI watchdog.
+When resuming an evolution experiment, each unscored round is scanned for its
+latest non-empty `output/results/solution_report.md`. An existing report skips
+OpenClaw execution and proceeds directly through workflow checking, judging,
+result recording, and then the next round.
+
+OpenClaw workflow evolution permits only `AskExpert`, `ScEnsemble`, and
+`Review`. Each round inserts one operator after one numbered step in
+`## Required Workflow`; every other part of the parent prompt remains byte-for-byte
+unchanged. The complete final report and its six-metric average score are used
+to select and optimize the next round. Evolution artifacts are stored under
+`openclaw_experiments/run_<timestamp>/`.
+
+Identical operators may not be adjacent in an evolved workflow. Every inserted
+operator declares a JSON evidence file under `output/logs/workflow_evidence/`.
+After OpenClaw finishes and before judging starts, the runner validates the
+operator order, evidence paths, JSON schemas, and required values, then writes
+`meta/workflow_check.json`. A failed workflow check stops the run before Judge.
 
 Please note that some errors may still exist due to the complexity of the agent structure. The model may not always use tools optimally or strictly follow instructions. Use this preview version with caution.
 
@@ -79,6 +130,9 @@ To evaluate using ModelingJudge, run:
 ```bash
 cd src/judger
 python main_judge.py
+
+# Evaluate one Tool Agent run
+python main_judge.py 2013_Bank_Service_Problem --workspace ../../output_workspace_modeltool/deepseek-v4-flash/2013_Bank_Service_Problem_20260817_232902
 ```
 
 Each evaluation metric corresponds to a Python file containing its specific prompt.

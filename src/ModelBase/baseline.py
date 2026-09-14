@@ -89,33 +89,19 @@ def form_messages(msg: str, system_prompt: str = "你好！"):
     ]
     return messages
 
-def gpt_chatcompletion(messages, model="gpt-4o"):
+def gpt_chatcompletion(messages, model="deepseek-v4-flash"):
     rounds = 0
     while True:
         rounds += 1
         try:
-            if "gpt" in model or "gemini" in model:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=0,
-                    n=1,
-                    max_tokens=8192,
-                )
-                content = response.choices[0].message.content
-            else:
-                messages.append({
-                    "role": "user",
-                    "content": "Please directly give me a long passage to address the modeling problem in markdown format."
-                })
-                response = client.chat.completions.create(
-                    model=client.models.list().data[0].id,
-                    messages=messages,
-                    temperature=0,
-                    n=1,
-                    max_tokens=8192,
-                )
-                content = response.choices[0].message.content
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0,
+                n=1,
+                max_tokens=8192,
+            )
+            content = response.choices[0].message.content
             return content.strip()
 
         except Exception as e:
@@ -181,13 +167,13 @@ def main(gold_id: str, data: dict, output_dir: str, answered_data: dict, log: di
 
 
 if __name__ == '__main__':
-    model = "gpt-4o" # Change to the model being tested
     config = yaml.safe_load(open("./model_config.yaml", "r"))
-    
-    if "gpt" in model:
-        client = OpenAI(api_key=config["openai_api_key"])
-    else:
-        client = OpenAI(api_key="dummy", base_url="http://localhost:8000/v1")
+    secret_path = os.path.join(os.path.dirname(__file__), "..", "..", "secret.json")
+    with open(secret_path, "r", encoding="utf-8") as f:
+        secret = json.load(f)
+
+    model = config["model_name"]
+    client = OpenAI(api_key=secret["api_key"], base_url=config["base_url"])
     
     # Load problem data
     with open("../data/modeling_data_final.json") as f:
@@ -221,4 +207,4 @@ if __name__ == '__main__':
     with open(save_path, 'w') as f:
         json.dump(answered_data, f, indent=4)
     
-    print(f"Completed - Success: {log['success']}, Failed: {log['fail']}") 
+    print(f"Completed - Success: {log['success']}, Failed: {log['fail']}")

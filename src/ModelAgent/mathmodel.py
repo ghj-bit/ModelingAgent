@@ -1,3 +1,4 @@
+import argparse
 import sys
 import os
 import yaml
@@ -46,9 +47,10 @@ class BaseAgent:
 
         # ---------- quick exit check ----------
         try:
-            task_decomposition = self.shared_context.get_context(
-                "selection_history"
-            )[-1]["task_decomposition"]
+            selection_history = self.shared_context.context.get("selection_history", [])
+            if not selection_history:
+                raise KeyError("selection_history")
+            task_decomposition = selection_history[-1]["task_decomposition"]
 
             last_subtask_id = len(task_decomposition) - 1
             flag_key = f"factor_critics_{last_subtask_id}_0"
@@ -147,6 +149,7 @@ def process_problem(config, gold_id, problem_data):
         work_dir = work_dir,
         query   = problem_data["question"],
         grading_points = problem_data["decomposition"]["grading_points"],
+        requirements = problem_data["decomposition"]["grading_points"],
     )
 
     exist = todo = 0
@@ -173,17 +176,28 @@ def process_problem(config, gold_id, problem_data):
 
     return gold_id, exist, todo
 
-def main():
-    with open("./model_config.yaml", "r") as f:
+def main(problem_id=None):
+    with open(os.path.join(os.path.dirname(__file__), "config.yaml"), "r", encoding="utf-8") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+
+    secret_path = os.path.join(os.path.dirname(__file__), "..", "..", "secret.json")
+    with open(secret_path, "r", encoding="utf-8") as f:
+        secret = json.load(f)
+    config["model"]["openai_api_key"] = secret["api_key"]
 
     model_name = config["model"]["name"]
     base_path  = f"YOUR_ABSOLUTE_PATH_TO_WORKSPACE/{model_name}"
     os.makedirs(base_path, exist_ok=True)
     config["base_path"] = base_path
 
-    with open("../data/modeling_data_final.json", "r") as f:
+    with open(os.path.join(BASE_DIR, "data", "modeling_data_final.json"), "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    if problem_id:
+        if problem_id not in data:
+            raise ValueError(f"Unknown problem ID: {problem_id}")
+        data = {problem_id: data[problem_id]}
+        print(f"Running single problem: {problem_id}")
     
     max_workers = config.get("data", {}).get("max_workers", 4)
     num_workers = min(max_workers, len(data), multiprocessing.cpu_count())
@@ -228,5 +242,8 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run ModelAgent benchmark problems.")
+    parser.add_argument("problem_id", nargs="?", help="Run only this problem ID; omit to run all problems.")
+    args = parser.parse_args()
     multiprocessing.freeze_support() 
-    main()
+    main(args.problem_id)

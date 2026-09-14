@@ -45,7 +45,11 @@ class SharedContext:
     
     def get_context(self, key):
         if key not in self.context:
-            raise Exception("Key not found in context")
+            available = ", ".join(sorted(self.context)) or "<empty>"
+            raise KeyError(
+                f"Context key {key!r} was not produced by an earlier workflow stage. "
+                f"Available keys: {available}"
+            )
         return self.context[key]
 
 

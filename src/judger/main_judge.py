@@ -1,7 +1,10 @@
 import json
 import os
 import ast
-from concurrent.futures import ThreadPoolExecutor
+import argparse
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Dict, Any, Set
 
 from structural_coherency import StructuralCoherencyJudger
@@ -11,16 +14,36 @@ from data_groundedness import DataGroundednessJudger
 from analysis_groundedness import AnalysisGroundednessJudger
 from innovativeness import InnovativenessJudger
 
+AVAILABLE_JUDGERS = (
+    "structural_coherency",
+    "scoring_decomposition",
+    "modeling_groundedness",
+    "data_groundedness",
+    "analysis_groundedness",
+    "innovativeness",
+)
+
+
+def result_file_path(output_dir: str | Path, gold_id: str) -> Path:
+    gold_id = gold_id.replace("?", "")
+    safe_id = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", gold_id).rstrip(" .")
+    return Path(output_dir) / f"{safe_id or 'problem'}.json"
+
 class MainJudger:
-    def __init__(self):
-        self.judgers = {
-            "structural_coherency": StructuralCoherencyJudger(),
-            "scoring_decomposition": ScoringDecompositionJudger(),
-            "modeling_groundedness": ModelingGroundednessJudger(),
-            "data_groundedness": DataGroundednessJudger(),
-            "analysis_groundedness": AnalysisGroundednessJudger(),
-            "innovativeness": InnovativenessJudger()
+    def __init__(self, judger_names=None):
+        judger_types = {
+            "structural_coherency": StructuralCoherencyJudger,
+            "scoring_decomposition": ScoringDecompositionJudger,
+            "modeling_groundedness": ModelingGroundednessJudger,
+            "data_groundedness": DataGroundednessJudger,
+            "analysis_groundedness": AnalysisGroundednessJudger,
+            "innovativeness": InnovativenessJudger,
         }
+        selected = tuple(judger_names or AVAILABLE_JUDGERS)
+        unknown = sorted(set(selected) - set(AVAILABLE_JUDGERS))
+        if unknown:
+            raise ValueError("Unknown judgers: " + ", ".join(unknown))
+        self.judgers = {name: judger_types[name]() for name in selected}
         
         # Judgers that use role-based evaluation
         self.role_based_judgers = {
@@ -33,14 +56,31 @@ class MainJudger:
     def run_judger(self, judger_name: str, writing: str, roles: list = None, grading_points: list = None) -> Dict[str, Any]:
         try:
             judger = self.judgers[judger_name]
+            print(f"[Judge] Starting {judger_name}", flush=True)
             
             # Handle role-based judgers
             if judger_name in self.role_based_judgers and roles:
-                results = []
-                for role in roles:
+                results = [None] * len(roles)
+
+                def run_role(index: int, role: dict):
+                    print(
+                        f"[Judge] {judger_name}: role {index + 1}/{len(roles)} "
+                        f"({role.get('name', 'unknown')})",
+                        flush=True,
+                    )
                     result = judger.run(writing, role=role)
                     result["role"] = role
-                    results.append(result)
+                    return index, result
+
+                with ThreadPoolExecutor(max_workers=len(roles)) as executor:
+                    futures = [
+                        executor.submit(run_role, index, role)
+                        for index, role in enumerate(roles)
+                    ]
+                    for future in as_completed(futures):
+                        index, result = future.result()
+                        results[index] = result
+
                 return {
                     "role_based_results": results,
                     "aggregated_score": sum(r.get("calculated_overall", 0) for r in results) / len(results)
@@ -61,13 +101,13 @@ class MainJudger:
     
     def get_existing_results(self, output_dir: str, gold_id: str) -> Dict[str, Any]:
         """Read existing judgement results if they exist"""
-        output_file = f"{output_dir}/{gold_id}.json"
-        if os.path.exists(output_file):
+        output_file = result_file_path(output_dir, gold_id)
+        if output_file.exists():
             try:
-                with open(output_file) as f:
+                with open(output_file, encoding="utf-8") as f:
                     results = json.load(f)
                 return results.get("judgements", {})
-            except:
+            except (OSError, UnicodeError, json.JSONDecodeError):
                 return {}
         return {}
 
@@ -76,7 +116,7 @@ class MainJudger:
         missing = set(self.judgers.keys())
         for judger_name, result in existing_results.items():
             # Only consider result valid if it exists and has no error
-            if result and "error" not in result:
+            if judger_name in self.judgers and result and "error" not in result:
                 missing.remove(judger_name)
         return missing
     
@@ -102,7 +142,7 @@ class MainJudger:
         
         # Add existing valid results to our results
         for judger_name, result in existing_results.items():
-            if judger_name not in missing_judgers:
+            if judger_name in self.judgers and judger_name not in missing_judgers:
                 results["judgements"][judger_name] = result
                 results["metadata"]["skipped_count"] += 1
                 results["metadata"]["skipped_judgers"].append(judger_name)
@@ -124,7 +164,7 @@ class MainJudger:
                 for name in missing_judgers
             }
             
-            for future in future_to_judger:
+            for future in as_completed(future_to_judger):
                 name = future_to_judger[future]
                 try:
                     result = future.result()
@@ -139,9 +179,17 @@ class MainJudger:
                     results["judgements"][name] = {"error": str(e)}
                     results["metadata"]["failed_count"] += 1
                     results["metadata"]["failed_judgers"].append(name)
+
+                with open(result_file_path(output_dir, gold_id), "w", encoding="utf-8") as f:
+                    json.dump(results, f, indent=4, ensure_ascii=False)
+                print(
+                    f"[Judge] Finished {name}; checkpoint saved "
+                    f"({len(results['judgements'])}/{len(self.judgers)})",
+                    flush=True,
+                )
         
-        with open(f"{output_dir}/{gold_id}.json", 'w') as f:
-            json.dump(results, f, indent=4)
+        with open(result_file_path(output_dir, gold_id), "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4, ensure_ascii=False)
         
         return results
 
@@ -162,8 +210,64 @@ def process_gold_id(args):
           f"Skipped: {results['metadata']['skipped_count']}")
     return gold_id, results
 
-def main():
-    for model, level in zip(["Qwen2.5-72B-Instruct"], ["ModelAgent"]):
+def evaluate_workspace(
+    problem_id: str, workspace: str, output_dir: str = None, judger_names=None
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    workspace_path = Path(workspace).resolve()
+    if not workspace_path.is_dir():
+        raise ValueError(f"Workspace directory not found: {workspace_path}")
+
+    report_files = sorted(workspace_path.glob("*.md"))
+    if not report_files:
+        raise ValueError(f"No Markdown reports found in: {workspace_path}")
+
+    with open(repo_root / "data" / "modeling_data_final.json", encoding="utf-8") as f:
+        criterias = json.load(f)
+    if problem_id not in criterias:
+        raise ValueError(f"Unknown problem ID: {problem_id}")
+
+    writing_parts = []
+    for report_file in report_files:
+        writing_parts.append(
+            f"# Submitted file: {report_file.name}\n\n"
+            + report_file.read_text(encoding="utf-8")
+        )
+    writing = "\n\n---\n\n".join(writing_parts)
+
+    if output_dir:
+        output_path = Path(output_dir).resolve()
+    else:
+        model_name = workspace_path.parent.name
+        output_path = (
+            repo_root
+            / "output_judge"
+            / "ModelTool"
+            / model_name
+            / workspace_path.name
+        )
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    criteria = criterias[problem_id]
+    grading_points = criteria.get("decomposition", {}).get("grading_points", [])
+    roles = criteria.get("eval_roles", [])
+
+    print(f"Evaluating {problem_id} from {workspace_path}")
+    print("Submitted reports: " + ", ".join(path.name for path in report_files))
+    results = MainJudger(judger_names).judge(
+        str(output_path), problem_id, writing, grading_points, roles
+    )
+    result_path = result_file_path(output_path, problem_id)
+    print(
+        f"Completed {problem_id} - Success: {results['metadata']['success_count']}, "
+        f"Failed: {results['metadata']['failed_count']}, "
+        f"Skipped: {results['metadata']['skipped_count']}"
+    )
+    print(f"Judgement saved to: {result_path}")
+
+
+def run_batch():
+    for model, level in zip(["deepseek-v4-flash"], ["ModelAgent"]):
         try:
             # Load problem data
             with open("../../data/modeling_data_final.json") as f:
@@ -193,6 +297,38 @@ def main():
                 results = list(executor.map(process_gold_id, args))
         except:
             continue
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate ModelingBench reports.")
+    parser.add_argument(
+        "problem_id", nargs="?", help="Evaluate only this problem ID."
+    )
+    parser.add_argument(
+        "--workspace",
+        help="Tool Agent run directory containing one or more Markdown reports.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Optional directory for the judgement JSON output.",
+    )
+    parser.add_argument(
+        "--judgers",
+        nargs="+",
+        choices=AVAILABLE_JUDGERS,
+        help="Run only the selected evaluation dimensions.",
+    )
+    args = parser.parse_args()
+
+    if args.problem_id or args.workspace or args.output_dir:
+        if not args.problem_id or not args.workspace:
+            parser.error("problem_id and --workspace must be provided together")
+        evaluate_workspace(
+            args.problem_id, args.workspace, args.output_dir, args.judgers
+        )
+        return
+
+    run_batch()
 
 if __name__ == "__main__":
     main()

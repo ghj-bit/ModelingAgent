@@ -1,8 +1,11 @@
 import sys
 import os
+import argparse
 import json
 import time
+import traceback
 import yaml
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any
 
@@ -33,6 +36,10 @@ class BaseAgent:
         except Exception as e:
             raise ValueError(f"Error reading config YAML from {config_path}: {e}")
 
+        with open(os.path.join(BASE_DIR, "secret.json"), "r", encoding="utf-8") as f:
+            secret = json.load(f)
+        config["openai_api_key"] = secret["api_key"]
+
         self.max_iter = max_iter
         self.model_name = config.get("model_name", "gpt-4o-mini")
         
@@ -43,7 +50,13 @@ class BaseAgent:
             }
         }
         
-        if "gpt" in self.model_name.lower():
+        if config.get("base_url"):
+            core_config["model"].update({
+                "type": "openai",
+                "openai_api_key": config["openai_api_key"],
+                "openai_base_url": config["base_url"]
+            })
+        elif "gpt" in self.model_name.lower():
             if config.get("aihubmix_api_key"):
                 core_config["model"].update({
                     "type": "openai",
@@ -97,7 +110,7 @@ class BaseAgent:
         self.url_text_extractor_tool = URL_Text_Extractor_Tool()
         self.pdf_parser_tool = PDF_Parser_Tool()
         self.text_detector_tool = Text_Detector_Tool()
-        self.image_captioner_tool = Image_Captioner_Tool()
+        self.image_captioner_tool = Image_Captioner_Tool(model_string=None)
         self.solution_generator_tool = Solution_Generator_Tool()
         self.python_execution_tool = Python_Execution_Tool()
 
@@ -195,6 +208,55 @@ class BaseAgent:
                 time.sleep(5)
                 if rounds > 3:
                     raise Exception("Chat Completion failed too many times")
+
+    @staticmethod
+    def _parse_tool_arguments(arguments):
+        if not isinstance(arguments, str):
+            return arguments
+
+        try:
+            return json.loads(arguments)
+        except json.JSONDecodeError as error:
+            # A long file_writer content value may be missing its closing quote
+            # immediately before the final mode field.
+            mode_marker = ', "mode":'
+            marker_pos = arguments.rfind(mode_marker, max(0, len(arguments) - 64))
+            if marker_pos != -1:
+                repaired_content = (
+                    arguments[:marker_pos] + '"' + arguments[marker_pos:]
+                )
+                for closing_delimiter in ("", "}", "]"):
+                    try:
+                        parsed = json.loads(repaired_content + closing_delimiter)
+                        print(
+                            "[BaseAgent] Repaired tool arguments by closing the "
+                            "content string before 'mode'"
+                            + (
+                                f" and appending '{closing_delimiter}'."
+                                if closing_delimiter
+                                else "."
+                            )
+                        )
+                        return parsed
+                    except json.JSONDecodeError:
+                        continue
+
+            # Some OpenAI-compatible models occasionally omit one final JSON
+            # delimiter. Only repair this narrow EOF case.
+            if error.pos < len(arguments.rstrip()):
+                raise
+
+            for closing_delimiter in ("}", "]"):
+                try:
+                    parsed = json.loads(arguments + closing_delimiter)
+                    print(
+                        "[BaseAgent] Repaired tool arguments by appending "
+                        f"'{closing_delimiter}'."
+                    )
+                    return parsed
+                except json.JSONDecodeError:
+                    continue
+            raise
                 
 
     def handle_call(self, call_data: dict) -> dict:
@@ -232,10 +294,11 @@ class BaseAgent:
         fw_conf = call_data.get("file_writer_tool", {})
         if fw_conf.get("use_tool") == True or fw_conf.get("use_tool") == 'true':
             params = fw_conf.get("tool_params", {})
+            mode = params.get("mode", "a")
             result = self.file_writer_tool.execute(
                 file_path=params["file_path"],
                 content=params["content"],
-                mode=params["mode"]
+                mode=mode
             )
             results["file_writer_tool"] = result
 
@@ -248,7 +311,7 @@ class BaseAgent:
             if len(params["content"]) > 300:
                 truncated_content += "..."
             summary_text = (
-                f"File_Writer_Tool => wrote '{truncated_content}' to {params['file_path']} (mode={params['mode']})"
+                f"File_Writer_Tool => wrote '{truncated_content}' to {params['file_path']} (mode={mode})"
             )
             tools_summary_list.append(summary_text)
         else:
@@ -624,16 +687,21 @@ class BaseAgent:
             
             function_name_str = function_call.get("name", "")
             function_args_str = function_call.get("arguments", "")
+
+            try:
+                parsed_function = self._parse_tool_arguments(function_args_str)
+            except json.JSONDecodeError as e:
+                print(f"[BaseAgent] JSON decode error: {e}")
+                last_tool_call_result = (
+                    "Tool call arguments were invalid JSON. Retry the tool call "
+                    "with valid, fully closed JSON; shorten long content if needed."
+                )
+                continue
             
             # If function_name_str is multi_tools_executor, need special handling
             if function_name_str == "multi_tools_executor":
-                try:
-                    tool_call_dict = json.loads(function_args_str) if type(function_args_str) == str else function_args_str
-                except json.JSONDecodeError as e:
-                    print(f"[BaseAgent] JSON decode error: {e}")
-                    break
+                tool_call_dict = parsed_function
             else:
-                parsed_function = json.loads(function_args_str) if type(function_args_str) == str else function_args_str
                 if "use_tool" in parsed_function and "tool_params" in parsed_function:
                     tool_call_dict = {function_name_str.lower(): parsed_function}
                 else:
@@ -768,12 +836,14 @@ def process_single_problem(gold_id: str, problem_data: Dict[str, Any], config_pa
     """Process a single problem using BaseAgent"""
     # try:
     if True:
-        workspace_path = os.path.join(base_output_dir, gold_id)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        workspace_path = os.path.join(base_output_dir, f"{gold_id}_{timestamp}")
         
         if os.path.exists(workspace_path) and os.path.exists(os.path.join(workspace_path, "final_report.md")):
             print(f"!!!! Skipping {gold_id} because it already exists !!!!")
             return
-        if os.path.exists(workspace_path) and len(open(os.path.join(workspace_path, "memory.jsonl")).readlines()) >= 20:
+        memory_path = os.path.join(workspace_path, "memory.jsonl")
+        if os.path.exists(memory_path) and len(open(memory_path, encoding="utf-8").readlines()) >= 20:
             print("Memory Length > 20, prioritize others ...")
             return
             
@@ -798,12 +868,18 @@ def process_single_problem(gold_id: str, problem_data: Dict[str, Any], config_pa
     # except Exception as e:
     #     print(f"Error processing problem {gold_id}: {e}")
 
-def process_problems_parallel(problems_file: str, config_path: str, base_output_dir: str, max_workers: int = 4, yaml_path: str = None):
+def process_problems_parallel(problems_file: str, config_path: str, base_output_dir: str, max_workers: int = 4, yaml_path: str = None, problem_id: str = None):
     """Process multiple problems in parallel"""
     try:
         # Load problems from JSON file
         with open(problems_file, "r", encoding="utf-8") as f:
             problems = json.load(f)
+
+        if problem_id:
+            if problem_id not in problems:
+                raise ValueError(f"Unknown problem ID: {problem_id}")
+            problems = {problem_id: problems[problem_id]}
+            print(f"Running single problem: {problem_id}")
 
         # Create base output directory
         os.makedirs(base_output_dir, exist_ok=True)
@@ -821,14 +897,20 @@ def process_problems_parallel(problems_file: str, config_path: str, base_output_
 
     except Exception as e:
         print(f"Error in parallel processing: {e}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Tool Agent benchmark problems.")
+    parser.add_argument("problem_id", nargs="?", help="Run only this problem ID; omit to run all problems.")
+    args = parser.parse_args()
+
     # Configuration
-    problems_file = "../data/modeling_data_final.json"  # JSON file containing problems
-    config_path = "./model_config.yaml"  # Model configuration file
-    base_output_dir = "../output_workspace_modeltool"  # Base directory for all outputs
-    yaml_path = "../baseprompts.yaml"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    problems_file = os.path.join(BASE_DIR, "data", "modeling_data_final.json")
+    config_path = os.path.join(script_dir, "model_config.yaml")
+    base_output_dir = os.path.join(BASE_DIR, "output_workspace_modeltool")
+    yaml_path = os.path.join(script_dir, "baseprompts.yaml")
     max_workers = 5 # Number of parallel threads
     
     model_name = yaml.safe_load(open(config_path, "r", encoding="utf-8"))["model_name"]
@@ -838,4 +920,11 @@ if __name__ == "__main__":
         os.makedirs(base_output_dir)
     
     # Run parallel processing
-    process_problems_parallel(problems_file, config_path, base_output_dir, max_workers, yaml_path=yaml_path)
+    process_problems_parallel(
+        problems_file,
+        config_path,
+        base_output_dir,
+        max_workers,
+        yaml_path=yaml_path,
+        problem_id=args.problem_id,
+    )

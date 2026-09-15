@@ -16,6 +16,16 @@ except ImportError:
 
 
 class CleanBaselineWorkspaceTests(unittest.TestCase):
+    def test_reference_prompt_is_packaged_with_source(self):
+        reference = clean.strategy.REFERENCE_BASELINE_PROMPT_PATH
+        self.assertEqual(reference.parent.name, "prompts")
+        self.assertTrue(reference.is_file())
+        self.assertNotIn("openclaw_experiments", reference.parts)
+        self.assertIn(
+            "Search only for external evidence necessary",
+            clean.strategy.reference_baseline_prompt_template(),
+        )
+
     def test_launcher_selects_latest_matching_experiment(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

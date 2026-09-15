@@ -49,12 +49,7 @@ EXPERIMENT_TYPE = "substantive_interaction_strategy_evolution"
 EXPERIMENT_PREFIX = "interaction_strategy_substantive"
 ACTIVE_STRATEGY_WORKFLOWS_DIR: Path | None = None
 REFERENCE_BASELINE_PROMPT_PATH = (
-    REPO_ROOT
-    / "openclaw_experiments"
-    / "interaction_strategy_clean_baseline_20260912_193324"
-    / "workflows"
-    / "round_1"
-    / "prompt.md"
+    SCRIPT_DIR / "prompts" / "reference_baseline_prompt.md"
 )
 
 STRATEGY_INTERACTION_OPERATORS = {

@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts import run_clean_baseline_train as launcher
+
 try:
     from . import run_substantive_interaction_strategy_clean_baseline as clean
 except ImportError:
@@ -14,6 +16,67 @@ except ImportError:
 
 
 class CleanBaselineWorkspaceTests(unittest.TestCase):
+    def test_launcher_selects_latest_matching_experiment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            problem_ids = ["first", "second"]
+            matching = []
+            for stamp, model in (
+                ("20260915_100000", "different/model"),
+                ("20260915_110000", "deepseek/deepseek-v4-flash"),
+                ("20260915_120000", "deepseek/deepseek-v4-flash"),
+            ):
+                experiment = (
+                    root / "openclaw_experiments" / f"{launcher.EXPERIMENT_PREFIX}{stamp}"
+                )
+                config = experiment / "runs/config.json"
+                config.parent.mkdir(parents=True)
+                config.write_text(
+                    json.dumps(
+                        {
+                            "experiment_type": "substantive_interaction_strategy_clean_baseline",
+                            "validation_problems": problem_ids,
+                            "validation_repetitions": 1,
+                            "model": model,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                if model == "deepseek/deepseek-v4-flash":
+                    matching.append(experiment)
+            with patch.object(launcher, "REPO_ROOT", root):
+                selected = launcher.latest_matching_experiment(
+                    problem_ids, "deepseek/deepseek-v4-flash"
+                )
+            self.assertEqual(selected, matching[-1])
+
+    def test_clean_workspace_recovers_nonempty_report_without_interaction(self):
+        interaction = clean.strategy.interaction
+        with tempfile.TemporaryDirectory() as directory:
+            experiment = Path(directory)
+            run = experiment / "runs/round_1/r1p1_existing"
+            report = run / "output/results/solution_report.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("Completed report", encoding="utf-8")
+            metadata = run / "meta/run.json"
+            metadata.parent.mkdir()
+            metadata.write_text(json.dumps({"problem_id": "task"}), encoding="utf-8")
+            with patch.object(sys, "argv", ["runner", "--problem-id", "task"]):
+                args = clean.runtime_args(clean.parse_args())
+            with (
+                patch.object(interaction, "VALIDATION_PROBLEMS", ("task",)),
+                patch.object(
+                    interaction.baseline,
+                    "find_openclaw_command",
+                    side_effect=AssertionError("Recovered runs must not register an Agent"),
+                ),
+            ):
+                prepared = clean.strategy.PREPARE_FRESH_PROBLEM(
+                    "task", {}, experiment / "prompt.md", 1, 1, experiment, args
+                )
+            self.assertTrue(prepared["recovered"])
+            self.assertEqual(prepared["final_report"], report)
+
     def test_runs_only_layout_execution_and_resume(self):
         interaction = clean.strategy.interaction
         with tempfile.TemporaryDirectory() as directory:

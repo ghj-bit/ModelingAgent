@@ -88,9 +88,10 @@ def build_clean_baseline_prompt(_strategy: dict) -> str:
 
 
 def runtime_args(args):
-    """Prepare clean workspaces without expert-interaction files or folders."""
+    """Prepare clean workspaces and start each Agent as soon as it registers."""
     run_args = _ORIGINAL_RUNTIME_ARGS(args)
     run_args.prepare_interaction_artifacts = False
+    run_args.pipeline_agent_start = True
     return run_args
 
 
@@ -238,6 +239,7 @@ def main() -> None:
         "concurrency": args.concurrency,
         "retry_concurrency": args.retry_concurrency,
         "judge_concurrency": args.judge_concurrency,
+        "pipeline_agent_start": True,
         "validation_repetitions": args.validation_repetitions,
         "judge_repeats": args.judge_repeats,
     }

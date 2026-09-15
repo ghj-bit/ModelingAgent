@@ -1140,10 +1140,12 @@ def prepare_validation_problem(
             continue
         if metadata.get("problem_id") is None and not run_dir.name.startswith(problem_id + "_"):
             continue
-        if (
+        report_complete = bool(
             report.read_text(encoding="utf-8", errors="replace").strip()
-            and has_completed_expert_exchange(run_dir)
-        ):
+        )
+        interaction_complete = has_completed_expert_exchange(run_dir)
+        clean_baseline = not getattr(args, "prepare_interaction_artifacts", True)
+        if report_complete and (interaction_complete or clean_baseline):
             print(
                 f"Round {round_number} repeat {repetition} {problem_id}: "
                 "recovered existing report; "
@@ -2758,6 +2760,7 @@ def evaluate_round(
     validation_attempts = getattr(args, "validation_attempts", 3)
     retry_concurrency = getattr(args, "retry_concurrency", 1)
     retry_delay = getattr(args, "validation_retry_delay", 10.0)
+    pipeline_agent_start = getattr(args, "pipeline_agent_start", False)
     for attempt in range(1, validation_attempts + 1):
         if not pending:
             break
@@ -2770,6 +2773,80 @@ def evaluate_round(
             )
             if retry_delay:
                 time.sleep(retry_delay)
+        worker_count = min(
+            args.concurrency if attempt == 1 else retry_concurrency,
+            len(pending),
+        )
+        if pipeline_agent_start:
+            def prepare_and_run(problem_id: str, repetition: int):
+                try:
+                    prepared = prepare_validation_problem(
+                        problem_id,
+                        problems[problem_id],
+                        prompt_path,
+                        round_number,
+                        repetition,
+                        experiment,
+                        args,
+                    )
+                except Exception as error:
+                    return None, "agent_registration", error
+                try:
+                    result = run_validation_problem(
+                        prepared,
+                        rubric,
+                        round_number,
+                        experiment,
+                        args,
+                    )
+                except Exception as error:
+                    return None, "execution", error
+                return result, None, None
+
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = {
+                    executor.submit(prepare_and_run, problem_id, repetition): (
+                        problem_id,
+                        repetition,
+                    )
+                    for problem_id, repetition in pending
+                }
+                for future in as_completed(futures):
+                    problem_id, repetition = futures[future]
+                    failure_key = f"{problem_id}::repeat_{repetition}"
+                    result, stage, error = future.result()
+                    if error is None:
+                        completed.setdefault(problem_id, {})[str(repetition)] = result
+                        checkpoint.get("failed", {}).pop(failure_key, None)
+                    else:
+                        previous = checkpoint.setdefault("failed", {}).get(
+                            failure_key, {}
+                        )
+                        history = list(previous.get("history", []))
+                        failure = {
+                            "attempt": attempt,
+                            "error": repr(error),
+                            "time": now(),
+                        }
+                        if stage == "agent_registration":
+                            failure["stage"] = stage
+                        history.append(failure)
+                        checkpoint["failed"][failure_key] = {
+                            "error": repr(error),
+                            "time": now(),
+                            "attempts": len(history),
+                            "history": history,
+                        }
+                    checkpoint["completed"] = completed
+                    workflow_evolution.write_json(checkpoint_path, checkpoint)
+            pending = [
+                (problem_id, repetition)
+                for repetition in range(1, target_repetitions + 1)
+                for problem_id in VALIDATION_PROBLEMS
+                if str(repetition) not in completed.get(problem_id, {})
+            ]
+            continue
+
         prepared_tasks = {}
         for problem_id, repetition in pending:
             failure_key = f"{problem_id}::repeat_{repetition}"
@@ -2803,10 +2880,7 @@ def evaluate_round(
                 workflow_evolution.write_json(checkpoint_path, checkpoint)
         if not prepared_tasks:
             continue
-        worker_count = min(
-            args.concurrency if attempt == 1 else retry_concurrency,
-            len(prepared_tasks),
-        )
+        worker_count = min(worker_count, len(prepared_tasks))
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = {
                 executor.submit(

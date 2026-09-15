@@ -1,56 +1,54 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "source_dataset": "data/modeling_data_final.json",
   "materialized_datasets": {
     "train": "data/modeling_data_train.json",
+    "validation": "data/modeling_data_validation.json",
     "test": "data/modeling_data_test.json",
     "excluded": "data/modeling_data_excluded.json"
   },
-  "audit_date": "2026-09-14",
+  "audit_date": "2026-09-15",
   "policy": {
     "split_unit": "task_id",
-    "split_strategy": "人工分层留出：兼顾年份、竞赛来源、一级主题和数据依赖；唯一的组合设计题保留在训练集。",
-    "eligibility": "题干完整且可通过本地信息或明确的外部检索完成；缺关键原始附件的题目不进入主划分。",
+    "split_strategy": "Stratified fixed holdout by year, competition source, primary category, and retrieval dependency. The existing test set is unchanged.",
+    "eligibility": "All records are retained. Tasks missing required source assets stay in training for continuity but are excluded from default sampling.",
     "external_retrieval_definition": {
       "required": "不获取真实外部数据就无法可复现地完成题目指定的真实案例、历史验证或数值应用。",
       "recommended": "可以用清晰假设或合成情景完成，但检索能显著改善参数校准和事实依据。",
       "not_required": "题面信息足以建立、验证和讨论模型，外部检索不是任务成立的必要条件。"
     },
-    "usage": "演化只从train采样；test在工作流和选择规则冻结后仅运行一次。检索题与非检索题应分别汇报分数，避免把检索可用性误当成建模能力。"
+    "usage": "Evolution samples only from train_default_sampling_pool. Validation is a fixed model-selection holdout: its reports, dialogue, and Judge feedback must never enter optimizer evidence. Test is used only once after the workflow and selection rules are frozen. Report retrieval and non-retrieval results separately."
   },
   "required_training_tasks": [
+    "2001_Adolescent_Pregnancy",
     "2003_Aviation_Baggage_Screening",
+    "2004_To_Be_Secure",
     "2013_Bank_Service_Problem",
     "2025_Managing_Sustainable_Tourism"
   ],
   "train": [
+    "2001_Adolescent_Pregnancy",
     "2001_Forest_Service",
     "2001_Skyscrapers",
     "2001_The_Bicycle_Wheel",
-    "2002_Airline_Overbooking",
     "2002_School_Busing",
     "2003_Aviation_Baggage_Screening",
-    "2003_Gamma_Knife_Treatment",
     "2003_The_Stunt_Person",
+    "2004_To_Be_Secure",
     "2005_Flood_Planning",
-    "2006_A_South_Sea",
     "2006_Positioning_and_Moving",
     "2006_Wheel_Chair_Access",
-    "2007_Gerrymandering",
     "2007_Organ_Transplant:_The",
     "2007_The_Airplane_Seating",
     "2008_Creating_Sudoku_Puzzles",
-    "2010_The_Sweet_Spot",
     "2011_Repeater_Coordination",
     "2011_Snowboard_Course",
     "2011_Space_Shuttle_Problem:",
     "2012_Camping_along_the",
     "2013_Bank_Service_Problem",
-    "2014_The_Next_Plague?",
     "2015_Is_it_sustainable?",
     "2016_Are_we_heading",
     "2016_Measuring_the_Evolution",
-    "2016_Record_Insurance",
     "2017_Jet_Lag",
     "2017_Sustainable_Cities_Needed!",
     "2019_Charge!",
@@ -60,18 +58,27 @@
     "2021_Storing_the_Sun",
     "2022_Forestry_for_Carbon",
     "2022_Power_Profile_of",
-    "2022_The_Need_for",
     "2022_Water_and_Hydroelectric",
     "2023_Dandelions:_Friend?_Foe?",
     "2023_Light_Pollution",
-    "2023_Preparing_for_Olympic",
     "2023_Prioritizing_the_UN",
     "2023_The_Future_of",
     "2024_Reducing_Illegal_Wildlife",
     "2024_Searching_for_Submersibles",
     "2024_The_Modeling_Musical",
-    "2025_Making_Room_for",
     "2025_Managing_Sustainable_Tourism"
+  ],
+  "validation": [
+    "2002_Airline_Overbooking",
+    "2003_Gamma_Knife_Treatment",
+    "2006_A_South_Sea",
+    "2007_Gerrymandering",
+    "2010_The_Sweet_Spot",
+    "2014_The_Next_Plague?",
+    "2016_Record_Insurance",
+    "2022_The_Need_for",
+    "2023_Preparing_for_Olympic",
+    "2025_Making_Room_for"
   ],
   "test": [
     "2001_Design_of_an",
@@ -93,10 +100,51 @@
     "2024_Sustainability_of_Property",
     "2025_Cyber_Strong?"
   ],
-  "excluded_missing_assets": [
+  "train_default_sampling_pool": [
+    "2001_Forest_Service",
+    "2001_Skyscrapers",
+    "2001_The_Bicycle_Wheel",
+    "2002_School_Busing",
+    "2003_Aviation_Baggage_Screening",
+    "2003_The_Stunt_Person",
+    "2005_Flood_Planning",
+    "2006_Positioning_and_Moving",
+    "2006_Wheel_Chair_Access",
+    "2007_Organ_Transplant:_The",
+    "2007_The_Airplane_Seating",
+    "2008_Creating_Sudoku_Puzzles",
+    "2011_Repeater_Coordination",
+    "2011_Snowboard_Course",
+    "2011_Space_Shuttle_Problem:",
+    "2012_Camping_along_the",
+    "2013_Bank_Service_Problem",
+    "2015_Is_it_sustainable?",
+    "2016_Are_we_heading",
+    "2016_Measuring_the_Evolution",
+    "2017_Jet_Lag",
+    "2017_Sustainable_Cities_Needed!",
+    "2019_Charge!",
+    "2020_Drowning_in_Plastic",
+    "2020_Moving_North",
+    "2020_The_Best_Summer",
+    "2021_Storing_the_Sun",
+    "2022_Forestry_for_Carbon",
+    "2022_Power_Profile_of",
+    "2022_Water_and_Hydroelectric",
+    "2023_Dandelions:_Friend?_Foe?",
+    "2023_Light_Pollution",
+    "2023_Prioritizing_the_UN",
+    "2023_The_Future_of",
+    "2024_Reducing_Illegal_Wildlife",
+    "2024_Searching_for_Submersibles",
+    "2024_The_Modeling_Musical",
+    "2025_Managing_Sustainable_Tourism"
+  ],
+  "train_retained_incomplete_assets": [
     "2001_Adolescent_Pregnancy",
     "2004_To_Be_Secure"
   ],
+  "excluded_missing_assets": [],
   "groups": {
     "complete_locally_without_required_retrieval": [
       "2001_Design_of_an",
@@ -193,42 +241,35 @@
   },
   "protocol_subsets": {
     "train_closed_book": [
+      "2001_Adolescent_Pregnancy",
       "2001_Forest_Service",
       "2001_Skyscrapers",
       "2001_The_Bicycle_Wheel",
-      "2002_Airline_Overbooking",
       "2002_School_Busing",
       "2003_Aviation_Baggage_Screening",
-      "2003_Gamma_Knife_Treatment",
       "2003_The_Stunt_Person",
-      "2006_A_South_Sea",
+      "2004_To_Be_Secure",
       "2006_Positioning_and_Moving",
       "2006_Wheel_Chair_Access",
       "2007_The_Airplane_Seating",
       "2008_Creating_Sudoku_Puzzles",
-      "2010_The_Sweet_Spot",
       "2011_Repeater_Coordination",
       "2011_Snowboard_Course",
       "2012_Camping_along_the",
       "2013_Bank_Service_Problem",
-      "2014_The_Next_Plague?",
       "2019_Charge!",
       "2020_The_Best_Summer",
       "2021_Storing_the_Sun",
-      "2022_The_Need_for",
       "2023_Prioritizing_the_UN",
-      "2023_The_Future_of",
-      "2025_Making_Room_for"
+      "2023_The_Future_of"
     ],
     "train_retrieval_required": [
       "2005_Flood_Planning",
-      "2007_Gerrymandering",
       "2007_Organ_Transplant:_The",
       "2011_Space_Shuttle_Problem:",
       "2015_Is_it_sustainable?",
       "2016_Are_we_heading",
       "2016_Measuring_the_Evolution",
-      "2016_Record_Insurance",
       "2017_Jet_Lag",
       "2017_Sustainable_Cities_Needed!",
       "2020_Drowning_in_Plastic",
@@ -238,11 +279,24 @@
       "2022_Water_and_Hydroelectric",
       "2023_Dandelions:_Friend?_Foe?",
       "2023_Light_Pollution",
-      "2023_Preparing_for_Olympic",
       "2024_Reducing_Illegal_Wildlife",
       "2024_Searching_for_Submersibles",
       "2024_The_Modeling_Musical",
       "2025_Managing_Sustainable_Tourism"
+    ],
+    "validation_closed_book": [
+      "2002_Airline_Overbooking",
+      "2003_Gamma_Knife_Treatment",
+      "2006_A_South_Sea",
+      "2010_The_Sweet_Spot",
+      "2014_The_Next_Plague?",
+      "2022_The_Need_for",
+      "2025_Making_Room_for"
+    ],
+    "validation_retrieval_required": [
+      "2007_Gerrymandering",
+      "2016_Record_Insurance",
+      "2023_Preparing_for_Olympic"
     ],
     "test_closed_book": [
       "2001_Design_of_an",
@@ -269,34 +323,92 @@
   },
   "statistics": {
     "all_records": 68,
-    "eligible_records": 66,
+    "eligible_records": 68,
     "train": {
-      "total": 48,
+      "total": 40,
       "by_primary_category": {
-        "Economics, finance and business decisions": 2,
-        "Engineering, physical systems and design": 9,
-        "Environmental, ecological, energy and sustainability": 19,
+        "Economics, finance and business decisions": 1,
+        "Engineering, physical systems and design": 7,
+        "Environmental, ecological, energy and sustainability": 17,
         "Games and combinatorial design": 1,
         "Governance, security and information systems": 4,
-        "Health, population and social systems": 4,
-        "Operations, transport and logistics": 9
+        "Health, population and social systems": 3,
+        "Operations, transport and logistics": 7
       },
       "by_source": {
-        "HiMCM": 12,
+        "HiMCM": 10,
         "ICM": 13,
-        "IM2C": 2,
-        "MCM": 19,
-        "MidMCM": 2
+        "IM2C": 1,
+        "MCM": 15,
+        "MidMCM": 1
       },
       "by_external_retrieval": {
-        "not_required": 16,
-        "recommended": 10,
-        "required": 22
+        "not_assessed": 2,
+        "not_required": 11,
+        "recommended": 8,
+        "required": 19
       },
       "by_local_data_status": {
         "complete_embedded_data": 3,
-        "complete_self_contained": 23,
-        "external_data_not_bundled": 22
+        "complete_self_contained": 16,
+        "external_data_not_bundled": 19,
+        "incomplete_missing_required_asset": 2
+      }
+    },
+    "train_default_sampling_pool": {
+      "total": 38,
+      "by_primary_category": {
+        "Economics, finance and business decisions": 1,
+        "Engineering, physical systems and design": 7,
+        "Environmental, ecological, energy and sustainability": 17,
+        "Games and combinatorial design": 1,
+        "Governance, security and information systems": 3,
+        "Health, population and social systems": 2,
+        "Operations, transport and logistics": 7
+      },
+      "by_source": {
+        "HiMCM": 9,
+        "ICM": 12,
+        "IM2C": 1,
+        "MCM": 15,
+        "MidMCM": 1
+      },
+      "by_external_retrieval": {
+        "not_required": 11,
+        "recommended": 8,
+        "required": 19
+      },
+      "by_local_data_status": {
+        "complete_embedded_data": 3,
+        "complete_self_contained": 16,
+        "external_data_not_bundled": 19
+      }
+    },
+    "validation": {
+      "total": 10,
+      "by_primary_category": {
+        "Economics, finance and business decisions": 1,
+        "Engineering, physical systems and design": 2,
+        "Environmental, ecological, energy and sustainability": 2,
+        "Governance, security and information systems": 1,
+        "Health, population and social systems": 2,
+        "Operations, transport and logistics": 2
+      },
+      "by_source": {
+        "HiMCM": 3,
+        "ICM": 1,
+        "IM2C": 1,
+        "MCM": 4,
+        "MidMCM": 1
+      },
+      "by_external_retrieval": {
+        "not_required": 5,
+        "recommended": 2,
+        "required": 3
+      },
+      "by_local_data_status": {
+        "complete_self_contained": 7,
+        "external_data_not_bundled": 3
       }
     },
     "test": {
@@ -327,21 +439,11 @@
       }
     },
     "excluded": {
-      "total": 2,
-      "by_primary_category": {
-        "Governance, security and information systems": 1,
-        "Health, population and social systems": 1
-      },
-      "by_source": {
-        "HiMCM": 1,
-        "ICM": 1
-      },
-      "by_external_retrieval": {
-        "not_assessed": 2
-      },
-      "by_local_data_status": {
-        "incomplete_missing_required_asset": 2
-      }
+      "total": 0,
+      "by_primary_category": {},
+      "by_source": {},
+      "by_external_retrieval": {},
+      "by_local_data_status": {}
     }
   },
   "task_audit": {
@@ -351,7 +453,8 @@
       "source": "HiMCM",
       "level": "High School",
       "primary_category": "Health, population and social systems",
-      "eligible_for_split": false,
+      "eligible_for_split": true,
+      "eligible_for_default_sampling": false,
       "local_data_status": "incomplete_missing_required_asset",
       "external_retrieval": "not_assessed",
       "reason": "题目要求分析12个县的2000年数据，但当前JSON只保留列名和1998/1999汇总，没有图中12行县级数值。"
@@ -363,6 +466,7 @@
       "level": "High School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "真实航站楼流量、步行距离和登机口数据可校准模型，但题目允许设计一般模型。"
@@ -374,6 +478,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -385,6 +490,7 @@
       "level": "High School",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -396,6 +502,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "轮组质量与空气阻力参数可外查，也可作为清晰假设或参数化输入。"
@@ -407,6 +514,7 @@
       "level": "Undergraduate",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "真实缺席率和补偿成本有助于校准，但可用概率参数和敏感性分析完成。"
@@ -418,6 +526,7 @@
       "level": "High School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -429,6 +538,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -440,6 +550,7 @@
       "level": "Undergraduate",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_embedded_data",
       "external_retrieval": "not_required",
       "reason": "EDS参数及机场TIS表已经转写到question中。"
@@ -451,6 +562,7 @@
       "level": "Undergraduate",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -462,6 +574,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "纸箱压溃和缓冲性能可外查，也可通过材料参数与实验方案表达。"
@@ -473,6 +586,7 @@
       "level": "High School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -483,7 +597,8 @@
       "source": "ICM",
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
-      "eligible_for_split": false,
+      "eligible_for_split": true,
+      "eligible_for_default_sampling": false,
       "local_data_status": "incomplete_missing_required_asset",
       "external_retrieval": "not_assessed",
       "reason": "题目明确依赖附件A/B中的防御措施成本与效果；当前JSON只有机会成本表和附件说明，没有附件A/B的数值。"
@@ -495,6 +610,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "需要Lake Murray下游地形、河网和溃坝水文参数才能回答具体淹没范围。"
@@ -506,6 +622,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "明确要求自行寻找全球储量、发现量、消费量和价格的历史数据。"
@@ -517,6 +634,7 @@
       "level": "High School",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -528,6 +646,7 @@
       "level": "High School",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "伞衣、气动力和折叠参数可外查，但可建立无量纲或参数化模型。"
@@ -539,6 +658,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -550,6 +670,7 @@
       "level": "Undergraduate",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "机场流量、人工与设备成本可提升真实性，题目允许构造多规模示例。"
@@ -561,6 +682,7 @@
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "纽约州应用需要人口空间分布和州界/选区地理数据。"
@@ -572,6 +694,7 @@
       "level": "Undergraduate",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "要求建模真实移植网络并比较另一国家政策，本地只给出少量汇总数。"
@@ -583,6 +706,7 @@
       "level": "Undergraduate",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -594,6 +718,7 @@
       "level": "Undergraduate",
       "primary_category": "Games and combinatorial design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -605,6 +730,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "全国碳中和可行性与成本测算需要排放、碳汇和经济数据。"
@@ -616,6 +742,7 @@
       "level": "Undergraduate",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -627,6 +754,7 @@
       "level": "High School",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_embedded_data",
       "external_retrieval": "not_required",
       "reason": "2000-2008暴力、人口、失业、学校及监狱/假释表均已转写。"
@@ -638,6 +766,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -649,6 +778,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "题面直接列出BP和EIA能源数据源，生命周期与发电结构分析依赖外部数据。"
@@ -660,6 +790,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -671,6 +802,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "运动员与雪道物理参数可用于数值校准，核心模型可参数化完成。"
@@ -682,6 +814,7 @@
       "level": "High School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "十年成本、载荷与飞行计划需要运载工具能力、价格和任务需求数据。"
@@ -693,6 +826,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -704,6 +838,7 @@
       "level": "High School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_embedded_data",
       "external_retrieval": "not_required",
       "reason": "到达间隔和服务时间的离散概率表已完整转写。"
@@ -715,6 +850,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "材料热物性和烤箱边界条件有助于校准，题面允许比较型模型。"
@@ -726,6 +862,7 @@
       "level": "High School",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -737,6 +874,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "要求选择一个最不发达国家并依据其人口、资源、经济和社会条件制定计划。"
@@ -748,6 +886,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "要求选择真实缺水国家/地区并分析历史、地质、生态、人口和健康数据。"
@@ -759,6 +898,7 @@
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "明确要求用多个历史时期的数据验证信息传播模型。"
@@ -770,6 +910,7 @@
       "level": "Undergraduate",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "六条迁徙路线、国家容量、法律和动态事件数据未在本地完整给出。"
@@ -781,6 +922,7 @@
       "level": "High School",
       "primary_category": "Economics, finance and business decisions",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "破纪录概率和保险定价需要历年世界纪录、赛事和运动员表现数据。"
@@ -792,6 +934,7 @@
       "level": "High School",
       "primary_category": "Health, population and social systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "给定出发城市后，候选会址比较仍需时区、航程、气候和旅行数据。"
@@ -803,6 +946,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "明确要求研究两个真实城市的现有增长规划并进行跨洲比较。"
@@ -814,6 +958,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -825,6 +970,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "电价、设备功率和历史增长数据有助于成本量化，亦可用情景假设。"
@@ -836,6 +982,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "全球及区域塑料产生、处理能力、政策效果和产业影响需要外部数据。"
@@ -847,6 +994,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "50年鱼群迁移预测需要海温情景、物种适温、海域和渔业经济数据。"
@@ -858,6 +1006,7 @@
       "level": "High School",
       "primary_category": "Economics, finance and business decisions",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -869,6 +1018,7 @@
       "level": "Middle School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_embedded_data",
       "external_retrieval": "not_required",
       "reason": "五年十场销量表、包装规格与成本表已完整转写。"
@@ -880,6 +1030,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "要求应用于一个发达国家和一个发展中国家，需国家食物系统指标。"
@@ -891,6 +1042,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_embedded_data",
       "external_retrieval": "recommended",
       "reason": "电器负荷和当地太阳辐照数据有助于选型，但电池表已嵌入且可做情景测试。"
@@ -902,6 +1054,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "具体森林的生长、碳汇、采伐和多重价值分析需要所选森林数据。"
@@ -913,6 +1066,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "东京赛道、车手功率曲线、坡度和天气条件未在本地题面中提供。"
@@ -924,6 +1078,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "蜂群生物参数可增强校准，题面已给出关键数量级并可做敏感性分析。"
@@ -935,6 +1090,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "五州分水与发电方案需要库容、入流、需求和发电关系数据。"
@@ -946,6 +1102,7 @@
       "level": "High School",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "气候传播及另外两种入侵植物的真实案例需要物种和地区资料。"
@@ -957,6 +1114,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -968,6 +1126,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "对两个真实地点计算风险和干预效果需要夜光、人口、生态与照明数据。"
@@ -979,6 +1138,7 @@
       "level": "Middle School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "三个场馆的比赛日程、项目和奖牌仪式安排需从所列外部资料取得。"
@@ -990,6 +1150,7 @@
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "SDG关联证据和指标数据可增强网络权重，17项目标已完整列出。"
@@ -1001,6 +1162,7 @@
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "recommended",
       "reason": "历届奥运成本和社会影响能支持指标权重，策略模型本身可用情景数据完成。"
@@ -1012,6 +1174,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "题目明确要求以研究和数据分析支持具体客户的五年项目。"
@@ -1023,6 +1186,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -1034,6 +1198,7 @@
       "level": "Undergraduate",
       "primary_category": "Engineering, physical systems and design",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "Ionian Sea定位与搜救需要海流、风、深度、海岸和设备性能数据。"
@@ -1045,6 +1210,7 @@
       "level": "Undergraduate",
       "primary_category": "Economics, finance and business decisions",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "两洲灾害地区和历史地标应用需要灾损、保费、房产及适应成本数据。"
@@ -1056,6 +1222,7 @@
       "level": "Middle School",
       "primary_category": "Operations, transport and logistics",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "明确要求调查所选艺人的历史巡演并据此规划下一次巡演。"
@@ -1067,6 +1234,7 @@
       "level": "Undergraduate",
       "primary_category": "Governance, security and information systems",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "明确要求使用GCI、VERIS/VCDB等国家政策和网络事件数据。"
@@ -1078,6 +1246,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "complete_self_contained",
       "external_retrieval": "not_required",
       "reason": "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。"
@@ -1089,6 +1258,7 @@
       "level": "Undergraduate",
       "primary_category": "Environmental, ecological, energy and sustainability",
       "eligible_for_split": true,
+      "eligible_for_default_sampling": true,
       "local_data_status": "external_data_not_bundled",
       "external_retrieval": "required",
       "reason": "Juneau方案及另一旅游地迁移验证需要题面引用的地方报告和目的地数据。"

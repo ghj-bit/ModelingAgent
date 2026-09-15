@@ -3,12 +3,17 @@
 This variant reuses the execution and evaluation behavior of
 ``run_substantive_interaction_strategy_baseline.py`` while removing the staged
 process-report contract and the additional report-integration instructions.
+By default, run every task in data/modeling_data_train.json with one worker
+per task. Explicit problem IDs and concurrency flags override these defaults.
 """
 
 from __future__ import annotations
 
+import atexit
+import json
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -19,10 +24,11 @@ except ImportError:
 
 EXPERIMENT_TYPE = "substantive_interaction_strategy_clean_baseline"
 EXPERIMENT_PREFIX = "interaction_strategy_clean_baseline"
+TRAIN_DATASET = Path(__file__).resolve().parents[2] / "data" / "modeling_data_train.json"
 
-_ORIGINAL_INSTALL_RUNTIME_HOOKS = strategy.install_runtime_hooks
 _ORIGINAL_PARSE_ARGS = strategy.parse_args
 _ORIGINAL_VALIDATE_ARGS = strategy.validate_args
+_ORIGINAL_RUNTIME_ARGS = strategy.runtime_args
 
 
 def build_clean_baseline_prompt(_strategy: dict) -> str:
@@ -46,11 +52,12 @@ def build_clean_baseline_prompt(_strategy: dict) -> str:
 
     workflow_summary = "## Workflow Summary Contract\n"
     final_report_contract = "## Final Report Contract\n"
-    if prompt.count(workflow_summary) != 1 or prompt.count(final_report_contract) != 1:
+    if prompt.count(workflow_summary) > 1 or prompt.count(final_report_contract) != 1:
         raise RuntimeError("Shared prompt has an unexpected workflow/report layout")
-    before_summary, remainder = prompt.split(workflow_summary, 1)
-    _, final_report = remainder.split(final_report_contract, 1)
-    prompt = before_summary.rstrip() + "\n\n" + final_report_contract + final_report
+    if workflow_summary in prompt:
+        before_summary, remainder = prompt.split(workflow_summary, 1)
+        _, final_report = remainder.split(final_report_contract, 1)
+        prompt = before_summary.rstrip() + "\n\n" + final_report_contract + final_report
 
     report_method = (
         "Use equations, tables, numerical results, and citations where they materially "
@@ -78,6 +85,13 @@ def build_clean_baseline_prompt(_strategy: dict) -> str:
         1,
     )
     return prompt
+
+
+def runtime_args(args):
+    """Prepare clean workspaces without expert-interaction files or folders."""
+    run_args = _ORIGINAL_RUNTIME_ARGS(args)
+    run_args.prepare_interaction_artifacts = False
+    return run_args
 
 
 def run_baseline_validation_problem(
@@ -135,13 +149,41 @@ def run_baseline_validation_problem(
 
 def parse_args():
     args = _ORIGINAL_PARSE_ARGS()
-    if "--max-rounds" not in sys.argv:
+
+    def supplied(option: str) -> bool:
+        return any(
+            value == option or value.startswith(option + "=")
+            for value in sys.argv[1:]
+        )
+
+    if not supplied("--problem-id"):
+        problems = json.loads(TRAIN_DATASET.read_text(encoding="utf-8"))
+        if not isinstance(problems, dict) or not problems:
+            raise ValueError(f"Training dataset must be a non-empty task mapping: {TRAIN_DATASET}")
+        args.problem_id = list(problems)
+    for option in ("concurrency", "retry-concurrency", "judge-concurrency"):
+        if not supplied("--" + option):
+            setattr(args, option.replace("-", "_"), len(args.problem_id))
+    if not supplied("--max-rounds"):
         args.max_rounds = 1
     return args
 
 
 def validate_args(args) -> None:
     _ORIGINAL_VALIDATE_ARGS(args)
+    if args.exp:
+        config_path = Path(args.exp) / "runs" / "config.json"
+        if not config_path.is_file():
+            config_path = Path(args.exp) / "config.json"
+        if config_path.is_file():
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            if config.get("experiment_type") != EXPERIMENT_TYPE:
+                raise ValueError("--exp is not a clean-baseline experiment")
+            if config.get("validation_problems") != args.problem_id:
+                raise ValueError(
+                    "Cannot resume a clean baseline with a different task list; "
+                    "use a new --exp directory."
+                )
     if args.max_rounds != 1:
         raise ValueError(
             "The clean no-interaction baseline has one round; use "
@@ -155,19 +197,77 @@ def validate_args(args) -> None:
 
 
 def install_runtime_hooks() -> None:
-    _ORIGINAL_INSTALL_RUNTIME_HOOKS()
-    strategy.workflow.build_workflow_refinement_prompt = build_clean_baseline_prompt
+    strategy.interaction.prepare_validation_problem = strategy.PREPARE_FRESH_PROBLEM
     strategy.interaction.run_validation_problem = run_baseline_validation_problem
 
 
 def main() -> None:
-    strategy.EXPERIMENT_TYPE = EXPERIMENT_TYPE
-    strategy.EXPERIMENT_PREFIX = EXPERIMENT_PREFIX
-    strategy.build_end_to_end_prompt = build_clean_baseline_prompt
-    strategy.parse_args = parse_args
-    strategy.validate_args = validate_args
-    strategy.install_runtime_hooks = install_runtime_hooks
-    strategy.main()
+    """Run one clean baseline without creating strategy-evolution artifacts."""
+    args = parse_args()
+    validate_args(args)
+    problems = strategy.baseline.load_problems()
+    unknown = [problem_id for problem_id in args.problem_id if problem_id not in problems]
+    if unknown:
+        raise ValueError("Unknown problem ID(s): " + ", ".join(unknown))
+    if len(args.problem_id) != len(set(args.problem_id)):
+        raise ValueError("problem IDs must be unique")
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    experiment = (
+        Path(args.exp).resolve() if args.exp else
+        TRAIN_DATASET.parents[1] / "openclaw_experiments" / f"{EXPERIMENT_PREFIX}_{stamp}"
+    )
+    if experiment.is_dir() and any(path.name != "runs" for path in experiment.iterdir()):
+        raise ValueError(
+            "This experiment contains the old layout. Use a new --exp directory "
+            "for a clean baseline containing only runs."
+        )
+    round_dir = experiment / "runs" / "round_1"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    prompt_path = round_dir / "prompt.md"
+    prompt_path.write_text(build_clean_baseline_prompt({}), encoding="utf-8")
+    config = {
+        "experiment_type": EXPERIMENT_TYPE,
+        "execution_mode": "clean_baseline_no_interaction",
+        "initial_draft_used": False,
+        "max_rounds": 1,
+        "validation_problems": args.problem_id,
+        "model": args.model,
+        "thinking": args.thinking,
+        "timeout": args.timeout,
+        "concurrency": args.concurrency,
+        "retry_concurrency": args.retry_concurrency,
+        "judge_concurrency": args.judge_concurrency,
+        "validation_repetitions": args.validation_repetitions,
+        "judge_repeats": args.judge_repeats,
+    }
+    strategy.workflow_evolution.write_json(experiment / "runs" / "config.json", config)
+    print(f"Experiment: {experiment}", flush=True)
+    print(f"Problems: {len(args.problem_id)}; concurrency: {args.concurrency}", flush=True)
+    if args.initialize_only:
+        print(f"Initialization complete; prompt: {prompt_path}")
+        return
+
+    strategy.interaction.VALIDATION_PROBLEMS = tuple(args.problem_id)
+    install_runtime_hooks()
+    strategy.workflow_evolution.configure_completion_grace(
+        strategy.baseline.run_problem, args.completion_grace
+    )
+    openclaw = strategy.baseline.find_openclaw_command(args.openclaw_command)
+    atexit.register(
+        strategy.interaction.cleanup_experiment_agents_at_exit, openclaw, experiment
+    )
+    run_args = runtime_args(args)
+    run_args.evaluation_round_dir = round_dir
+    result = strategy.interaction.evaluate_round(
+        experiment, 1, {"rubric_id": "clean_baseline_no_interaction"},
+        problems, prompt_path, run_args,
+    )
+    result.pop("rubric", None)
+    result.pop("rubric_id", None)
+    result["baseline_no_interaction"] = True
+    strategy.workflow_evolution.write_json(round_dir / "result.json", result)
+    print(f"Clean baseline complete; results: {round_dir / 'result.json'}", flush=True)
 
 
 if __name__ == "__main__":

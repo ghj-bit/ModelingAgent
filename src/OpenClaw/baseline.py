@@ -910,6 +910,7 @@ def prepare_run(
     selected_skills: list[str] | None = None,
     run_directory_prefix: str | None = None,
     flat_run_layout: bool = False,
+    prepare_interaction_artifacts: bool = True,
 ) -> tuple[Path, Path, Path]:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_slug = slugify(model)
@@ -924,17 +925,18 @@ def prepare_run(
         output_dir / "data",
         output_dir / "results",
         output_dir / "logs",
-        output_dir / "logs" / "workflow_evidence",
-        output_dir / "logs" / "operator_feedback",
     ):
         path.mkdir(parents=True, exist_ok=True)
 
-    create_operator_role_prompts(
-        output_dir,
-        react_role_prompts,
-        problem_id=problem_id,
-        problem=problem,
-    )
+    if prepare_interaction_artifacts:
+        for name in ("workflow_evidence", "operator_feedback"):
+            (output_dir / "logs" / name).mkdir(parents=True, exist_ok=True)
+        create_operator_role_prompts(
+            output_dir,
+            react_role_prompts,
+            problem_id=problem_id,
+            problem=problem,
+        )
 
     installed_skills = []
     if skills_source is not None:

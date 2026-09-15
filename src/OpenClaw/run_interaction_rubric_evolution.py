@@ -1162,6 +1162,7 @@ def prepare_validation_problem(
                 "recovered": True,
             }
 
+    prepare_interaction_artifacts = getattr(args, "prepare_interaction_artifacts", True)
     run_dir, output_dir, rendered_prompt = baseline.prepare_run(
         problem_id,
         problem,
@@ -1173,10 +1174,12 @@ def prepare_validation_problem(
         None,
         run_prefix,
         True,
+        prepare_interaction_artifacts=prepare_interaction_artifacts,
     )
-    if not EXPERT_BRIDGE_HELPER.is_file():
-        raise FileNotFoundError(f"Expert bridge helper not found: {EXPERT_BRIDGE_HELPER}")
-    shutil.copy2(EXPERT_BRIDGE_HELPER, output_dir / "code" / EXPERT_BRIDGE_HELPER.name)
+    if prepare_interaction_artifacts:
+        if not EXPERT_BRIDGE_HELPER.is_file():
+            raise FileNotFoundError(f"Expert bridge helper not found: {EXPERT_BRIDGE_HELPER}")
+        shutil.copy2(EXPERT_BRIDGE_HELPER, output_dir / "code" / EXPERT_BRIDGE_HELPER.name)
     agent_id = baseline.slugify(
         f"ir-{experiment.name[-15:]}-r{round_number}-x{repetition}-"
         f"p{problem_index}-{uuid.uuid4().hex[:10]}"
@@ -2723,7 +2726,9 @@ def evaluate_round(
     args,
     existing_result: dict | None = None,
 ) -> dict:
-    round_dir = experiment / "workflows" / f"round_{round_number}"
+    round_dir = Path(getattr(args, "evaluation_round_dir", None) or (
+        experiment / "workflows" / f"round_{round_number}"
+    ))
     checkpoint_path = round_dir / "evaluation_checkpoint.json"
     checkpoint = workflow_evolution.read_json(
         checkpoint_path, {"completed": {}, "failed": {}}

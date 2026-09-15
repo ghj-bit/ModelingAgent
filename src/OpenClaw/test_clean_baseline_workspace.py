@@ -1,0 +1,113 @@
+"""Offline checks for preparing clean workspaces without interaction artifacts."""
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+try:
+    from . import run_substantive_interaction_strategy_clean_baseline as clean
+except ImportError:
+    import run_substantive_interaction_strategy_clean_baseline as clean
+
+
+class CleanBaselineWorkspaceTests(unittest.TestCase):
+    def test_runs_only_layout_execution_and_resume(self):
+        interaction = clean.strategy.interaction
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            experiment = root / "experiment"
+            argv = ["runner", "--problem-id", "task", "--exp", str(experiment)]
+
+            def solve(prepared, *args):
+                output = prepared["output_dir"]
+                self.assertEqual(list((output / "logs").iterdir()), [])
+                self.assertEqual(list((output / "code").iterdir()), [])
+                prepared["final_report"].write_text("Solved", encoding="utf-8")
+
+            with (
+                patch.object(sys, "argv", argv + ["--initialize-only"]),
+                patch.object(clean.strategy.baseline, "load_problems", return_value={"task": {}}),
+            ):
+                clean.main()
+            self.assertEqual([path.name for path in experiment.iterdir()], ["runs"])
+            prompt = experiment / "runs/round_1/prompt.md"
+            self.assertEqual(prompt.read_text(encoding="utf-8"), clean.build_clean_baseline_prompt({}))
+
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(clean.strategy.baseline, "load_problems", return_value={"task": {}}),
+                patch.object(clean.strategy.baseline, "find_openclaw_command", return_value="openclaw"),
+                patch.object(clean.strategy.baseline, "run_checked"),
+                patch.object(clean.atexit, "register"),
+                patch.object(interaction, "VALIDATION_PROBLEMS", ("task",)),
+                patch.object(interaction, "prepare_validation_problem", interaction.prepare_validation_problem),
+                patch.object(interaction, "run_validation_problem", interaction.run_validation_problem),
+                patch.object(interaction, "judge_report", return_value={"average_score": 0.8, "dimension_scores": {"quality": 0.8}}),
+                patch.object(clean.strategy, "run_end_to_end_modeling_phase", side_effect=solve) as agent,
+                patch.object(clean.strategy, "main", side_effect=AssertionError("No strategy evolution")),
+            ):
+                clean.main()
+                clean.main()
+                agent.assert_called_once()
+            self.assertEqual([path.name for path in experiment.iterdir()], ["runs"])
+            self.assertFalse(list(experiment.rglob("workflow.json")))
+            self.assertFalse(list(experiment.rglob("strategy.json")))
+            result = json.loads((experiment / "runs/round_1/result.json").read_text(encoding="utf-8"))
+            report = Path(result["problem_results"][0]["final_report"])
+            self.assertEqual(report.read_text(encoding="utf-8"), "Solved")
+            self.assertTrue((report.parents[2] / "meta/run.json").is_file())
+            self.assertTrue((experiment / "runs/round_1/evaluation_checkpoint.json").is_file())
+
+    def prepare(self, root, clean_mode):
+        with patch.object(sys, "argv", ["runner", "--problem-id", "task"]):
+            args = clean.parse_args()
+        run_args = clean.runtime_args(args) if clean_mode else clean._ORIGINAL_RUNTIME_ARGS(args)
+        prompt = root / "template.md"
+        prompt.write_text(clean.build_clean_baseline_prompt({}), encoding="utf-8")
+        interaction = clean.strategy.interaction
+
+        def register(command, run_dir, log_path):
+            output = Path(run_dir) / "output"
+            if clean_mode:
+                self.assertEqual(list((output / "logs").iterdir()), [])
+                self.assertEqual(list((output / "code").iterdir()), [])
+
+        with (
+            patch.object(interaction, "VALIDATION_PROBLEMS", ("task",)),
+            patch.object(interaction.baseline, "find_openclaw_command", return_value="openclaw"),
+            patch.object(interaction.baseline, "run_checked", side_effect=register),
+        ):
+            return interaction.prepare_validation_problem(
+                "task", {"question": "Solve the task"}, prompt, 1, 1, root, run_args
+            )
+
+    def test_clean_workspace_never_creates_interaction_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                patch.object(clean.strategy.baseline, "create_operator_role_prompts") as roles,
+                patch.object(clean.strategy.interaction.shutil, "copy2") as copy,
+                patch.object(Path, "unlink", side_effect=AssertionError("No runtime deletion")),
+                patch.object(clean.strategy.interaction.shutil, "rmtree", side_effect=AssertionError("No runtime deletion")),
+            ):
+                prepared = self.prepare(Path(directory), True)
+                roles.assert_not_called()
+                copy.assert_not_called()
+            output = prepared["output_dir"]
+            self.assertTrue((output / "logs").is_dir())
+            self.assertEqual(list((output / "logs").iterdir()), [])
+            self.assertFalse((output / "code/wait_for_expert_reply.py").exists())
+
+    def test_interaction_runner_keeps_default_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepared = self.prepare(Path(directory), False)
+            output = prepared["output_dir"]
+            for name in ("operator_roles", "operator_feedback", "workflow_evidence"):
+                self.assertTrue((output / "logs" / name).is_dir())
+            self.assertTrue((output / "code/wait_for_expert_reply.py").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -16,6 +16,54 @@ except ImportError:
 
 
 class CleanBaselineWorkspaceTests(unittest.TestCase):
+    def test_launcher_resumes_only_an_explicit_experiment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "data/modeling_data_train.json"
+            dataset.parent.mkdir()
+            dataset.write_text(json.dumps({"task": {}}), encoding="utf-8")
+            existing = root / "openclaw_experiments/existing"
+            config = existing / "runs/config.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(
+                json.dumps(
+                    {
+                        "experiment_type": "substantive_interaction_strategy_clean_baseline",
+                        "validation_problems": ["task"],
+                        "validation_repetitions": 1,
+                        "model": "deepseek/deepseek-v4-flash",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = launcher.subprocess.CompletedProcess([], 0)
+            with (
+                patch.object(launcher, "REPO_ROOT", root),
+                patch.object(launcher.subprocess, "run", return_value=completed) as run,
+                patch.object(sys, "argv", ["launcher", "--num-problems", "1"]),
+            ):
+                self.assertEqual(launcher.main(), 0)
+            generated_command = run.call_args.args[0]
+            generated = Path(
+                generated_command[generated_command.index("--exp") + 1]
+            )
+            self.assertNotEqual(generated, existing.resolve())
+            self.assertTrue(generated.name.startswith(launcher.EXPERIMENT_PREFIX))
+
+            with (
+                patch.object(launcher, "REPO_ROOT", root),
+                patch.object(launcher.subprocess, "run", return_value=completed) as run,
+                patch.object(
+                    sys,
+                    "argv",
+                    ["launcher", "--num-problems", "1", "--experiment", str(existing)],
+                ),
+            ):
+                self.assertEqual(launcher.main(), 0)
+            resumed_command = run.call_args.args[0]
+            resumed = Path(resumed_command[resumed_command.index("--exp") + 1])
+            self.assertEqual(resumed, existing.resolve())
+
     def test_reference_prompt_is_packaged_with_source(self):
         reference = clean.strategy.REFERENCE_BASELINE_PROMPT_PATH
         self.assertEqual(reference.parent.name, "prompts")
@@ -25,40 +73,6 @@ class CleanBaselineWorkspaceTests(unittest.TestCase):
             "Search only for external evidence necessary",
             clean.strategy.reference_baseline_prompt_template(),
         )
-
-    def test_launcher_selects_latest_matching_experiment(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            problem_ids = ["first", "second"]
-            matching = []
-            for stamp, model in (
-                ("20260915_100000", "different/model"),
-                ("20260915_110000", "deepseek/deepseek-v4-flash"),
-                ("20260915_120000", "deepseek/deepseek-v4-flash"),
-            ):
-                experiment = (
-                    root / "openclaw_experiments" / f"{launcher.EXPERIMENT_PREFIX}{stamp}"
-                )
-                config = experiment / "runs/config.json"
-                config.parent.mkdir(parents=True)
-                config.write_text(
-                    json.dumps(
-                        {
-                            "experiment_type": "substantive_interaction_strategy_clean_baseline",
-                            "validation_problems": problem_ids,
-                            "validation_repetitions": 1,
-                            "model": model,
-                        }
-                    ),
-                    encoding="utf-8",
-                )
-                if model == "deepseek/deepseek-v4-flash":
-                    matching.append(experiment)
-            with patch.object(launcher, "REPO_ROOT", root):
-                selected = launcher.latest_matching_experiment(
-                    problem_ids, "deepseek/deepseek-v4-flash"
-                )
-            self.assertEqual(selected, matching[-1])
 
     def test_clean_workspace_recovers_nonempty_report_without_interaction(self):
         interaction = clean.strategy.interaction

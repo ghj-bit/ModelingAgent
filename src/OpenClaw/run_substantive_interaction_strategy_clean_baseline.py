@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import atexit
 import json
+import os
 import sys
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +31,56 @@ TRAIN_DATASET = Path(__file__).resolve().parents[2] / "data" / "modeling_data_tr
 _ORIGINAL_PARSE_ARGS = strategy.parse_args
 _ORIGINAL_VALIDATE_ARGS = strategy.validate_args
 _ORIGINAL_RUNTIME_ARGS = strategy.runtime_args
+
+
+def active_openclaw_config_path() -> Path:
+    explicit = os.environ.get("OPENCLAW_CONFIG_PATH", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    home_override = os.environ.get("OPENCLAW_HOME", "").strip()
+    home = Path(home_override).expanduser() if home_override else Path.home()
+    state_override = os.environ.get("OPENCLAW_STATE_DIR", "").strip()
+    state_dirs = (
+        [Path(state_override).expanduser()]
+        if state_override
+        else [home / ".openclaw", home / ".clawdbot"]
+    )
+    for state_dir in state_dirs:
+        for filename in ("openclaw.json", "clawdbot.json"):
+            candidate = state_dir / filename
+            if candidate.is_file():
+                return candidate.resolve()
+    return (state_dirs[0] / "openclaw.json").resolve()
+
+
+def activate_clean_openclaw_config() -> tuple[Path, str | None]:
+    """Use a private config whose Agents never seed workspace bootstrap files."""
+    source = active_openclaw_config_path()
+    try:
+        config = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"Cannot read OpenClaw config: {source}") from error
+    agents = config.setdefault("agents", {})
+    agents.setdefault("defaults", {})["skipBootstrap"] = True
+    agents["list"] = []
+
+    handle, filename = tempfile.mkstemp(prefix="modelingagent-clean-", suffix=".json")
+    config_path = Path(filename)
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        json.dump(config, file, ensure_ascii=False, indent=2)
+        file.write("\n")
+    os.chmod(config_path, 0o600)
+    previous = os.environ.get("OPENCLAW_CONFIG_PATH")
+    os.environ["OPENCLAW_CONFIG_PATH"] = str(config_path)
+    return config_path, previous
+
+
+def remove_clean_openclaw_config(path: Path, previous: str | None) -> None:
+    if previous is None:
+        os.environ.pop("OPENCLAW_CONFIG_PATH", None)
+    else:
+        os.environ["OPENCLAW_CONFIG_PATH"] = previous
+    path.unlink(missing_ok=True)
 
 
 def build_clean_baseline_prompt(_strategy: dict) -> str:
@@ -91,6 +143,7 @@ def runtime_args(args):
     """Prepare clean workspaces and start each Agent as soon as it registers."""
     run_args = _ORIGINAL_RUNTIME_ARGS(args)
     run_args.prepare_interaction_artifacts = False
+    run_args.require_clean_task_workspace = True
     run_args.pipeline_agent_start = True
     return run_args
 
@@ -114,13 +167,18 @@ def run_baseline_validation_problem(
             f"{problem_id}-clean-baseline-r{round_number}-"
             f"x{prepared['repetition']}-{uuid.uuid4().hex[:8]}"
         )
-        strategy.run_end_to_end_modeling_phase(
-            prepared,
-            session_id,
-            prepared["prompt"],
-            args,
-            prepared["final_report"],
-        )
+        try:
+            strategy.run_end_to_end_modeling_phase(
+                prepared,
+                session_id,
+                prepared["prompt"],
+                args,
+                prepared["final_report"],
+            )
+        finally:
+            strategy.interaction.assert_clean_task_output_workspace(
+                Path(prepared["output_dir"])
+            )
         final_report = Path(prepared["final_report"])
         if not final_report.is_file() or not final_report.read_text(
             encoding="utf-8"
@@ -180,10 +238,24 @@ def validate_args(args) -> None:
             config = json.loads(config_path.read_text(encoding="utf-8"))
             if config.get("experiment_type") != EXPERIMENT_TYPE:
                 raise ValueError("--exp is not a clean-baseline experiment")
-            if config.get("validation_problems") != args.problem_id:
+            saved_problems = config.get("validation_problems")
+            requested_problems = list(args.problem_id)
+            can_extend = (
+                isinstance(saved_problems, list)
+                and bool(saved_problems)
+                and set(saved_problems) < set(requested_problems)
+            )
+            if saved_problems != requested_problems and not can_extend:
                 raise ValueError(
                     "Cannot resume a clean baseline with a different task list; "
                     "use a new --exp directory."
+                )
+            if can_extend:
+                print(
+                    "Extending clean baseline task list from "
+                    f"{len(saved_problems)} to {len(requested_problems)}; "
+                    "completed reports will be reused.",
+                    flush=True,
                 )
     if args.max_rounds != 1:
         raise ValueError(
@@ -240,6 +312,9 @@ def main() -> None:
         "retry_concurrency": args.retry_concurrency,
         "judge_concurrency": args.judge_concurrency,
         "pipeline_agent_start": True,
+        "isolated_openclaw_config": True,
+        "openclaw_bootstrap_suppressed_before_agent_registration": True,
+        "workspace_root_entries": ["code", "data", "results", "logs"],
         "validation_repetitions": args.validation_repetitions,
         "judge_repeats": args.judge_repeats,
     }
@@ -255,9 +330,9 @@ def main() -> None:
     strategy.workflow_evolution.configure_completion_grace(
         strategy.baseline.run_problem, args.completion_grace
     )
-    openclaw = strategy.baseline.find_openclaw_command(args.openclaw_command)
+    isolated_config, previous_config = activate_clean_openclaw_config()
     atexit.register(
-        strategy.interaction.cleanup_experiment_agents_at_exit, openclaw, experiment
+        remove_clean_openclaw_config, isolated_config, previous_config
     )
     run_args = runtime_args(args)
     run_args.evaluation_round_dir = round_dir

@@ -8,6 +8,8 @@ import copy
 import difflib
 import hashlib
 import json
+import math
+import random
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -18,11 +20,13 @@ try:
     from . import baseline
     from . import run_evolution as workflow_evolution
     from . import run_interaction_rubric_evolution as interaction
+    from . import run_judge_stability
     from . import run_substantive_interaction_experiment as substantive
 except ImportError:
     import baseline
     import run_evolution as workflow_evolution
     import run_interaction_rubric_evolution as interaction
+    import run_judge_stability
     import run_substantive_interaction_experiment as substantive
 
 
@@ -38,8 +42,10 @@ DEFAULT_FIXED_RUBRIC_PATH = (
     / "round_4"
     / "rubric.json"
 )
-DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD = 0.96
+DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD = 0.90
 STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION = 5
+SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION = 3
+CPE_TRAINING_PARENT_COUNT = 2
 FIRST_STAGNATION_COUNTED_ROUND = 4
 OPERATOR_SIMILARITY_THRESHOLD = 0.90
 REPORT_CHANGE_SUMMARY_MAX_CHARS = 50
@@ -47,7 +53,21 @@ JUDGE_FEEDBACK_DIMENSIONS = (
     "analysis_groundedness",
     "modeling_groundedness",
 )
-ACTIVE_WORKFLOWS: dict[int, dict[str, Any]] = {}
+DEFAULT_CPE_SPLIT_PATH = REPO_ROOT / "data" / "modelingbench_train_test_split.json"
+DEFAULT_CPE_TRAIN_BATCH_SIZE = 3
+DEFAULT_CPE_VALIDATION_SIZE = 10
+DEFAULT_CPE_SELECTION_EPSILON = 0.0
+DEFAULT_CPE_MAX_EXCHANGES = 3
+DEFAULT_CPE_TOTAL_TOKEN_REFERENCE = 5000
+DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS = 540.0
+DEFAULT_CPE_EXCHANGE_COST_WEIGHT = 0.5
+DEFAULT_CPE_TOKEN_COST_WEIGHT = 0.4
+DEFAULT_CPE_LATENCY_COST_WEIGHT = 0.1
+DEFAULT_CPE_COST_PENALTY_WEIGHT = 0.01
+EXPERT_REPLY_LATENCY_PATTERN = re.compile(
+    r"completed exchange\s+(\d+)\s+reply\s+\([^;]*;\s*([0-9]+(?:\.[0-9]+)?)s\)"
+)
+ACTIVE_WORKFLOWS: dict[tuple[str, int], dict[str, Any]] = {}
 
 # These are seed interaction mechanisms, not Python mutation operators. Each
 # couples a distinct expert contribution to an agent-owned technical audit and
@@ -116,31 +136,31 @@ def initial_strategy_population() -> list[dict[str, Any]]:
                 {
                     "action_id": "rank_high_impact_assumptions",
                     "action_type": "agent_audit",
-                    "rule": "List the assumptions that could materially change the model's principal conclusions. Rank them by decision impact and evidential weakness, retain the distinct high-risk assumptions that remain insufficiently justified, and do not force the audit to select only one. Exclude redundant assumptions from the same causal chain and do not assume that the inherited formulation is correct.",
+                    "rule": "List the assumptions that could materially change the model's principal conclusions. Rank them by decision impact and evidential weakness, then retain at most two independent assumptions most likely to reverse the primary recommendation or invalidate a headline result. Exclude redundant assumptions from the same causal chain, record lower-priority assumptions as residual limitations, and do not assume that the inherited formulation is correct.",
                 },
                 {
                     "action_id": "expert_reality_challenge",
                     "action_type": "expert_exchange",
-                    "rule": INTERACTION_OPERATORS["assumption_audit"]["rule"],
+                    "rule": "Present only the selected one or two materially consequential weakly supported assumptions and their real-world meanings without defending them. Ask the expert to challenge their plausibility, identify omitted conditions, or explain when they could fail. The expert supplies qualitative domain judgment; the agent owns every technical translation, calculation, and validation.",
                 },
                 {
                     "action_id": "technical_translation",
                     "action_type": "agent_analysis",
-                    "rule": "Translate every material expert challenge into explicit, falsifiable model alternatives or boundary scenarios. State which assumptions, equations, constraints, parameters, code paths, or decision criteria each translation affects; do not directly adopt an expert-supplied number or technical prescription.",
+                    "rule": "Translate the material challenges to the selected assumptions into explicit, falsifiable model alternatives or boundary scenarios. State the smallest set of assumptions, equations, constraints, parameters, code paths, or decision criteria affected; do not directly adopt an expert-supplied number or technical prescription and do not expand the repair to unrelated model components.",
                 },
                 {
                     "action_id": "recompute_and_compare",
                     "action_type": "agent_validation",
-                    "rule": "Implement the justified alternatives, rerun every affected computation, and compare them individually and jointly with the original formulation. Repair the model and revise the conclusions when the evidence warrants it; otherwise document the tested robustness boundaries.",
+                    "rule": "Implement the smallest justified alternatives for the selected assumptions. For each selected assumption, perform one primary recomputation and one proportionate independent check, then compare the decision-relevant outputs with the original formulation. Regenerate outputs that directly depend on changed code or parameters.",
                 },
                 {
                     "action_id": "close_dialogue",
                     "action_type": "close",
-                    "rule": "After the first validation pass, review the full assumption register again. End consultation only when the remaining high-risk assumptions either have been tested or do not require further expert judgment; otherwise use a second exchange for the unresolved independent issues and then integrate the supported consequences into the report.",
+                    "rule": "After the first validation pass, review only the selected assumptions. Use a second exchange when a selected unresolved issue still requires expert judgment; otherwise stop, integrate the supported consequences, and record unselected or unresolved lower-priority assumptions as limitations.",
                 },
             ],
             "max_exchanges": 2,
-            "stop_condition": "Stop after all material challenges raised in the consultation have been translated and tested and a residual-risk review finds no independent high-risk assumption needing another expert reply, or after the second exchange followed by recomputation. Do not stop merely because the original conclusion survives.",
+            "stop_condition": "Stop after the selected one or two assumptions have each received one primary recomputation and one proportionate independent check, or after a second exchange for an unresolved selected issue followed by that bounded validation. Record other assumptions as residual limitations rather than expanding the run.",
             "seed_operator": "assumption_audit",
         },
         {
@@ -151,31 +171,31 @@ def initial_strategy_population() -> list[dict[str, Any]]:
                 {
                     "action_id": "audit_model_implementation",
                     "action_type": "agent_audit",
-                    "rule": "Inspect the mathematical formulation, units, constraints, algorithms, and executable code for internal consistency and agreement with the problem statement. Use targeted sanity or boundary checks to identify all unresolved weaknesses capable of invalidating material results, group redundant findings by causal chain, and retain the distinct high-risk weaknesses rather than selecting only one.",
+                    "rule": "Inspect the mathematical formulation, units, constraints, algorithms, and executable code for internal consistency and agreement with the problem statement. Use targeted sanity or boundary checks to rank weaknesses, then retain at most two independent weaknesses most likely to reverse the primary recommendation or invalidate a headline result. Group redundant findings by causal chain and record lower-priority findings as residual limitations.",
                 },
                 {
                     "action_id": "expert_failure_attack",
                     "action_type": "expert_exchange",
-                    "rule": INTERACTION_OPERATORS["model_failure_mode"]["rule"],
+                    "rule": "Present the real-world implications of only the selected one or two dangerous technical weaknesses. Ask the expert to attack those implications with plausible failure conditions or counterexamples. Do not ask the expert to inspect code or calculate; the agent must repair the selected weaknesses and test each repair independently.",
                 },
                 {
                     "action_id": "repair_model",
                     "action_type": "agent_analysis",
-                    "rule": "Convert every material failure condition into a precise technical test. Correct all affected equations, constraints, algorithms, data transformations, or code implementations, and regenerate all dependent outputs rather than preserving an invalid inherited result.",
+                    "rule": "Convert each selected material failure condition into one precise technical test. Make the smallest sufficient correction to the affected equations, constraints, algorithms, data transformations, or code, and regenerate outputs that directly depend on that correction. Do not repair unrelated weaknesses or broaden the model unless the selected failure condition cannot otherwise be tested.",
                 },
                 {
                     "action_id": "independent_regression_test",
                     "action_type": "agent_validation",
-                    "rule": "Validate every repaired component and the integrated model with independent checks such as analytical special cases, a second implementation, invariant checks, or targeted regression and boundary tests. Compare old and repaired results and update the recommendation and confidence boundary accordingly.",
+                    "rule": "Validate each selected repair with one proportionate independent check, preferring an analytical special case, invariant, or targeted boundary test over a second full implementation. Compare the decision-relevant old and repaired results and update the recommendation and confidence boundary.",
                 },
                 {
                     "action_id": "close_dialogue",
                     "action_type": "close",
-                    "rule": "Re-audit the integrated model after the first repair pass. End consultation only when the remaining high-risk failure modes have been tested or need no further expert judgment; otherwise use a second exchange for unresolved independent failure modes before integrating the verified model and results into the report.",
+                    "rule": "Re-audit only the selected failure modes after the first repair pass. Use a second exchange when a selected unresolved failure mode still requires expert judgment; otherwise stop, integrate the verified results, and record remaining lower-priority weaknesses as limitations.",
                 },
             ],
             "max_exchanges": 2,
-            "stop_condition": "Stop after all material failure conditions raised in the consultation pass independent tests and a residual technical audit finds no independent high-risk issue needing another expert reply, or after the second exchange followed by integrated regression testing.",
+            "stop_condition": "Stop after the selected one or two failure conditions have each received one focused repair and one proportionate independent check, or after a second exchange for an unresolved selected failure mode followed by that bounded validation. Record other weaknesses as residual limitations rather than expanding the run.",
             "seed_operator": "model_failure_mode",
         },
         {
@@ -186,31 +206,31 @@ def initial_strategy_population() -> list[dict[str, Any]]:
                 {
                     "action_id": "find_weak_sensitive_parameter",
                     "action_type": "agent_audit",
-                    "rule": "Trace the material conclusions to their data and parameters. Identify all influential parameters, parameter groups, or empirical claims with weak evidence, using targeted sensitivity checks when needed. Rank and group them by causal role without forcing the audit to retain only one quantity.",
+                    "rule": "Trace the material conclusions to their data and parameters. Rank influential weakly evidenced parameters, parameter groups, or empirical claims using targeted sensitivity checks when needed, then retain at most two independent inputs most likely to reverse the primary recommendation or invalidate a headline result. Group related quantities by causal role and record lower-priority evidence gaps as limitations.",
                 },
                 {
                     "action_id": "expert_real_world_boundary",
                     "action_type": "expert_exchange",
-                    "rule": INTERACTION_OPERATORS["data_parameter_boundary"]["rule"],
+                    "rule": "Explain the distinct decision roles of only the selected one or two weak inputs and ask the expert for qualitative real-world bounds, observable boundary conditions, and suitable authoritative evidence types. The expert must not invent numerical estimates. The agent must independently verify externally testable claims, set defensible values or ranges, recalibrate, and compare conclusions.",
                 },
                 {
                     "action_id": "verify_external_evidence",
                     "action_type": "agent_research",
-                    "rule": "When the selected parameters or claims are externally verifiable, consult one or two authoritative sources per distinct evidence decision and record their provenance. Reconcile source scope, units, population, and time period with the model; do not treat the expert reply itself as empirical verification.",
+                    "rule": "When a selected input is externally verifiable, consult one or two authoritative sources for that evidence decision and record their provenance. Reconcile source scope, units, population, and time period with the model; do not treat the expert reply itself as empirical verification or expand research to unselected inputs.",
                 },
                 {
                     "action_id": "recalibrate_and_compare",
                     "action_type": "agent_validation",
-                    "rule": "Recalibrate every supported parameter or defensible joint range, rerun affected analyses, and compare the updated outputs and decisions individually and jointly with the original. Revise the model, recommendation, limitations, and confidence bounds wherever the comparison shows a material difference.",
+                    "rule": "Recalibrate only the selected supported inputs or their defensible joint range. Run one primary recalibration and one proportionate independent check, then compare the decision-relevant outputs individually and jointly with the original. Revise the model, recommendation, limitations, and confidence bounds when the comparison shows a material difference.",
                 },
                 {
                     "action_id": "close_dialogue",
                     "action_type": "close",
-                    "rule": "After recalibration, repeat the sensitivity and evidence-gap review. End consultation only when the remaining influential weak inputs have been addressed or require no further expert judgment; otherwise use a second exchange for the unresolved independent parameter groups, then integrate only supported consequences into the report.",
+                    "rule": "After recalibration, review only the selected inputs. Use a second exchange when a selected unresolved input still requires expert judgment; otherwise stop, integrate only supported consequences, and record remaining evidence gaps as limitations.",
                 },
             ],
             "max_exchanges": 2,
-            "stop_condition": "Stop after the material weak inputs raised in consultation have been externally verified when applicable and recalibrated, and a residual sensitivity review finds no independent high-risk input needing another expert reply, or after the second exchange followed by a documented joint comparison.",
+            "stop_condition": "Stop after the selected one or two weak inputs have been verified when applicable, recalibrated once, and checked once, or after a second exchange for an unresolved selected input followed by that bounded comparison. Record other evidence gaps as residual limitations rather than expanding the run.",
             "seed_operator": "data_parameter_boundary",
         },
     ]
@@ -235,12 +255,19 @@ def optimizer_workflow(workflow: dict) -> dict:
         "parent_round",
         "parent_rounds",
         "secondary_parent_round",
+        "training_batch",
     ):
         compact.pop(key, None)
     return compact
 
 
-def load_seed_population(experiment: Path, resumed: bool, source: str | None) -> list[dict]:
+def load_seed_population(
+    experiment: Path,
+    resumed: bool,
+    source: str | None,
+    *,
+    persist_legacy_file: bool = True,
+) -> list[dict]:
     target = experiment / "initial_interaction_workflows.json"
     legacy = experiment / "initial_interaction_workflow.json"
     if target.is_file():
@@ -263,13 +290,151 @@ def load_seed_population(experiment: Path, resumed: bool, source: str | None) ->
     if len({item["workflow_id"] for item in population}) != len(population):
         raise ValueError("Initial workflows must have distinct behavior")
     workflow_evolution.write_json(target, population)
-    if not legacy.exists():
+    if persist_legacy_file and not legacy.exists():
         workflow_evolution.write_json(legacy, population[0])
     return population
 
 
 def now() -> str:
     return datetime.now().isoformat()
+
+
+def load_cpe_split(path: Path) -> tuple[list[str], list[str]]:
+    """Load the already materialized ModelingBench train/validation split."""
+    payload = workflow_evolution.read_json(Path(path).resolve(), {})
+    if not isinstance(payload, dict):
+        raise ValueError("CPE split file must contain a JSON object")
+    train = payload.get("train")
+    validation = payload.get("validation")
+    if not isinstance(train, list) or not train:
+        raise ValueError("CPE split file has no non-empty train list")
+    if not isinstance(validation, list) or not validation:
+        raise ValueError("CPE split file has no non-empty validation list")
+    train = [str(item) for item in train]
+    validation = [str(item) for item in validation]
+    if len(train) != len(set(train)) or len(validation) != len(set(validation)):
+        raise ValueError("CPE train and validation lists must not contain duplicates")
+    overlap = sorted(set(train) & set(validation))
+    if overlap:
+        raise ValueError("CPE train/validation overlap: " + ", ".join(overlap))
+    return train, validation
+
+
+def cpe_state_path(experiment: Path) -> Path:
+    return experiment / "workflows" / "cpe_state.json"
+
+
+def load_or_create_cpe_state(
+    experiment: Path,
+    train_pool: list[str],
+    validation_pool: list[str],
+    train_batch_size: int,
+    validation_size: int,
+    sampling_seed: int | None,
+    selection_epsilon: float = DEFAULT_CPE_SELECTION_EPSILON,
+) -> dict[str, Any]:
+    """Create a full-validation, restart-safe CPE sampling state."""
+    path = cpe_state_path(experiment)
+    saved = workflow_evolution.read_json(path, {})
+    if saved:
+        expected = {
+            "schema_version": 5,
+            "train_pool": train_pool,
+            "validation_pool": validation_pool,
+            "train_batch_size": train_batch_size,
+            "validation_size": validation_size,
+            "selection_epsilon": float(selection_epsilon),
+            "train_sampling": "independent_batches_with_replacement_across_rounds",
+            "validation_problems": validation_pool,
+            "utility_basis": "mean_quality_gain_minus_interaction_cost",
+            "interaction_cost": {
+                "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
+                "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
+                "total_latency_max_seconds": (
+                    DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS
+                ),
+                "exchange_weight": DEFAULT_CPE_EXCHANGE_COST_WEIGHT,
+                "token_weight": DEFAULT_CPE_TOKEN_COST_WEIGHT,
+                "latency_weight": DEFAULT_CPE_LATENCY_COST_WEIGHT,
+                "penalty_weight": DEFAULT_CPE_COST_PENALTY_WEIGHT,
+            },
+        }
+        mismatches = [key for key, value in expected.items() if saved.get(key) != value]
+        if sampling_seed is not None and saved.get("sampling_seed") != sampling_seed:
+            mismatches.append("sampling_seed")
+        if mismatches:
+            raise ValueError(
+                "Cannot resume CPE with changed sampling configuration: "
+                + ", ".join(sorted(set(mismatches)))
+            )
+        return saved
+
+    if train_batch_size > len(train_pool):
+        raise ValueError("CPE train batch size exceeds the training pool")
+    if validation_size != len(validation_pool):
+        raise ValueError(
+            "CPE validation size must equal the complete validation pool size "
+            f"({len(validation_pool)})"
+        )
+    seed = (
+        int(sampling_seed)
+        if sampling_seed is not None
+        else random.SystemRandom().randrange(0, 2**63)
+    )
+    state = {
+        "schema_version": 5,
+        "sampling_seed": seed,
+        "train_pool": train_pool,
+        "validation_pool": validation_pool,
+        "train_batch_size": train_batch_size,
+        "validation_size": validation_size,
+        "selection_epsilon": float(selection_epsilon),
+        "validation_problems": list(validation_pool),
+        "train_sampling": "independent_batches_with_replacement_across_rounds",
+        "utility_basis": "mean_quality_gain_minus_interaction_cost",
+        "interaction_cost": {
+            "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
+            "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
+            "total_latency_max_seconds": DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS,
+            "exchange_weight": DEFAULT_CPE_EXCHANGE_COST_WEIGHT,
+            "token_weight": DEFAULT_CPE_TOKEN_COST_WEIGHT,
+            "latency_weight": DEFAULT_CPE_LATENCY_COST_WEIGHT,
+            "penalty_weight": DEFAULT_CPE_COST_PENALTY_WEIGHT,
+        },
+        "rounds": {},
+        "patch_history": [],
+        "current_policy": None,
+        "best_policy": None,
+        "training_elites": [],
+        "validation_stagnation_rounds": [],
+        "created_at": now(),
+        "updated_at": now(),
+    }
+    workflow_evolution.write_json(path, state)
+    return state
+
+
+def reserve_cpe_train_batch(state: dict[str, Any], round_number: int) -> list[str]:
+    """Sample a fresh batch per round and return all tasks to the pool afterward."""
+    rounds = state.setdefault("rounds", {})
+    round_state = rounds.setdefault(str(round_number), {})
+    existing = round_state.get("train_batch")
+    if isinstance(existing, list) and existing:
+        return [str(item) for item in existing]
+
+    pool = [str(item) for item in state["train_pool"]]
+    batch_size = int(state["train_batch_size"])
+    seed = int(state["sampling_seed"])
+    batch = random.Random(f"{seed}:round:{round_number}").sample(pool, batch_size)
+    round_state["train_batch"] = batch
+    round_state["batch_reserved_at"] = now()
+    state["updated_at"] = now()
+    return batch
+
+
+def cpe_accepts(candidate_score: float, reference_score: float, epsilon: float) -> bool:
+    """Apply CPE's strict improvement gate with an explicit tolerance."""
+    return float(candidate_score) > float(reference_score) + float(epsilon)
 
 
 def normalize_text(value: Any) -> str:
@@ -436,7 +601,7 @@ def workflow_nodes(results: list[dict]) -> list[dict]:
 
 
 def evolution_evidence_nodes(results: list[dict]) -> list[dict]:
-    """Keep all three seeds and a later global best."""
+    """Keep the three seeds and the all-history mean-utility champion."""
     nodes = workflow_nodes(results)
     initial = sorted(
         (
@@ -451,20 +616,23 @@ def evolution_evidence_nodes(results: list[dict]) -> list[dict]:
         key=lambda item: (float(item["utility"]), -int(item["round"])),
         default=None,
     )
-    ordered = [*initial]
-    if best is not None and int(best["round"]) not in {
-        int(node["round"]) for node in initial
-    }:
-        ordered.append(best)
-
-    selected = []
-    seen_rounds = set()
-    for node in ordered:
-        round_number = int(node["round"])
-        if round_number in seen_rounds:
-            continue
-        seen_rounds.add(round_number)
-        selected.append(node)
+    selected = [{**node, "parent_archive_roles": [
+        {"role": "initial_parent", "seed_index": seed_index}
+    ]} for seed_index, node in enumerate(initial, 1)]
+    if best is not None:
+        best_round = int(best["round"])
+        archived = next(
+            (node for node in selected if int(node["round"]) == best_round), None
+        )
+        role = {
+            "role": "global_best_parent",
+            "scope": "historical",
+            "objective": "average_utility",
+        }
+        if archived is None:
+            selected.append({**best, "parent_archive_roles": [role]})
+        else:
+            archived["parent_archive_roles"].append(role)
     return selected
 
 
@@ -597,6 +765,10 @@ def optimizer_evidence(
                 "evidence_index": evidence_index,
                 "round": node["round"],
                 "average_utility": node["utility"],
+                "average_dimension_scores": node.get(
+                    "average_dimension_scores", {}
+                ),
+                "parent_roles": node.get("parent_archive_roles", []),
                 "workflow": optimizer_workflow(node["workflow"]),
                 "validation_runs": validation_runs,
             }
@@ -634,6 +806,78 @@ def optimizer_interaction_artifacts(run_dir: Path) -> list[dict[str, Any]]:
         for artifact in substantive.parent_artifacts(run_dir)
         if artifact.get("artifact_type") in allowed_types
     ]
+
+
+CPE_WITHHELD_JUDGE_FIELDS = frozenset(
+    {
+        "average_score",
+        "average_dimension_scores",
+        "dimension_scores",
+        "judge_feedback",
+        "judge_groundedness_weakness_summary",
+        "judge_stability_result",
+        "original_report_utility",
+        "refined_report_utility",
+        "quality_gain",
+        "utility_gain",
+    }
+)
+
+
+def assert_no_cpe_judge_evidence(value: Any, path: str = "evidence") -> None:
+    """Prevent task-level ModelingBench Judge outputs entering a CPE prompt."""
+    if isinstance(value, dict):
+        leaked = sorted(CPE_WITHHELD_JUDGE_FIELDS & set(value))
+        if leaked:
+            raise ValueError(f"CPE optimizer evidence leaks Judge fields at {path}: {leaked}")
+        for key, child in value.items():
+            assert_no_cpe_judge_evidence(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            assert_no_cpe_judge_evidence(child, f"{path}[{index}]")
+
+
+def cpe_training_parent_evidence(
+    result: dict[str, Any],
+    parent_rank: int,
+    problems: dict,
+    evidence_dir: Path,
+    args,
+) -> dict[str, Any]:
+    """Expose one training parent and its rollouts without Judge outputs."""
+    training_runs = []
+    for run in result.get("problem_results", []):
+        problem_id = str(run["problem_id"])
+        problem = problems[problem_id]
+        run_evidence = {
+            "problem_id": problem_id,
+            "title": problem.get("title", problem_id),
+            "question": problem["question"],
+            "artifacts": optimizer_interaction_artifacts(Path(run["run_dir"])),
+        }
+        summary = summarize_interaction_report_changes(run, evidence_dir, args)
+        if summary:
+            run_evidence["interaction_report_change_summary"] = summary
+        training_runs.append(run_evidence)
+    evidence = {
+        "parent_rank": parent_rank,
+        "workflow_id": result["workflow_id"],
+        "workflow": optimizer_workflow(result["workflow"]),
+        "net_utility_on_current_training_batch": float(result["utility"]),
+        "training_evidence": {
+            "round": int(result["round"]),
+            "training_runs": training_runs,
+            "average_interaction_cost": float(result.get("interaction_cost", 0.0)),
+            "average_interaction_penalty": float(
+                result.get("interaction_penalty", 0.0)
+            ),
+            "interaction_cost_parameters": result.get(
+                "interaction_cost_parameters", {}
+            ),
+        },
+    }
+    assert_no_cpe_judge_evidence(evidence)
+    return evidence
 
 
 def stagnation_window(
@@ -701,7 +945,7 @@ workflow, scoring rubric, report section, or Python mutation operator.
 Existing dialogue operators:
 {json.dumps(existing, ensure_ascii=False, indent=2)}
 
-Workflow validation evidence:
+Workflow interaction evidence (task-level ModelingBench Judge outputs withheld):
 {json.dumps(evidence, ensure_ascii=False, indent=2)}
 
 Create a genuinely different information function that could address a recurring
@@ -717,6 +961,104 @@ mutation_rationale. The name must be lower snake_case. The rule must be directly
 usable as an expert_exchange instruction. mutation_rationale must explain the
 new information function and why existing operators did not provide it.
 """
+
+
+def evolve_cpe_dialogue_operator(
+    workflows_dir: Path,
+    args,
+    evidence: list[dict[str, Any]],
+    trigger_round: int,
+    trigger_reason: str,
+    trigger_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Evolve and persist one standalone operator from Judge-free CPE evidence."""
+    assert_no_cpe_judge_evidence(evidence)
+    events = load_evolved_operator_events(workflows_dir)
+    event_number = len(events) + 1
+    safe_reason = re.sub(r"[^a-z0-9]+", "_", trigger_reason.lower()).strip("_")
+    event_dir = (
+        workflows_dir
+        / "operator_evolution"
+        / f"event_{event_number:02d}_round_{trigger_round}_{safe_reason}"
+    )
+    event_dir.mkdir(parents=True, exist_ok=True)
+    existing = available_dialogue_operators(workflows_dir)
+    operator_prompt_base = build_operator_evolution_prompt(existing, evidence)
+    last_error: Exception | None = None
+    for attempt in range(1, args.optimizer_retries + 1):
+        retry = (
+            "\nThe previous proposal was rejected. Produce a different information "
+            f"function. Rejection: {last_error}\n"
+            if last_error
+            else ""
+        )
+        prompt = operator_prompt_base + retry
+        (event_dir / f"operator_prompt_attempt_{attempt}.md").write_text(
+            prompt, encoding="utf-8"
+        )
+        (event_dir / "operator_prompt.md").write_text(prompt, encoding="utf-8")
+        try:
+            candidate = interaction.local.optimizer_response(
+                {
+                    "model": args.opt_model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Return one concise valid JSON dialogue operator.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": min(0.35 + 0.15 * (attempt - 1), 0.85),
+                    "max_tokens": 1800,
+                    "response_format": {"type": "json_object"},
+                },
+                args,
+            )
+            workflow_evolution.write_json(
+                event_dir / f"operator_response_attempt_{attempt}.json", candidate
+            )
+            workflow_evolution.write_json(
+                event_dir / "operator_response.json", candidate
+            )
+            candidate = validate_dialogue_operator(candidate, existing)
+            semantic = json.dumps(
+                {
+                    key: candidate[key]
+                    for key in ("name", "purpose", "rule", "output")
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            candidate["operator_id"] = "dialogue_operator_" + hashlib.sha1(
+                semantic.encode("utf-8")
+            ).hexdigest()[:12]
+            event = {
+                "trigger_after_round": trigger_round,
+                "trigger_reason": trigger_reason,
+                "trigger_details": trigger_details or {},
+                "judge_outputs_withheld": True,
+                "operator": candidate,
+                "created_at": now(),
+            }
+            workflow_evolution.write_json(event_dir / "operator.json", candidate)
+            events.append(event)
+            workflow_evolution.write_json(
+                evolved_operator_registry_path(workflows_dir), events
+            )
+            print(
+                f"Evolved dialogue operator {candidate['name']} after round "
+                f"{trigger_round} ({trigger_reason})",
+                flush=True,
+            )
+            return event
+        except Exception as error:
+            last_error = error
+            print(
+                f"CPE dialogue operator proposal attempt {attempt}/"
+                f"{args.optimizer_retries} failed: {error}",
+                flush=True,
+            )
+    raise RuntimeError("Could not produce a novel valid CPE dialogue operator") from last_error
 
 
 def maybe_evolve_dialogue_operator(
@@ -880,16 +1222,20 @@ parent inputs motivated each substantive behavioral change and how every parent
 was considered. Extra reflection logs or paraphrases alone are insufficient.
 
 Workflow parent-input archive. It contains all three initial workflows and the
-current global-best evolved workflow when a later round has become the global
-best. All listed workflows must be considered:
+all-history global-best workflow by mean utility across every completed round.
+If an initial workflow is also the historical best, it appears only once and
+its `parent_roles` field carries both roles. All listed workflows must be
+considered:
 {json.dumps(evidence, ensure_ascii=False, indent=2)}
 
-Each evidence node contains its mean validation utility. Its validation runs
+Each evidence node contains its mean validation utility and average dimension
+scores. Its validation runs
 contain the complete expert dialogue, an at-most-50-character summary of report
 changes directly attributable to interaction, and LLM weakness summaries only
 for non-perfect `analysis_groundedness` and `modeling_groundedness` Judge
 feedback. Other Judge dimensions are omitted. Compare the three seed mechanisms
-explicitly and use a later global best as evidence of successful evolution.
+explicitly and use the all-history global best as evidence of successful
+evolution.
 Treat final-report weaknesses as workflow evidence only when the dialogue process
 could plausibly affect them.
 Do not create a workflow action that adds an `Expert Interaction Impact` section or
@@ -903,6 +1249,243 @@ contains action_id, action_type, and rule. Encode any conditional follow-up or
 early stopping directly in the relevant action rule and stop_condition. At
 least one action must have action_type expert_exchange.
 """
+
+
+def cpe_operator_evidence(
+    training_parents: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep workflows and interaction trajectories while removing fitness values."""
+    evidence = copy.deepcopy(training_parents)
+    for parent in evidence:
+        parent.pop("net_utility_on_current_training_batch", None)
+    assert_no_cpe_judge_evidence(evidence)
+    return evidence
+
+
+def build_cpe_workflow_evolution_prompt(
+    training_parents: list[dict[str, Any]],
+    validation_champion: dict[str, Any],
+    patch_history: list[dict[str, Any]],
+    dialogue_operators: dict[str, dict] | None = None,
+) -> str:
+    """Build a CPE prompt with explicit train/validation information barriers."""
+    if len(training_parents) != CPE_TRAINING_PARENT_COUNT:
+        raise ValueError(
+            f"CPE workflow evolution requires {CPE_TRAINING_PARENT_COUNT} "
+            "training parents"
+        )
+    assert_no_cpe_judge_evidence(training_parents)
+    dialogue_operators = dialogue_operators or available_dialogue_operators()
+    visible_history = [
+        {
+            "round": event.get("round"),
+            "candidate_workflow_id": event.get("candidate_workflow_id"),
+            "parent_train_net_utilities": event.get(
+                "parent_train_net_utilities", []
+            ),
+            "candidate_train_net_utility": event.get(
+                "candidate_train_net_utility"
+            ),
+            "train_accepted": event.get("train_accepted"),
+        }
+        for event in patch_history[-8:]
+    ]
+    return f"""Evolve one executable human-expert interaction workflow
+for mathematical-modeling report refinement. Treat the workflow text as the
+communication policy: change only how the modeling agent audits, asks the human
+expert, translates the reply, validates consequences, follows up, and stops.
+
+Two training-parent workflows were selected as the strongest policies from the
+preceding training stage and reevaluated on the same sampled training batch.
+Each parent contains its workflow, aggregate net utility, public task statements,
+complete expert dialogue, interaction-attributable report-change summaries, and
+interaction-cost information. Task-level ModelingBench Judge scores, dimension
+scores, Judge feedback, and Judge-derived weakness summaries are intentionally
+withheld. Compare both parents, then choose the evolution mode yourself from the
+evidence:
+- crossover: combine compatible mechanisms or complementary strengths from both
+  parents into one behaviorally coherent workflow;
+- mutation: choose either parent as the primary base and make a targeted
+  behavioral change when recombination would add conflict or unnecessary
+  complexity. In this mode, use the other parent as comparative evidence rather
+  than requiring it to donate a workflow component.
+Do not choose randomly, alternate modes mechanically, or force crossover when a
+focused mutation is better. In either mode, do not ignore either parent's
+training evidence:
+{json.dumps(training_parents, ensure_ascii=False, indent=2)}
+
+Historical validation champion. This record intentionally contains only its
+communication workflow and mean net utility:
+{json.dumps(validation_champion, ensure_ascii=False, indent=2)}
+
+Recent training-only decision history:
+{json.dumps(visible_history, ensure_ascii=False, indent=2)}
+
+Use the two parents' training interactions to identify contrasting communication
+failures and transferable successes. Use their aggregate net utilities and the
+training-only decision history as coarse fitness signals. Propose a targeted
+behavioral patch rather than a task-specific solution. Validation task identities,
+trajectories, dimension scores, reports, dialogues, and decision history are
+withheld; do not infer them or optimize for individual validation tasks. Do not
+infer or reconstruct withheld ModelingBench Judge judgments from the task text.
+
+The modeling agent retains all calculation, implementation, external-data
+validation, simulation, and report-writing responsibility. The workflow may use
+one to three expert exchanges. Every later exchange must build on an earlier
+reply and have a distinct decision-relevant purpose. Keep the workflow general
+and compact, and never copy task-specific facts, entities, parameters, methods,
+or conclusions from the rollouts.
+
+Available dialogue operators (optional qualitative information functions):
+{json.dumps(dialogue_operators, ensure_ascii=False, indent=2)}
+
+Return only one JSON object with name, purpose, entry_action, actions,
+max_exchanges, stop_condition, evolution_mode, changed_components, and
+evolution_rationale. evolution_mode must be exactly `crossover` or `mutation`.
+Use two to eight ordered actions. Each action contains action_id, action_type,
+and rule, and at least one action has action_type expert_exchange. Encode the
+targeted patch in the returned full workflow. In evolution_rationale, explain
+why the selected mode fits the two parents' evidence, how both parents were
+considered, and which training signal motivated each changed component.
+"""
+
+
+def propose_cpe_workflow(
+    training_parents: list[dict[str, Any]],
+    validation_champion: dict[str, Any],
+    previous_results: list[dict],
+    patch_history: list[dict[str, Any]],
+    round_number: int,
+    round_dir: Path,
+    args,
+) -> dict[str, Any]:
+    """Evolve from two Judge-free training parents under CPE boundaries."""
+    workflow_prompt_base = build_cpe_workflow_evolution_prompt(
+        training_parents,
+        validation_champion,
+        patch_history,
+        available_dialogue_operators(round_dir.parent),
+    )
+    previous = workflow_nodes(previous_results)
+    last_error: Exception | None = None
+    similarity_rejections = 0
+    operator_event = None
+    for attempt in range(1, args.optimizer_retries + 1):
+        retry = (
+            "\nThe previous proposal was rejected. Return a different targeted "
+            f"behavioral patch. Rejection: {last_error}\n"
+            if last_error
+            else ""
+        )
+        prompt = workflow_prompt_base + retry
+        (round_dir / f"evolution_prompt_attempt_{attempt}.md").write_text(
+            prompt, encoding="utf-8"
+        )
+        (round_dir / "evolution_prompt.md").write_text(prompt, encoding="utf-8")
+        try:
+            candidate = interaction.local.optimizer_response(
+                {
+                    "model": args.opt_model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Return one concise valid JSON workflow object.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": min(0.2 + 0.15 * (attempt - 1), 0.8),
+                    "max_tokens": 3000,
+                    "response_format": {"type": "json_object"},
+                },
+                args,
+            )
+            candidate = without_removed_workflow_fields(candidate)
+            workflow_evolution.write_json(
+                round_dir / f"evolution_response_attempt_{attempt}.json", candidate
+            )
+            workflow_evolution.write_json(round_dir / "evolution_response.json", candidate)
+            changed = candidate.get("changed_components")
+            if not isinstance(changed, list) or not any(
+                str(item).strip() for item in changed
+            ):
+                raise ValueError("optimizer did not identify a changed workflow component")
+            evolution_mode = str(candidate.get("evolution_mode", "")).strip().lower()
+            if evolution_mode not in {"crossover", "mutation"}:
+                raise ValueError(
+                    "optimizer evolution_mode must be crossover or mutation"
+                )
+            candidate["evolution_mode"] = evolution_mode
+            validate_workflow(candidate)
+            candidate["workflow_id"] = workflow_id(candidate)
+            similarities = [
+                (node["round"], workflow_similarity(candidate, node["workflow"]))
+                for node in previous
+            ]
+            duplicate = max(similarities, key=lambda item: item[1], default=None)
+            if duplicate and duplicate[1] >= args.candidate_similarity_threshold:
+                similarity_rejections += 1
+                similarity_error = ValueError(
+                    "candidate workflow is too similar to evaluated round "
+                    f"{duplicate[0]} (similarity={duplicate[1]:.4f})"
+                )
+                if (
+                    similarity_rejections
+                    == SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION
+                ):
+                    operator_event = evolve_cpe_dialogue_operator(
+                        round_dir.parent,
+                        args,
+                        cpe_operator_evidence(training_parents),
+                        round_number,
+                        "workflow_similarity_retry_limit",
+                        {
+                            "similarity_rejections": similarity_rejections,
+                            "candidate_similarity_threshold": (
+                                args.candidate_similarity_threshold
+                            ),
+                            "most_similar_round": duplicate[0],
+                            "similarity": duplicate[1],
+                        },
+                    )
+                    workflow_prompt_base = build_cpe_workflow_evolution_prompt(
+                        training_parents,
+                        validation_champion,
+                        patch_history,
+                        available_dialogue_operators(round_dir.parent),
+                    )
+                raise similarity_error
+            candidate.update(
+                {
+                    "evolution_operator": "cpe_batch_reflection_patch",
+                    "created_round": round_number,
+                    "parent_workflow_ids": [
+                        parent["workflow_id"] for parent in training_parents
+                    ],
+                    "training_batch": [
+                        item["problem_id"]
+                        for item in training_parents[0]
+                        .get("training_evidence", {})
+                        .get("training_runs", [])
+                    ],
+                    "operator_evolution_trigger": (
+                        {
+                            "trigger_reason": operator_event["trigger_reason"],
+                            "operator_id": operator_event["operator"]["operator_id"],
+                        }
+                        if operator_event is not None
+                        else None
+                    ),
+                }
+            )
+            return candidate
+        except Exception as error:
+            last_error = error
+            print(
+                f"CPE workflow proposal attempt {attempt}/{args.optimizer_retries} "
+                f"failed: {error}",
+                flush=True,
+            )
+    raise RuntimeError("Could not produce a novel valid CPE workflow") from last_error
 
 
 def propose_workflow(
@@ -1096,7 +1679,9 @@ def prepare_workflow_validation_problem(
         experiment,
         args,
     )
-    workflow = ACTIVE_WORKFLOWS.get(round_number)
+    workflow = ACTIVE_WORKFLOWS.get(
+        (str(Path(experiment).resolve()), round_number)
+    )
     if workflow is None:
         raise RuntimeError(f"No active interaction workflow for round {round_number}")
     metadata_path = Path(prepared["run_dir"]) / "meta" / "run.json"
@@ -1206,12 +1791,49 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD,
     )
+    parser.add_argument("--cpe-split-file", type=Path, default=DEFAULT_CPE_SPLIT_PATH)
+    parser.add_argument(
+        "--train-batch-size",
+        type=int,
+        default=DEFAULT_CPE_TRAIN_BATCH_SIZE,
+        help=(
+            "CPE distinct tasks per round; all tasks return to the pool before "
+            "the next round."
+        ),
+    )
+    parser.add_argument(
+        "--validation-size",
+        type=int,
+        default=DEFAULT_CPE_VALIDATION_SIZE,
+        help="Must equal the complete validation split size (currently 10).",
+    )
+    parser.add_argument("--sampling-seed", type=int)
+    parser.add_argument(
+        "--selection-epsilon", type=float, default=DEFAULT_CPE_SELECTION_EPSILON
+    )
     return parser.parse_args()
 
 
+def restore_cpe_net_utilities(results: list[dict]) -> list[dict]:
+    """Restore net CPE utility after the shared absolute-score normalizer."""
+    for item in results:
+        if item.get("utility_basis") != "mean_quality_gain_minus_interaction_cost":
+            continue
+        problem_results = item.get("problem_results", [])
+        net_utilities = [
+            float(result["net_utility"])
+            for result in problem_results
+            if isinstance(result.get("net_utility"), (int, float))
+        ]
+        if len(net_utilities) == len(problem_results) and net_utilities:
+            item["net_utility"] = sum(net_utilities) / len(net_utilities)
+            item["utility"] = item["net_utility"]
+    return results
+
+
 def normalized_results(results_path: Path) -> list[dict]:
-    results = interaction.normalize_results(
-        workflow_evolution.read_json(results_path, [])
+    results = restore_cpe_net_utilities(
+        interaction.normalize_results(workflow_evolution.read_json(results_path, []))
     )
     for node in results:
         for field in ("parent_round", "parent_rounds", "secondary_parent_round"):
@@ -1255,7 +1877,7 @@ def execute_workflow_round(
     workflow["workflow_id"] = workflow_id(workflow)
     validate_workflow(workflow)
     workflow_evolution.write_json(round_dir / "workflow.json", workflow)
-    ACTIVE_WORKFLOWS[round_number] = workflow
+    ACTIVE_WORKFLOWS[(str(Path(experiment).resolve()), round_number)] = workflow
     prompt_path = round_dir / "prompt.md"
     prompt_path.write_text(
         build_workflow_refinement_prompt(workflow), encoding="utf-8"
@@ -1308,14 +1930,70 @@ def execute_workflow_round(
     return result, failures
 
 
+def execute_cpe_evaluation(
+    experiment: Path,
+    round_number: int,
+    phase: str,
+    split_name: str,
+    problem_ids: list[str],
+    workflow: dict[str, Any],
+    fixed_rubric: dict[str, Any],
+    problems: dict,
+    run_args,
+    enforce_gate: bool,
+    original_scores: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict]]:
+    """Evaluate one policy in an isolated CPE phase with restart checkpoints."""
+    evaluation_experiment = (
+        experiment / "cpe_evaluations" / f"round_{round_number}" / phase
+    )
+    result_path = (
+        evaluation_experiment / "workflows" / f"round_{round_number}" / "result.json"
+    )
+    existing = workflow_evolution.read_json(result_path, {})
+    evaluation_args = copy.copy(run_args)
+    evaluation_args.evaluation_problem_ids = tuple(problem_ids)
+    if completed_round_result(
+        [existing] if existing else [],
+        round_number,
+        len(problem_ids),
+        evaluation_args.validation_repetitions,
+    ):
+        apply_cpe_net_utility(existing, original_scores)
+        workflow_evolution.write_json(result_path, existing)
+        return existing, []
+    result, failures = execute_workflow_round(
+        evaluation_experiment,
+        round_number,
+        workflow,
+        fixed_rubric,
+        problems,
+        evaluation_args,
+        existing or None,
+        enforce_gate,
+    )
+    result.update(
+        {
+            "cpe_phase": phase,
+            "evaluation_split": split_name,
+            "evaluation_problems": list(problem_ids),
+        }
+    )
+    apply_cpe_net_utility(result, original_scores)
+    workflow_evolution.write_json(result_path, result)
+    return result, failures
+
+
 def persist_round_result(
     experiment: Path, results_path: Path, result: dict
 ) -> list[dict]:
     results = normalized_results(results_path)
     results = [item for item in results if item.get("round") != result["round"]]
     results.append(result)
-    results = interaction.normalize_results(
-        sorted(results, key=lambda item: item["round"])
+    results = restore_cpe_net_utilities(
+        interaction.normalize_results(
+            sorted(results, key=lambda item: item["round"])
+        )
     )
     result = next(item for item in results if item["round"] == result["round"])
     workflows_dir = experiment / "workflows"
@@ -1336,6 +2014,743 @@ def persist_round_result(
         f"Round {result['round']} workflow {result['workflow_id']} "
         f"utility: {result['utility']:.6f}",
         flush=True,
+    )
+    return results
+
+
+def persist_cpe_round_result(results_path: Path, result: dict[str, Any]) -> list[dict]:
+    """Persist a CPE round whose sampled tasks can differ from other rounds."""
+    results = normalized_results(results_path)
+    results = [item for item in results if item.get("round") != result["round"]]
+    results.append(result)
+    results = sorted(results, key=lambda item: int(item["round"]))
+    workflow_evolution.write_json(
+        results_path.parent / f"round_{result['round']}" / "result.json", result
+    )
+    workflow_evolution.write_json(results_path, results)
+    write_execution_time_excel(results_path.parent / "round_execution_times.xlsx", results)
+    print(
+        f"Round {result['round']} CPE train net utility: "
+        f"{result['train_post_utility']:.6f}; "
+        f"train accepted={result['train_accepted']}; "
+        f"validation accepted={result.get('validation_accepted')}",
+        flush=True,
+    )
+    return results
+
+
+def initialize_cpe_policies(
+    state: dict[str, Any], seed_results: list[dict[str, Any]]
+) -> None:
+    """Initialize two training parents from the two strongest validation seeds."""
+    if (
+        state.get("current_policy")
+        and state.get("best_policy")
+        and len(state.get("training_elites", [])) == CPE_TRAINING_PARENT_COUNT
+    ):
+        return
+    if len(seed_results) != 3:
+        raise ValueError("CPE initialization requires exactly three seed results")
+    ranked = sorted(
+        seed_results,
+        key=lambda item: (-float(item["utility"]), int(item["round"])),
+    )
+    best = ranked[0]
+    policy = {
+        "source_round": int(best["round"]),
+        "workflow_id": best["workflow_id"],
+        "workflow": without_removed_workflow_fields(best["workflow"]),
+        "validation_utility": float(best["utility"]),
+        "utility_basis": "mean_quality_gain_minus_interaction_cost",
+    }
+    state["current_policy"] = copy.deepcopy(policy)
+    state["best_policy"] = copy.deepcopy(policy)
+    state["training_elites"] = [
+        {
+            "rank": rank,
+            "source_round": int(item["round"]),
+            "source_phase": "initial_validation",
+            "workflow_id": item["workflow_id"],
+            "workflow": without_removed_workflow_fields(item["workflow"]),
+            "selection_utility": float(item["utility"]),
+            "selection_basis": "initial_validation_net_utility",
+        }
+        for rank, item in enumerate(
+            ranked[:CPE_TRAINING_PARENT_COUNT], start=1
+        )
+    ]
+    state["initial_seed_validation"] = [
+        {
+            "round": int(item["round"]),
+            "workflow_id": item["workflow_id"],
+            "validation_utility": float(item["utility"]),
+        }
+        for item in sorted(seed_results, key=lambda item: int(item["round"]))
+    ]
+    state["updated_at"] = now()
+
+
+def select_cpe_training_elites(
+    eligible_results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep the two strongest distinct workflows on the current shared batch."""
+    ranked = sorted(
+        eligible_results,
+        key=lambda item: (-float(item["utility"]), str(item["workflow_id"])),
+    )
+    selected = []
+    seen = set()
+    for item in ranked:
+        workflow_id_value = str(item["workflow_id"])
+        if workflow_id_value in seen:
+            continue
+        seen.add(workflow_id_value)
+        selected.append(
+            {
+                "rank": len(selected) + 1,
+                "source_round": int(item["round"]),
+                "source_phase": str(item.get("cpe_phase", "train_candidate")),
+                "workflow_id": workflow_id_value,
+                "workflow": without_removed_workflow_fields(item["workflow"]),
+                "selection_utility": float(item["utility"]),
+                "selection_basis": "current_shared_training_batch_net_utility",
+            }
+        )
+        if len(selected) == CPE_TRAINING_PARENT_COUNT:
+            break
+    if len(selected) != CPE_TRAINING_PARENT_COUNT:
+        raise ValueError("CPE training selection did not produce two distinct elites")
+    return selected
+
+
+def maybe_evolve_cpe_operator_for_validation_stagnation(
+    state: dict[str, Any],
+    workflows_dir: Path,
+    args,
+    training_parents: list[dict[str, Any]],
+    round_number: int,
+    validation_improved: bool,
+) -> dict[str, Any] | None:
+    """Evolve an operator after five rounds without a validation-best gain."""
+    if validation_improved:
+        state["validation_stagnation_rounds"] = []
+        return None
+    stagnant = [
+        int(value) for value in state.get("validation_stagnation_rounds", [])
+    ]
+    if round_number not in stagnant:
+        stagnant.append(round_number)
+    state["validation_stagnation_rounds"] = stagnant
+    if len(stagnant) < STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION:
+        return None
+    trigger_rounds = stagnant[-STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION:]
+    event = evolve_cpe_dialogue_operator(
+        workflows_dir,
+        args,
+        cpe_operator_evidence(training_parents),
+        round_number,
+        "validation_champion_stagnation",
+        {
+            "stagnant_rounds": trigger_rounds,
+            "historical_validation_utility": float(
+                state["best_policy"]["validation_utility"]
+            ),
+        },
+    )
+    state["validation_stagnation_rounds"] = []
+    state["last_operator_evolution"] = {
+        "trigger_after_round": round_number,
+        "trigger_reason": event["trigger_reason"],
+        "operator_id": event["operator"]["operator_id"],
+    }
+    return event
+
+
+def ensure_cpe_baseline_reports(
+    experiment: Path,
+    problem_ids: list[str],
+    run_args,
+    baseline_report_root: Path,
+) -> None:
+    """Resolve only the clean drafts needed by the current sampled batch."""
+    missing = []
+    for problem_id in problem_ids:
+        configured = Path(str(run_args.baseline_reports.get(problem_id, "")))
+        report_validator = getattr(
+            substantive, "baseline_report_matches_problem", None
+        )
+        configured_matches = configured.is_file() and (
+            not callable(report_validator)
+            or report_validator(problem_id, configured)
+        )
+        if configured_matches:
+            continue
+        try:
+            source = substantive.resolve_baseline_report(
+                problem_id, baseline_report_root
+            )
+        except FileNotFoundError:
+            missing.append(problem_id)
+        else:
+            run_args.baseline_reports[problem_id] = str(source.resolve())
+    if missing:
+        raise FileNotFoundError(
+            "Missing clean baseline reports for sampled training tasks: "
+            + ", ".join(missing)
+            + ". Generate these no-interaction baselines and resume the same "
+            "experiment; its sampled batch is already checkpointed."
+        )
+    config_path = experiment / "config.json"
+    config = workflow_evolution.read_json(config_path, {})
+    config["baseline_reports"] = dict(run_args.baseline_reports)
+    config["updated_at"] = now()
+    workflow_evolution.write_json(config_path, config)
+
+
+def ensure_cpe_original_report_scores(
+    experiment: Path,
+    problem_ids: list[str],
+    run_args,
+) -> dict[str, dict[str, Any]]:
+    """Judge each original draft once per configured repetition and cache it."""
+    score_root = experiment / "cpe_original_report_scores"
+    score_root.mkdir(parents=True, exist_ok=True)
+
+    def score_one(problem_id: str) -> tuple[str, dict[str, Any]]:
+        report = Path(str(run_args.baseline_reports[problem_id])).resolve()
+        problem_root = score_root / baseline.safe_path_component(problem_id)
+        output = problem_root / "judge_stability.json"
+        source_stability = workflow_evolution.read_json(
+            report.parents[2] / "meta" / "judge_stability.json", {}
+        )
+        source_trials = source_stability.get("evaluations", {}).get("report", [])
+        source_trial = next(
+            (
+                item
+                for item in source_trials
+                if int(item.get("trial", -1)) == 1
+                and Path(str(item.get("raw_result", ""))).is_file()
+            ),
+            None,
+        )
+        seed_results = (
+            {"original": Path(source_trial["raw_result"])}
+            if source_trial is not None
+            else None
+        )
+        payload = run_judge_stability.evaluate_reports_repeated(
+            problem_id,
+            {"original": report},
+            run_args.judge_repeats,
+            f"interaction-rubric-{experiment.name}-original",
+            output,
+            problem_root,
+            experiment=experiment,
+            seed_results=seed_results,
+            concurrency=run_args.judge_concurrency,
+            judgers=interaction.EVALUATION_DIMENSIONS,
+        )
+        averaged = payload["average_scores"]["round_original"]
+        dimensions = interaction.objective_dimensions(
+            averaged["average_dimension_scores"]
+        )
+        return problem_id, {
+            "problem_id": problem_id,
+            "report": str(report),
+            "utility": interaction.objective_score(dimensions),
+            "dimension_scores": dimensions,
+            "judge_repeats": averaged["trial_count"],
+            "judge_stability_result": str(output),
+        }
+
+    scores: dict[str, dict[str, Any]] = {}
+    worker_count = min(max(1, int(run_args.concurrency)), len(problem_ids))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = {executor.submit(score_one, item): item for item in problem_ids}
+        for future in as_completed(futures):
+            problem_id, score = future.result()
+            scores[problem_id] = score
+    scores = {problem_id: scores[problem_id] for problem_id in problem_ids}
+    summary_path = experiment / "workflows" / "cpe_original_report_scores.json"
+    all_scores = workflow_evolution.read_json(summary_path, {})
+    if not isinstance(all_scores, dict):
+        all_scores = {}
+    all_scores.update(scores)
+    workflow_evolution.write_json(
+        summary_path, all_scores
+    )
+    return scores
+
+
+def approximate_interaction_tokens(text: str) -> int:
+    """Estimate tokens without adding a tokenizer dependency to the runner."""
+    cjk = sum(1 for char in text if "\u3400" <= char <= "\u9fff")
+    other_non_ascii = sum(
+        1 for char in text if ord(char) >= 128 and not "\u3400" <= char <= "\u9fff"
+    )
+    ascii_characters = sum(1 for char in text if ord(char) < 128)
+    return math.ceil(cjk + other_non_ascii + ascii_characters / 4)
+
+
+def expert_reply_latencies(run_dir: Path) -> dict[int, float]:
+    """Read exact expert API elapsed seconds, with filesystem-time fallback."""
+    run_dir = Path(run_dir)
+    bridge_log = run_dir / "meta" / "expert_bridge.log"
+    latencies: dict[int, float] = {}
+    if bridge_log.is_file():
+        for match in EXPERT_REPLY_LATENCY_PATTERN.finditer(
+            bridge_log.read_text(encoding="utf-8", errors="replace")
+        ):
+            latencies[int(match.group(1))] = float(match.group(2))
+    feedback_dir = run_dir / "output" / "logs" / "operator_feedback"
+    for exchange in range(1, DEFAULT_CPE_MAX_EXCHANGES + 1):
+        if exchange in latencies:
+            continue
+        request_path = feedback_dir / f"expert_request_{exchange}.json"
+        reply_path = feedback_dir / f"expert_reply_{exchange}.json"
+        if request_path.is_file() and reply_path.is_file():
+            latencies[exchange] = max(
+                0.0, reply_path.stat().st_mtime - request_path.stat().st_mtime
+            )
+    return latencies
+
+
+def cpe_interaction_cost(run_dir: Path) -> dict[str, Any]:
+    """Calculate the normalized interaction cost for one completed run."""
+    exchanges = interaction.completed_expert_exchanges(Path(run_dir))
+    if not exchanges:
+        raise ValueError(f"Cannot calculate interaction cost without dialogue: {run_dir}")
+    exchange_count = len(exchanges)
+    total_tokens = sum(
+        approximate_interaction_tokens(item["question"])
+        + approximate_interaction_tokens(item["answer"])
+        for item in exchanges
+    )
+    latencies = expert_reply_latencies(Path(run_dir))
+    total_latency = sum(
+        float(latencies.get(int(item["exchange"]), 0.0)) for item in exchanges
+    )
+    exchange_component = max(exchange_count - 1, 0) / (
+        DEFAULT_CPE_MAX_EXCHANGES - 1
+    )
+    token_component = math.log1p(total_tokens) / math.log1p(
+        DEFAULT_CPE_TOTAL_TOKEN_REFERENCE
+    )
+    latency_component = math.log1p(total_latency) / math.log1p(
+        DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS
+    )
+    cost = (
+        DEFAULT_CPE_EXCHANGE_COST_WEIGHT * exchange_component
+        + DEFAULT_CPE_TOKEN_COST_WEIGHT * token_component
+        + DEFAULT_CPE_LATENCY_COST_WEIGHT * latency_component
+    )
+    return {
+        "exchange_count": exchange_count,
+        "total_tokens_approx": total_tokens,
+        "total_expert_latency_seconds": total_latency,
+        "exchange_cost_component": exchange_component,
+        "token_cost_component": token_component,
+        "latency_cost_component": latency_component,
+        "interaction_cost": cost,
+        "token_count_method": (
+            "ceil(CJK + other_non_ASCII + ASCII_characters/4)"
+        ),
+        "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback",
+    }
+
+
+def apply_cpe_net_utility(
+    result: dict[str, Any], original_scores: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Apply quality-gain-minus-interaction-cost utility to an evolution result."""
+    problem_results = result.get("problem_results", [])
+    if not problem_results:
+        raise ValueError("Cannot calculate CPE net utility without problem results")
+    missing = [
+        str(item.get("problem_id"))
+        for item in problem_results
+        if str(item.get("problem_id")) not in original_scores
+    ]
+    if missing:
+        raise ValueError("Missing original-report scores for: " + ", ".join(missing))
+
+    gains = []
+    original_utilities = []
+    refined_utilities = []
+    interaction_costs = []
+    penalties = []
+    net_utilities = []
+    for item in problem_results:
+        problem_id = str(item["problem_id"])
+        original_utility = float(original_scores[problem_id]["utility"])
+        refined_utility = float(item["average_score"])
+        gain = refined_utility - original_utility
+        repetitions = item.get("repetitions") or [item]
+        run_costs = [
+            cpe_interaction_cost(Path(str(repetition["run_dir"])))
+            for repetition in repetitions
+        ]
+        interaction_cost = sum(
+            float(run_cost["interaction_cost"]) for run_cost in run_costs
+        ) / len(run_costs)
+        penalty = DEFAULT_CPE_COST_PENALTY_WEIGHT * interaction_cost
+        net_utility = gain - penalty
+        item["original_report_utility"] = original_utility
+        item["refined_report_utility"] = refined_utility
+        item["quality_gain"] = gain
+        item["utility_gain"] = gain
+        item["interaction_cost"] = interaction_cost
+        item["interaction_penalty"] = penalty
+        item["net_utility"] = net_utility
+        item["interaction_cost_runs"] = run_costs
+        original_utilities.append(original_utility)
+        refined_utilities.append(refined_utility)
+        gains.append(gain)
+        interaction_costs.append(interaction_cost)
+        penalties.append(penalty)
+        net_utilities.append(net_utility)
+
+    result["absolute_utility"] = sum(refined_utilities) / len(refined_utilities)
+    result["original_report_utility"] = sum(original_utilities) / len(
+        original_utilities
+    )
+    result["quality_gain"] = sum(gains) / len(gains)
+    result["utility_gain"] = result["quality_gain"]
+    result["interaction_cost"] = sum(interaction_costs) / len(
+        interaction_costs
+    )
+    result["interaction_penalty"] = sum(penalties) / len(penalties)
+    result["net_utility"] = sum(net_utilities) / len(net_utilities)
+    result["utility"] = result["net_utility"]
+    result["utility_basis"] = "mean_quality_gain_minus_interaction_cost"
+    result["interaction_cost_parameters"] = {
+        "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
+        "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
+        "total_latency_max_seconds": DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS,
+        "exchange_weight": DEFAULT_CPE_EXCHANGE_COST_WEIGHT,
+        "token_weight": DEFAULT_CPE_TOKEN_COST_WEIGHT,
+        "latency_weight": DEFAULT_CPE_LATENCY_COST_WEIGHT,
+        "penalty_weight": DEFAULT_CPE_COST_PENALTY_WEIGHT,
+    }
+    return result
+
+
+def cpe_validation_champion_signal(state: dict[str, Any]) -> dict[str, Any]:
+    """Expose exactly the validation champion workflow and net utility."""
+    champion = state["best_policy"]
+    return {
+        "workflow": optimizer_workflow(champion["workflow"]),
+        "utility": float(champion["validation_utility"]),
+    }
+
+
+def run_cpe_evolved_rounds(
+    experiment: Path,
+    results_path: Path,
+    initial_results: list[dict[str, Any]],
+    initial_population: list[dict[str, Any]],
+    fixed_rubric: dict[str, Any],
+    problems: dict,
+    run_args,
+    args,
+    state: dict[str, Any],
+    original_scores: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Run net-utility CPE train gating and full-validation champion gating."""
+    seed_count = len(initial_population)
+    seed_results = [
+        item for item in initial_results if 1 <= int(item.get("round", 0)) <= seed_count
+    ]
+    initialize_cpe_policies(state, seed_results)
+    workflow_evolution.write_json(cpe_state_path(experiment), state)
+    results = initial_results
+    validation_problems = [str(item) for item in state["validation_problems"]]
+
+    for round_number in range(seed_count + 1, args.max_rounds + 1):
+        round_state = state.setdefault("rounds", {}).setdefault(
+            str(round_number), {}
+        )
+        if round_state.get("status") == "complete":
+            stored_result = round_state.get("result")
+            if isinstance(stored_result, dict):
+                results = persist_cpe_round_result(results_path, stored_result)
+            continue
+
+        train_batch = reserve_cpe_train_batch(state, round_number)
+        workflow_evolution.write_json(cpe_state_path(experiment), state)
+        ensure_cpe_baseline_reports(
+            experiment,
+            train_batch,
+            run_args,
+            Path(args.baseline_report_root),
+        )
+        original_scores.update(
+            ensure_cpe_original_report_scores(experiment, train_batch, run_args)
+        )
+        round_dir = results_path.parent / f"round_{round_number}"
+        round_dir.mkdir(parents=True, exist_ok=True)
+        elite_policies = state.get("training_elites", [])
+        if len(elite_policies) != CPE_TRAINING_PARENT_COUNT:
+            raise ValueError("CPE state must contain exactly two training elites")
+        workflow_evolution.write_json(
+            round_dir / "training_elites_at_start.json", elite_policies
+        )
+        parent_results = [None] * CPE_TRAINING_PARENT_COUNT
+        parent_failures = []
+        print(
+            "Running two training-parent workflows in parallel "
+            "(per-parent problem concurrency="
+            f"{getattr(run_args, 'concurrency', 1)})",
+            flush=True,
+        )
+        with ThreadPoolExecutor(max_workers=CPE_TRAINING_PARENT_COUNT) as executor:
+            futures = {
+                executor.submit(
+                    execute_cpe_evaluation,
+                    experiment,
+                    round_number,
+                    f"train_parent_{parent_rank}",
+                    "train",
+                    train_batch,
+                    without_removed_workflow_fields(elite["workflow"]),
+                    fixed_rubric,
+                    problems,
+                    run_args,
+                    args.enforce_substantive_interaction_gate,
+                    original_scores,
+                ): parent_rank
+                for parent_rank, elite in enumerate(elite_policies, start=1)
+            }
+            for future in as_completed(futures):
+                parent_rank = futures[future]
+                parent_result, failures = future.result()
+                parent_results[parent_rank - 1] = parent_result
+                parent_failures.extend(failures)
+        parent_results = [
+            result for result in parent_results if result is not None
+        ]
+        if len(parent_results) != CPE_TRAINING_PARENT_COUNT:
+            raise RuntimeError(
+                "A parallel training-parent evaluation produced no result"
+            )
+        if parent_failures:
+            raise RuntimeError(
+                f"{len(parent_failures)} training-parent run(s) failed the "
+                "substantive gate"
+            )
+
+        training_parent_evidence = [
+            cpe_training_parent_evidence(
+                result,
+                parent_rank,
+                problems,
+                round_dir / f"train_parent_{parent_rank}_evidence",
+                args,
+            )
+            for parent_rank, result in enumerate(parent_results, start=1)
+        ]
+        workflow_evolution.write_json(
+            round_dir / "training_parent_evidence.json", training_parent_evidence
+        )
+
+        saved_candidate = without_removed_workflow_fields(
+            workflow_evolution.read_json(round_dir / "workflow.json", {})
+        )
+        candidate = saved_candidate or propose_cpe_workflow(
+            training_parent_evidence,
+            cpe_validation_champion_signal(state),
+            results,
+            state.get("patch_history", []),
+            round_number,
+            round_dir,
+            args,
+        )
+        workflow_evolution.write_json(round_dir / "workflow.json", candidate)
+
+        train_candidate, candidate_failures = execute_cpe_evaluation(
+            experiment,
+            round_number,
+            "train_candidate",
+            "train",
+            train_batch,
+            candidate,
+            fixed_rubric,
+            problems,
+            run_args,
+            args.enforce_substantive_interaction_gate,
+            original_scores,
+        )
+        if candidate_failures:
+            raise RuntimeError(
+                f"{len(candidate_failures)} train-candidate run(s) failed the "
+                "substantive gate"
+            )
+
+        weakest_parent_utility = min(
+            float(result["utility"]) for result in parent_results
+        )
+        train_accepted = cpe_accepts(
+            train_candidate["utility"],
+            weakest_parent_utility,
+            args.selection_epsilon,
+        )
+        next_elites = select_cpe_training_elites(
+            [*parent_results, train_candidate] if train_accepted else parent_results
+        )
+        state["training_elites"] = next_elites
+        state["current_policy"] = {
+            **copy.deepcopy(next_elites[0]),
+            "train_utility": float(next_elites[0]["selection_utility"]),
+            "utility_basis": "mean_quality_gain_minus_interaction_cost",
+        }
+        validation_result = None
+        validation_accepted = None
+        if train_accepted:
+            validation_result, validation_failures = execute_cpe_evaluation(
+                experiment,
+                round_number,
+                "validation",
+                "validation",
+                validation_problems,
+                candidate,
+                fixed_rubric,
+                problems,
+                run_args,
+                args.enforce_substantive_interaction_gate,
+                original_scores,
+            )
+            if validation_failures:
+                raise RuntimeError(
+                    f"{len(validation_failures)} validation run(s) failed the "
+                    "substantive gate"
+                )
+            validation_accepted = cpe_accepts(
+                validation_result["utility"],
+                state["best_policy"]["validation_utility"],
+                args.selection_epsilon,
+            )
+            if validation_accepted:
+                state["best_policy"] = {
+                    "source_round": round_number,
+                    "workflow_id": candidate["workflow_id"],
+                    "workflow": without_removed_workflow_fields(candidate),
+                    "validation_utility": float(validation_result["utility"]),
+                    "utility_basis": "mean_quality_gain_minus_interaction_cost",
+                }
+
+        parent_utilities = [float(result["utility"]) for result in parent_results]
+        patch_event = {
+            "round": round_number,
+            "candidate_workflow_id": candidate["workflow_id"],
+            "evolution_mode": candidate.get("evolution_mode"),
+            "training_parent_workflow_ids": [
+                result["workflow_id"] for result in parent_results
+            ],
+            "changed_components": candidate.get("changed_components", []),
+            "evolution_rationale": candidate.get("evolution_rationale", ""),
+            "parent_train_net_utilities": parent_utilities,
+            "candidate_train_net_utility": float(train_candidate["utility"]),
+            "train_pre_utility": max(parent_utilities),
+            "train_post_utility": float(train_candidate["utility"]),
+            "train_pre_net_utility": max(parent_utilities),
+            "train_post_net_utility": float(train_candidate["utility"]),
+            "train_accepted": train_accepted,
+            "training_elites_after_selection": copy.deepcopy(next_elites),
+            "validation_utility": (
+                float(validation_result["utility"])
+                if validation_result is not None
+                else None
+            ),
+            "validation_accepted": validation_accepted,
+        }
+        history = [
+            event
+            for event in state.setdefault("patch_history", [])
+            if int(event.get("round", -1)) != round_number
+        ]
+        history.append(patch_event)
+        state["patch_history"] = history
+
+        if candidate.get("operator_evolution_trigger"):
+            state["validation_stagnation_rounds"] = []
+            stagnation_operator_event = None
+        else:
+            stagnation_operator_event = (
+                maybe_evolve_cpe_operator_for_validation_stagnation(
+                    state,
+                    results_path.parent,
+                    args,
+                    training_parent_evidence,
+                    round_number,
+                    validation_accepted is True,
+                )
+            )
+        patch_event["stagnation_operator_evolution"] = (
+            {
+                "trigger_reason": stagnation_operator_event["trigger_reason"],
+                "operator_id": stagnation_operator_event["operator"]["operator_id"],
+            }
+            if stagnation_operator_event is not None
+            else None
+        )
+
+        result = {
+            **train_candidate,
+            "round": round_number,
+            "workflow": candidate,
+            "workflow_id": candidate["workflow_id"],
+            "evolution_operator": "cpe_batch_reflection_patch",
+            "evaluation_split": "train",
+            "training_batch": train_batch,
+            "training_parent_workflow_ids": patch_event[
+                "training_parent_workflow_ids"
+            ],
+            "parent_train_net_utilities": parent_utilities,
+            "candidate_train_net_utility": float(train_candidate["utility"]),
+            "train_pre_utility": max(parent_utilities),
+            "train_post_utility": float(train_candidate["utility"]),
+            "train_accepted": train_accepted,
+            "training_elites_after_selection": copy.deepcopy(next_elites),
+            "validation_utility": patch_event["validation_utility"],
+            "validation_accepted": validation_accepted,
+            "validation_result_path": (
+                str(
+                    experiment
+                    / "cpe_evaluations"
+                    / f"round_{round_number}"
+                    / "validation"
+                    / "workflows"
+                    / f"round_{round_number}"
+                    / "result.json"
+                )
+                if validation_result is not None
+                else None
+            ),
+            "best_validation_utility": float(
+                state["best_policy"]["validation_utility"]
+            ),
+            "best_workflow_id": state["best_policy"]["workflow_id"],
+            "cpe_round_complete": True,
+        }
+        round_state.update(
+            {
+                "status": "complete",
+                "completed_at": now(),
+                "result": result,
+            }
+        )
+        state["updated_at"] = now()
+        workflow_evolution.write_json(cpe_state_path(experiment), state)
+        workflow_evolution.write_json(
+            results_path.parent / "best_workflow.json", state["best_policy"]
+        )
+        workflow_evolution.write_json(
+            results_path.parent / "cpe_patch_history.json", state["patch_history"]
+        )
+        results = persist_cpe_round_result(results_path, result)
+
+    workflow_evolution.write_json(
+        results_path.parent / "best_workflow.json", state["best_policy"]
     )
     return results
 
@@ -1648,7 +3063,11 @@ def plot_round_average_dimension_scores(
     return output_path
 
 
-def main() -> None:
+def main(
+    *,
+    cpe_mode: bool = False,
+    compact_experiment_inputs: bool = False,
+) -> None:
     args = parse_args()
     numeric = (
         args.max_rounds,
@@ -1673,12 +3092,24 @@ def main() -> None:
         raise ValueError("validation retry delay must be non-negative")
     if not 0.0 < args.candidate_similarity_threshold <= 1.0:
         raise ValueError("candidate similarity threshold must be in (0, 1]")
+    if args.selection_epsilon < 0:
+        raise ValueError("selection epsilon must be non-negative")
+    if cpe_mode and args.max_rounds < 3:
+        raise ValueError("CPE mode requires at least three initial workflow rounds")
+    if cpe_mode and (args.train_batch_size < 1 or args.validation_size < 1):
+        raise ValueError("CPE train batch size and validation size must be positive")
 
     problems = baseline.load_problems()
-    unknown = [item for item in args.problem_id if item not in problems]
+    if cpe_mode:
+        train_pool, validation_pool = load_cpe_split(args.cpe_split_file)
+        requested_problems = [*train_pool, *validation_pool]
+    else:
+        train_pool, validation_pool = [], []
+        requested_problems = list(args.problem_id)
+    unknown = [item for item in requested_problems if item not in problems]
     if unknown:
         raise ValueError("Unknown problem ID(s): " + ", ".join(unknown))
-    if len(args.problem_id) != len(set(args.problem_id)):
+    if not cpe_mode and len(args.problem_id) != len(set(args.problem_id)):
         raise ValueError("problem IDs must be unique")
 
     experiment, resumed = experiment_path(args.exp)
@@ -1692,40 +3123,110 @@ def main() -> None:
         previous_config = workflow_evolution.read_json(
             experiment / "config.json", {}
         )
-        if previous_config.get("experiment_type") != (
+        if previous_config and previous_config.get("experiment_type") != (
             "substantive_interaction_workflow_evolution"
         ):
             raise ValueError("--exp is not an interaction-workflow experiment")
+        has_results = bool(workflow_evolution.read_json(results_path, []))
+        if has_results and not previous_config:
+            raise ValueError("Resumed experiment has results but no valid config.json")
+        saved_cpe = previous_config.get("cpe", {})
+        saved_cpe_mode = bool(
+            saved_cpe.get("enabled") if isinstance(saved_cpe, dict) else False
+        )
+        if has_results and saved_cpe_mode != cpe_mode:
+            raise ValueError(
+                "Cannot resume an experiment with a different CPE mode; start a "
+                "new experiment or use the matching entry point."
+            )
 
     interaction.OBJECTIVE_WEIGHTS = dict(previous_config.get("utility_weights", {}))
 
     fixed_target = experiment / "fixed_interaction_rubric.json"
-    if fixed_target.is_file():
+    configured_fixed_source = Path(
+        str(
+            previous_config.get("fixed_interaction_rubric_source")
+            or previous_config.get("fixed_interaction_rubric")
+            or ""
+        )
+    )
+    if compact_experiment_inputs and configured_fixed_source.is_file():
+        fixed_rubric_path = configured_fixed_source
+    elif not compact_experiment_inputs and fixed_target.is_file():
         fixed_rubric_path = fixed_target
     else:
         fixed_rubric_path = resolve_fixed_rubric_path(args.fixed_rubric)
     fixed_rubric = load_fixed_rubric(fixed_rubric_path)
-    workflow_evolution.write_json(fixed_target, fixed_rubric)
+    if not compact_experiment_inputs:
+        workflow_evolution.write_json(fixed_target, fixed_rubric)
 
     initial_target = experiment / "initial_interaction_workflows.json"
-    initial_population = load_seed_population(experiment, resumed, args.initial_workflow)
+    initial_population = load_seed_population(
+        experiment,
+        resumed,
+        args.initial_workflow,
+        persist_legacy_file=not compact_experiment_inputs,
+    )
+    if cpe_mode and len(initial_population) != 3:
+        raise ValueError("CPE mode requires exactly three initial workflows")
+
+    cpe_state = None
+    if cpe_mode:
+        cpe_state = load_or_create_cpe_state(
+            experiment,
+            train_pool,
+            validation_pool,
+            args.train_batch_size,
+            args.validation_size,
+            args.sampling_seed,
+            args.selection_epsilon,
+        )
+        initial_problem_ids = list(cpe_state["validation_problems"])
+        report_problem_ids = list(initial_problem_ids)
+    else:
+        initial_problem_ids = list(args.problem_id)
+        report_problem_ids = list(args.problem_id)
 
     configured_reports = previous_config.get("baseline_reports", {})
     if not isinstance(configured_reports, dict):
         configured_reports = {}
     baseline_reports = {}
-    for problem_id in args.problem_id:
+    missing_reports = []
+    for problem_id in report_problem_ids:
         configured = Path(str(configured_reports.get(problem_id, "")))
-        source = (
-            configured
-            if configured.is_file()
-            else substantive.resolve_baseline_report(
-                problem_id, Path(args.baseline_report_root)
-            )
+        report_validator = getattr(
+            substantive, "baseline_report_matches_problem", None
         )
+        configured_matches = configured.is_file() and (
+            not callable(report_validator)
+            or report_validator(problem_id, configured)
+        )
+        try:
+            source = (
+                configured
+                if configured_matches
+                else substantive.resolve_baseline_report(
+                    problem_id, Path(args.baseline_report_root)
+                )
+            )
+        except FileNotFoundError:
+            missing_reports.append(problem_id)
+            continue
         baseline_reports[problem_id] = str(source.resolve())
+    if missing_reports:
+        missing_scope = (
+            "selected initial validation tasks"
+            if cpe_mode
+            else "selected workflow-evaluation tasks"
+        )
+        raise FileNotFoundError(
+            f"Missing clean baseline reports for the {missing_scope}: "
+            + ", ".join(missing_reports)
+            + ". Generate those no-interaction baselines first or pass a complete "
+            "--baseline-report-root."
+        )
 
-    interaction.VALIDATION_PROBLEMS = tuple(args.problem_id)
+    interaction.VALIDATION_PROBLEMS = tuple(initial_problem_ids)
     interaction.INITIAL_RUBRIC = fixed_rubric
     interaction.finalize_interaction_receipt = finalize_workflow_receipt
     interaction.run_local_modeling_phase = substantive.run_substantive_modeling_phase
@@ -1741,11 +3242,10 @@ def main() -> None:
         "workflow_evolution": True,
         "max_rounds": args.max_rounds,
         "execution_mode": "expert_guided_baseline_report_refinement",
-        "fixed_interaction_rubric": str(fixed_target.resolve()),
         "fixed_interaction_rubric_source": str(fixed_rubric_path.resolve()),
         "interaction_rubric_in_optimizer_prompt": False,
         "interaction_rubric_in_agent_prompt": False,
-        "initial_interaction_workflow": str(initial_target.resolve()),
+        "initial_interaction_workflows": str(initial_target.resolve()),
         "initial_strategy_count": len(initial_population),
         "initial_strategy_rounds_parallel": True,
         "initial_round_problem_concurrency": args.concurrency,
@@ -1760,16 +3260,118 @@ def main() -> None:
             ),
             "strict_improvement": True,
             "registry": str(evolved_operator_registry_path(workflows_dir).resolve()),
+            "objective": (
+                "historical_best_validation_net_utility"
+                if cpe_mode
+                else "historical_best_round_utility"
+            ),
+            "similarity_retry_trigger": (
+                SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION
+                if cpe_mode
+                else None
+            ),
         },
-        "round_dimension_plot": str(
-            (workflows_dir / "round_average_dimension_scores.png").resolve()
+        "round_dimension_plot": (
+            None
+            if cpe_mode
+            else str(
+                (workflows_dir / "round_average_dimension_scores.png").resolve()
+            )
         ),
         "execution_time_excel": str(
             (workflows_dir / "round_execution_times.xlsx").resolve()
         ),
         "baseline_report_root": str(Path(args.baseline_report_root).resolve()),
         "baseline_reports": baseline_reports,
-        "validation_problems": args.problem_id,
+        "validation_problems": initial_problem_ids,
+        "cpe": {
+            "enabled": cpe_mode,
+            "algorithm": (
+                "two_parent_net_utility_batch_evolution_"
+                "full_validation_champion_gate"
+            ),
+            "split_file": str(Path(args.cpe_split_file).resolve()),
+            "train_pool": train_pool if cpe_mode else [],
+            "train_batch_size": args.train_batch_size if cpe_mode else None,
+            "train_sampling": (
+                "independent_batches_with_replacement_across_rounds"
+                if cpe_mode
+                else None
+            ),
+            "validation_pool": validation_pool if cpe_mode else [],
+            "validation_size": args.validation_size if cpe_mode else None,
+            "validation_problems": initial_problem_ids if cpe_mode else [],
+            "sampling_seed": cpe_state["sampling_seed"] if cpe_state else None,
+            "selection_epsilon": args.selection_epsilon if cpe_mode else None,
+            "initial_seed_protocol": (
+                "rounds_1_to_3_run_the_same_full_validation_set_in_parallel"
+                if cpe_mode
+                else None
+            ),
+            "training_parent_count": (
+                CPE_TRAINING_PARENT_COUNT if cpe_mode else None
+            ),
+            "training_parent_evaluations_parallel": cpe_mode,
+            "training_parent_parallelism": (
+                CPE_TRAINING_PARENT_COUNT if cpe_mode else None
+            ),
+            "per_parent_problem_concurrency": (
+                args.concurrency if cpe_mode else None
+            ),
+            "initial_training_parents": (
+                "top_two_initial_validation_workflows" if cpe_mode else None
+            ),
+            "training_parent_selection": (
+                "top_two_distinct_workflows_on_current_shared_training_batch"
+                if cpe_mode
+                else None
+            ),
+            "candidate_enters_population_if_better_than_weakest_parent": cpe_mode,
+            "best_policy_requires_validation_accept": cpe_mode,
+            "utility_basis": (
+                "mean_quality_gain_minus_interaction_cost" if cpe_mode else None
+            ),
+            "original_report_role": (
+                "quality_reference_only_no_net_utility" if cpe_mode else None
+            ),
+            "interaction_cost": (
+                {
+                    "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
+                    "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
+                    "total_latency_max_seconds": (
+                        DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS
+                    ),
+                    "exchange_weight": DEFAULT_CPE_EXCHANGE_COST_WEIGHT,
+                    "token_weight": DEFAULT_CPE_TOKEN_COST_WEIGHT,
+                    "latency_weight": DEFAULT_CPE_LATENCY_COST_WEIGHT,
+                    "penalty_weight_lambda": DEFAULT_CPE_COST_PENALTY_WEIGHT,
+                    "token_count_method": (
+                        "ceil(CJK + other_non_ASCII + ASCII_characters/4)"
+                    ),
+                }
+                if cpe_mode
+                else None
+            ),
+            "validation_champion_optimizer_fields": (
+                ["workflow", "utility"] if cpe_mode else []
+            ),
+            "training_parent_evidence_includes": (
+                [
+                    "workflow",
+                    "aggregate_net_utility",
+                    "public_task_statement",
+                    "expert_dialogue",
+                    "interaction_report_change_summary",
+                    "interaction_cost",
+                ]
+                if cpe_mode
+                else []
+            ),
+            "training_parent_evidence_withholds": (
+                sorted(CPE_WITHHELD_JUDGE_FIELDS) if cpe_mode else []
+            ),
+            "pareto_champions": False,
+        },
         "model": args.model,
         "opt_model": args.opt_model,
         "expert_model": args.expert_model,
@@ -1780,28 +3382,68 @@ def main() -> None:
         "judge_feedback_concurrency": args.judge_feedback_concurrency,
         "optimizer_evidence": {
             "nodes": (
-                "all_three_initial_workflows_plus_current_global_best_"
-                "evolved_workflow"
+                "two_current_batch_training_parents_plus_validation_champion_signal"
+                if cpe_mode
+                else "all_three_initial_workflows_plus_historical_global_best"
             ),
-            "fields": [
-                "workflow",
-                "average_utility",
-                "expert_interaction",
-                "interaction_report_change_summary",
-                "judge_groundedness_weakness_summary",
-            ],
+            "fields": (
+                [
+                    "two_training_parent_workflows",
+                    "two_training_parent_net_utilities",
+                    "two_training_parent_task_statements",
+                    "two_training_parent_expert_dialogues",
+                    "two_training_parent_report_change_summaries",
+                    "two_training_parent_interaction_costs",
+                    "validation_champion_workflow",
+                    "validation_champion_net_utility",
+                    "training_only_decision_history",
+                ]
+                if cpe_mode
+                else [
+                    "workflow",
+                    "average_utility",
+                    "average_dimension_scores",
+                    "parent_roles",
+                    "expert_interaction",
+                    "interaction_report_change_summary",
+                    "judge_groundedness_weakness_summary",
+                ]
+            ),
             "report_change_summary_max_chars": REPORT_CHANGE_SUMMARY_MAX_CHARS,
-            "judge_feedback_dimensions": list(JUDGE_FEEDBACK_DIMENSIONS),
-            "all_workflow_nodes_required_as_parent_inputs": True,
+            "judge_feedback_dimensions": (
+                [] if cpe_mode else list(JUDGE_FEEDBACK_DIMENSIONS)
+            ),
+            "task_level_judge_outputs_withheld": cpe_mode,
+            "parent_archive_scope": (
+                "current_two_training_elites"
+                if cpe_mode
+                else "all_completed_rounds"
+            ),
+            "all_workflow_nodes_required_as_parent_inputs": not cpe_mode,
+            "validation_rollouts_withheld_from_optimizer": cpe_mode,
         },
         "validation_repetitions": args.validation_repetitions,
         "updated_at": now(),
     }
+    if not compact_experiment_inputs:
+        config.update(
+            {
+                "fixed_interaction_rubric": str(fixed_target.resolve()),
+                "initial_interaction_workflow": str(initial_target.resolve()),
+            }
+        )
     workflow_evolution.write_json(experiment / "config.json", config)
     print(f"Experiment: {experiment}")
-    print(f"Fixed interaction rubric: {fixed_target}")
-    print(f"Initial interaction workflow: {initial_target}")
-    print("Problems: " + ", ".join(args.problem_id))
+    displayed_fixed_rubric = (
+        fixed_rubric_path if compact_experiment_inputs else fixed_target
+    )
+    print(f"Fixed interaction rubric: {displayed_fixed_rubric}")
+    print(f"Initial interaction workflows: {initial_target}")
+    if cpe_mode:
+        print("Training pool: " + ", ".join(train_pool))
+        print("Full fixed validation set: " + ", ".join(initial_problem_ids))
+    else:
+        print("Problems: " + ", ".join(initial_problem_ids))
 
     if args.initialize_only:
         for index, seed in enumerate(initial_population[:args.max_rounds], 1):
@@ -1828,6 +3470,11 @@ def main() -> None:
         interaction.cleanup_experiment_agents_at_exit, openclaw, experiment
     )
     run_args = substantive.runtime_args(args, baseline_reports)
+    cpe_original_scores: dict[str, dict[str, Any]] = {}
+    if cpe_mode:
+        cpe_original_scores = ensure_cpe_original_report_scores(
+            experiment, initial_problem_ids, run_args
+        )
 
     # The initial strategies are independent population members. Start all
     # unfinished seed rounds together, then wait for the entire population
@@ -1839,7 +3486,7 @@ def main() -> None:
         if completed_round_result(
             results,
             round_number,
-            len(args.problem_id),
+            len(initial_problem_ids),
             args.validation_repetitions,
         ):
             print(f"Round {round_number} is complete; skipping", flush=True)
@@ -1857,8 +3504,8 @@ def main() -> None:
     initial_errors = []
     if pending_seeds:
         # Each independent seed round receives the full per-round problem
-        # concurrency. Three seed rounds and --concurrency 3 therefore permit
-        # all nine one-repetition problem runs to execute concurrently.
+        # concurrency. The three seed workflows all use the same held-out
+        # validation set and start together before score-dependent evolution.
         per_round_concurrency = args.concurrency
         print(
             f"Running {len(pending_seeds)} independent initial workflow rounds "
@@ -1887,6 +3534,8 @@ def main() -> None:
                 round_number = futures[future]
                 try:
                     result, failures = future.result()
+                    if cpe_mode:
+                        apply_cpe_net_utility(result, cpe_original_scores)
                     persist_round_result(experiment, results_path, result)
                     if failures:
                         initial_errors.append(
@@ -1903,6 +3552,32 @@ def main() -> None:
             "their checkpoints were preserved"
         ) from initial_errors[0]
 
+    results = normalized_results(results_path)
+    if cpe_mode:
+        for result in results:
+            if 1 <= int(result.get("round", 0)) <= seed_count:
+                apply_cpe_net_utility(result, cpe_original_scores)
+                workflow_evolution.write_json(
+                    workflows_dir / f"round_{result['round']}" / "result.json",
+                    result,
+                )
+        workflow_evolution.write_json(results_path, results)
+        results = run_cpe_evolved_rounds(
+            experiment,
+            results_path,
+            results,
+            initial_population,
+            fixed_rubric,
+            problems,
+            run_args,
+            args,
+            cpe_state,
+            cpe_original_scores,
+        )
+        best_path = workflows_dir / "best_workflow.json"
+        print(f"CPE best workflow: {best_path}", flush=True)
+        return
+
     # This also handles a resumed experiment that had already reached a plateau
     # before the operator-evolution rule was introduced.
     results = normalized_results(results_path)
@@ -1915,7 +3590,7 @@ def main() -> None:
         if completed_round_result(
             results,
             round_number,
-            len(args.problem_id),
+            len(initial_problem_ids),
             args.validation_repetitions,
         ):
             print(f"Round {round_number} is complete; skipping", flush=True)
@@ -1960,7 +3635,7 @@ def main() -> None:
         if completed_round_result(
             final_results,
             round_number,
-            len(args.problem_id),
+            len(initial_problem_ids),
             args.validation_repetitions,
         )
         is None

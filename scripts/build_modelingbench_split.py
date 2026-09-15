@@ -1,4 +1,4 @@
-"""Build the audited ModelingBench train/test split used by workflow evolution."""
+"""Build the audited ModelingBench train/validation/test split."""
 
 from __future__ import annotations
 
@@ -12,18 +12,21 @@ DATASET_PATH = ROOT / "data" / "modeling_data_final.json"
 CATEGORY_PATH = ROOT / "data" / "modeling_task_type_statistics.json"
 OUTPUT_PATH = ROOT / "data" / "modelingbench_train_test_split.json"
 TRAIN_PATH = ROOT / "data" / "modeling_data_train.json"
+VALIDATION_PATH = ROOT / "data" / "modeling_data_validation.json"
 TEST_PATH = ROOT / "data" / "modeling_data_test.json"
 EXCLUDED_PATH = ROOT / "data" / "modeling_data_excluded.json"
 
 
 REQUIRED_TRAIN = {
+    "2001_Adolescent_Pregnancy",
     "2003_Aviation_Baggage_Screening",
+    "2004_To_Be_Secure",
     "2013_Bank_Service_Problem",
     "2025_Managing_Sustainable_Tourism",
 }
 
-# These two records describe the missing asset instead of preserving the values needed
-# by the task. They are excluded until the original asset is restored.
+# These records omit numerical values from required source assets. They remain on
+# the training side for continuity but are not sampled by default until restored.
 MISSING_ASSETS = {
     "2001_Adolescent_Pregnancy": (
         "题目要求分析12个县的2000年数据，但当前JSON只保留列名和1998/1999汇总，"
@@ -119,6 +122,22 @@ TEST_IDS = {
     "2025_Cyber_Strong?",
 }
 
+# Fixed model-selection holdout taken only from the former training side. It spans
+# all six non-singleton task categories, early and recent years, four competition
+# levels, and all three retrieval regimes. The existing test set remains unchanged.
+VALIDATION_IDS = {
+    "2002_Airline_Overbooking",
+    "2003_Gamma_Knife_Treatment",
+    "2006_A_South_Sea",
+    "2007_Gerrymandering",
+    "2010_The_Sweet_Spot",
+    "2014_The_Next_Plague?",
+    "2016_Record_Insurance",
+    "2022_The_Need_for",
+    "2023_Preparing_for_Olympic",
+    "2025_Making_Room_for",
+}
+
 
 def counts(ids: list[str], audit: dict[str, dict]) -> dict:
     return {
@@ -143,7 +162,10 @@ def main() -> None:
     assert set(categories) == set(all_ids)
     assert REQUIRED_TRAIN <= set(all_ids)
     assert TEST_IDS.isdisjoint(REQUIRED_TRAIN)
+    assert VALIDATION_IDS.isdisjoint(REQUIRED_TRAIN)
+    assert TEST_IDS.isdisjoint(VALIDATION_IDS)
     assert TEST_IDS.isdisjoint(MISSING_ASSETS)
+    assert VALIDATION_IDS.isdisjoint(MISSING_ASSETS)
 
     audit: dict[str, dict] = {}
     for task_id, task in dataset.items():
@@ -151,12 +173,16 @@ def main() -> None:
             external = "not_assessed"
             local_status = "incomplete_missing_required_asset"
             reason = MISSING_ASSETS[task_id]
-            eligible = False
+            # Retain these user-required tasks on the training side, but keep them
+            # out of the default sampling pool until their source assets return.
+            eligible = True
+            eligible_for_default_sampling = False
         elif task_id in EXTERNAL_REQUIRED:
             external = "required"
             local_status = "external_data_not_bundled"
             reason = EXTERNAL_REQUIRED[task_id]
             eligible = True
+            eligible_for_default_sampling = True
         elif task_id in EXTERNAL_RECOMMENDED:
             external = "recommended"
             local_status = (
@@ -164,6 +190,7 @@ def main() -> None:
             )
             reason = EXTERNAL_RECOMMENDED[task_id]
             eligible = True
+            eligible_for_default_sampling = True
         else:
             external = "not_required"
             local_status = (
@@ -174,6 +201,7 @@ def main() -> None:
                 "题面提供了定义建模任务所需的情境和约束；允许声明假设、构造情景或进行参数化分析。",
             )
             eligible = True
+            eligible_for_default_sampling = True
 
         audit[task_id] = {
             "year": task["year"],
@@ -182,23 +210,38 @@ def main() -> None:
             "level": task["level"],
             "primary_category": categories[task_id],
             "eligible_for_split": eligible,
+            "eligible_for_default_sampling": eligible_for_default_sampling,
             "local_data_status": local_status,
             "external_retrieval": external,
             "reason": reason,
         }
 
-    eligible_ids = [task_id for task_id in all_ids if audit[task_id]["eligible_for_split"]]
     test_ids = [task_id for task_id in all_ids if task_id in TEST_IDS]
-    train_ids = [task_id for task_id in eligible_ids if task_id not in TEST_IDS]
-    excluded_ids = [task_id for task_id in all_ids if not audit[task_id]["eligible_for_split"]]
+    validation_ids = [task_id for task_id in all_ids if task_id in VALIDATION_IDS]
+    train_ids = [
+        task_id
+        for task_id in all_ids
+        if task_id not in TEST_IDS and task_id not in VALIDATION_IDS
+    ]
+    excluded_ids: list[str] = []
+    train_sampling_ids = [
+        task_id
+        for task_id in train_ids
+        if audit[task_id]["eligible_for_default_sampling"]
+    ]
 
     assert len(all_ids) == 68
-    assert len(train_ids) == 48
+    assert len(train_ids) == 40
+    assert len(train_sampling_ids) == 38
+    assert len(validation_ids) == 10
     assert len(test_ids) == 18
-    assert len(excluded_ids) == 2
+    assert not excluded_ids
     assert REQUIRED_TRAIN <= set(train_ids)
+    assert VALIDATION_IDS == set(validation_ids)
     assert set(train_ids).isdisjoint(test_ids)
-    assert set(train_ids) | set(test_ids) | set(excluded_ids) == set(all_ids)
+    assert set(train_ids).isdisjoint(validation_ids)
+    assert set(validation_ids).isdisjoint(test_ids)
+    assert set(train_ids) | set(validation_ids) | set(test_ids) == set(all_ids)
 
     complete_local = [
         task_id
@@ -212,21 +255,24 @@ def main() -> None:
     ]
 
     output = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "source_dataset": str(DATASET_PATH.relative_to(ROOT)).replace("\\", "/"),
         "materialized_datasets": {
             "train": str(TRAIN_PATH.relative_to(ROOT)).replace("\\", "/"),
+            "validation": str(VALIDATION_PATH.relative_to(ROOT)).replace("\\", "/"),
             "test": str(TEST_PATH.relative_to(ROOT)).replace("\\", "/"),
             "excluded": str(EXCLUDED_PATH.relative_to(ROOT)).replace("\\", "/"),
         },
-        "audit_date": "2026-09-14",
+        "audit_date": "2026-09-15",
         "policy": {
             "split_unit": "task_id",
             "split_strategy": (
-                "人工分层留出：兼顾年份、竞赛来源、一级主题和数据依赖；唯一的组合设计题保留在训练集。"
+                "Stratified fixed holdout by year, competition source, primary "
+                "category, and retrieval dependency. The existing test set is unchanged."
             ),
             "eligibility": (
-                "题干完整且可通过本地信息或明确的外部检索完成；缺关键原始附件的题目不进入主划分。"
+                "All records are retained. Tasks missing required source assets stay "
+                "in training for continuity but are excluded from default sampling."
             ),
             "external_retrieval_definition": {
                 "required": "不获取真实外部数据就无法可复现地完成题目指定的真实案例、历史验证或数值应用。",
@@ -234,13 +280,19 @@ def main() -> None:
                 "not_required": "题面信息足以建立、验证和讨论模型，外部检索不是任务成立的必要条件。",
             },
             "usage": (
-                "演化只从train采样；test在工作流和选择规则冻结后仅运行一次。"
-                "检索题与非检索题应分别汇报分数，避免把检索可用性误当成建模能力。"
+                "Evolution samples only from train_default_sampling_pool. Validation "
+                "is a fixed model-selection holdout: its reports, dialogue, and Judge "
+                "feedback must never enter optimizer evidence. Test is used only once "
+                "after the workflow and selection rules are frozen. Report retrieval "
+                "and non-retrieval results separately."
             ),
         },
         "required_training_tasks": sorted(REQUIRED_TRAIN),
         "train": train_ids,
+        "validation": validation_ids,
         "test": test_ids,
+        "train_default_sampling_pool": train_sampling_ids,
+        "train_retained_incomplete_assets": sorted(MISSING_ASSETS),
         "excluded_missing_assets": excluded_ids,
         "groups": {
             "complete_locally_without_required_retrieval": complete_local,
@@ -255,6 +307,16 @@ def main() -> None:
             "train_retrieval_required": [
                 task_id for task_id in train_ids if audit[task_id]["external_retrieval"] == "required"
             ],
+            "validation_closed_book": [
+                task_id
+                for task_id in validation_ids
+                if audit[task_id]["external_retrieval"] != "required"
+            ],
+            "validation_retrieval_required": [
+                task_id
+                for task_id in validation_ids
+                if audit[task_id]["external_retrieval"] == "required"
+            ],
             "test_closed_book": [
                 task_id for task_id in test_ids if audit[task_id]["external_retrieval"] != "required"
             ],
@@ -264,8 +326,10 @@ def main() -> None:
         },
         "statistics": {
             "all_records": len(all_ids),
-            "eligible_records": len(eligible_ids),
+            "eligible_records": len(all_ids),
             "train": counts(train_ids, audit),
+            "train_default_sampling_pool": counts(train_sampling_ids, audit),
+            "validation": counts(validation_ids, audit),
             "test": counts(test_ids, audit),
             "excluded": counts(excluded_ids, audit),
         },
@@ -274,6 +338,15 @@ def main() -> None:
 
     TRAIN_PATH.write_text(
         json.dumps({task_id: dataset[task_id] for task_id in train_ids}, ensure_ascii=False, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    VALIDATION_PATH.write_text(
+        json.dumps(
+            {task_id: dataset[task_id] for task_id in validation_ids},
+            ensure_ascii=False,
+            indent=2,
+        )
         + "\n",
         encoding="utf-8",
     )

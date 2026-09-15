@@ -68,6 +68,7 @@ EXPERT_INPUT_TYPES = frozenset(
     {"value_preference", "factual_constraint", "technical_suggestion"}
 )
 AGENT_REGISTRY_LOCK = threading.Lock()
+CLEAN_TASK_OUTPUT_ENTRIES = frozenset({"code", "data", "results", "logs"})
 MUTATION_AXES = (
     (
         "consultation trigger and timing",
@@ -119,6 +120,21 @@ INITIAL_RUBRIC = {
 
 def now() -> str:
     return datetime.now().isoformat()
+
+
+def assert_clean_task_output_workspace(output_dir: Path) -> None:
+    """Require a task workspace with no OpenClaw bootstrap or unrelated entries."""
+    output_dir = output_dir.resolve()
+    if output_dir.name.lower() != "output":
+        raise ValueError(f"Expected an output directory, got: {output_dir}")
+    entries = {path.name for path in output_dir.iterdir()}
+    if entries != CLEAN_TASK_OUTPUT_ENTRIES:
+        unexpected = sorted(entries - CLEAN_TASK_OUTPUT_ENTRIES)
+        missing = sorted(CLEAN_TASK_OUTPUT_ENTRIES - entries)
+        raise RuntimeError(
+            f"Task workspace is not clean: {output_dir}; "
+            f"unexpected={unexpected}, missing={missing}"
+        )
 
 
 def rubric_id(rubric: dict) -> str:
@@ -1125,7 +1141,10 @@ def prepare_validation_problem(
     experiment: Path,
     args,
 ) -> dict:
-    problem_index = VALIDATION_PROBLEMS.index(problem_id) + 1
+    evaluation_problem_ids = tuple(
+        getattr(args, "evaluation_problem_ids", VALIDATION_PROBLEMS)
+    )
+    problem_index = evaluation_problem_ids.index(problem_id) + 1
     run_prefix = f"r{repetition}p{problem_index}"
     round_run_root = experiment / "runs" / f"round_{round_number}"
     existing_reports = sorted(
@@ -1188,6 +1207,9 @@ def prepare_validation_problem(
     )
     openclaw = baseline.find_openclaw_command(args.openclaw_command)
     log_path = run_dir / "meta" / "solve.log"
+    require_clean_workspace = getattr(args, "require_clean_task_workspace", False)
+    if require_clean_workspace:
+        assert_clean_task_output_workspace(output_dir)
     try:
         # OpenClaw agent registration mutates shared state. Keep this critical
         # section serial even when the subsequent agent runs are concurrent.
@@ -1208,6 +1230,8 @@ def prepare_validation_problem(
                 run_dir,
                 log_path,
             )
+            if require_clean_workspace:
+                assert_clean_task_output_workspace(output_dir)
     except Exception:
         cleanup_temporary_agent(openclaw, agent_id, run_dir, log_path)
         raise
@@ -1707,6 +1731,10 @@ def run_validation_problem(prepared: dict, rubric: dict, round_number: int, expe
         finally:
             stop_event.set()
             bridge.join(timeout=2.0)
+            if getattr(args, "require_clean_task_workspace", False):
+                assert_clean_task_output_workspace(
+                    Path(prepared["output_dir"])
+                )
         if bridge.is_alive():
             raise RuntimeError("Synchronous expert bridge did not stop cleanly")
         if bridge_errors:
@@ -2648,13 +2676,16 @@ def checkpoint_repetitions(checkpoint: dict) -> dict[str, dict[str, dict]]:
 
 
 def seed_repetitions_from_result(
-    completed: dict[str, dict[str, dict]], existing_result: dict | None
+    completed: dict[str, dict[str, dict]],
+    existing_result: dict | None,
+    problem_ids: tuple[str, ...] | None = None,
 ) -> None:
+    problem_ids = tuple(problem_ids or VALIDATION_PROBLEMS)
     if not existing_result:
         return
     for aggregate in existing_result.get("problem_results", []):
         problem_id = aggregate.get("problem_id")
-        if problem_id not in VALIDATION_PROBLEMS:
+        if problem_id not in problem_ids:
             continue
         values = aggregate.get("repetitions")
         if not isinstance(values, list) or not values:
@@ -2673,8 +2704,10 @@ def import_repeat_test_results(
     rubric: dict,
     completed: dict[str, dict[str, dict]],
     target_repetitions: int = VALIDATION_REPETITIONS,
+    problem_ids: tuple[str, ...] | None = None,
 ) -> int:
     """Import successful fixed-rubric repeat-test records without rerunning them."""
+    problem_ids = tuple(problem_ids or VALIDATION_PROBLEMS)
     imported = 0
     known_run_dirs = {
         str(record.get("run_dir", ""))
@@ -2693,7 +2726,7 @@ def import_repeat_test_results(
         for repeat in payload.get("repetitions", []):
             for record in repeat.get("problems", []):
                 problem_id = record.get("problem_id")
-                if problem_id not in VALIDATION_PROBLEMS:
+                if problem_id not in problem_ids:
                     continue
                 if record.get("status", "completed") != "completed":
                     continue
@@ -2728,6 +2761,9 @@ def evaluate_round(
     args,
     existing_result: dict | None = None,
 ) -> dict:
+    evaluation_problem_ids = tuple(
+        getattr(args, "evaluation_problem_ids", VALIDATION_PROBLEMS)
+    )
     round_dir = Path(getattr(args, "evaluation_round_dir", None) or (
         experiment / "workflows" / f"round_{round_number}"
     ))
@@ -2736,12 +2772,19 @@ def evaluate_round(
         checkpoint_path, {"completed": {}, "failed": {}}
     )
     completed = checkpoint_repetitions(checkpoint)
-    seed_repetitions_from_result(completed, existing_result)
+    seed_repetitions_from_result(
+        completed, existing_result, evaluation_problem_ids
+    )
     target_repetitions = getattr(
         args, "validation_repetitions", VALIDATION_REPETITIONS
     )
     imported = import_repeat_test_results(
-        experiment, round_number, rubric, completed, target_repetitions
+        experiment,
+        round_number,
+        rubric,
+        completed,
+        target_repetitions,
+        evaluation_problem_ids,
     )
     if imported:
         print(
@@ -2754,7 +2797,7 @@ def evaluate_round(
     pending = [
         (problem_id, repetition)
         for repetition in range(1, target_repetitions + 1)
-        for problem_id in VALIDATION_PROBLEMS
+        for problem_id in evaluation_problem_ids
         if str(repetition) not in completed.get(problem_id, {})
     ]
     validation_attempts = getattr(args, "validation_attempts", 3)
@@ -2842,7 +2885,7 @@ def evaluate_round(
             pending = [
                 (problem_id, repetition)
                 for repetition in range(1, target_repetitions + 1)
-                for problem_id in VALIDATION_PROBLEMS
+                for problem_id in evaluation_problem_ids
                 if str(repetition) not in completed.get(problem_id, {})
             ]
             continue
@@ -2920,7 +2963,7 @@ def evaluate_round(
         pending = [
             (problem_id, repetition)
             for repetition in range(1, target_repetitions + 1)
-            for problem_id in VALIDATION_PROBLEMS
+            for problem_id in evaluation_problem_ids
             if str(repetition) not in completed.get(problem_id, {})
         ]
     missing = [f"{problem_id}/repeat_{repetition}" for problem_id, repetition in pending]
@@ -2938,7 +2981,7 @@ def evaluate_round(
                 for repetition in range(1, target_repetitions + 1)
             ],
         )
-        for problem_id in VALIDATION_PROBLEMS
+        for problem_id in evaluation_problem_ids
     ]
     checkpoint["completed"] = completed
     workflow_evolution.write_json(checkpoint_path, checkpoint)

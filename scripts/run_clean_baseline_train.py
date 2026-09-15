@@ -10,8 +10,8 @@ Workspace preparation creates no interaction log subdirectories and does not
 copy output/code/wait_for_expert_reply.py.
 The experiment root contains only runs; configuration and checkpoints live there.
 Each Agent begins execution immediately after its own registration completes.
-Without --experiment, the latest experiment with the same tasks and model is
-resumed automatically; pass a new explicit path to start another experiment.
+Without --experiment, a new timestamped experiment is created. Resume is only
+enabled when the experiment directory is supplied explicitly with --experiment.
 """
 
 from __future__ import annotations
@@ -63,37 +63,6 @@ def selected_task_ids(num_problems: int) -> list[str]:
     return list(payload)[:num_problems]
 
 
-def latest_matching_experiment(problem_ids: list[str], model: str) -> Path | None:
-    """Find the newest checkpoint-compatible experiment for automatic resume."""
-    experiment_root = REPO_ROOT / "openclaw_experiments"
-    if not experiment_root.is_dir():
-        return None
-    candidates = sorted(
-        (
-            path
-            for path in experiment_root.glob(EXPERIMENT_PREFIX + "*")
-            if path.is_dir()
-        ),
-        key=lambda path: path.name,
-        reverse=True,
-    )
-    for experiment in candidates:
-        config_path = experiment / "runs" / "config.json"
-        try:
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if (
-            config.get("experiment_type")
-            == "substantive_interaction_strategy_clean_baseline"
-            and config.get("validation_problems") == problem_ids
-            and config.get("model") == model
-            and int(config.get("validation_repetitions", 1)) == 1
-        ):
-            return experiment
-    return None
-
-
 def main() -> int:
     args = parse_args()
     problem_ids = selected_task_ids(args.num_problems)
@@ -102,15 +71,11 @@ def main() -> int:
 
     experiment = args.experiment
     if experiment is None:
-        experiment = latest_matching_experiment(problem_ids, args.model)
-        if experiment is None:
-            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            experiment = (
-                REPO_ROOT / "openclaw_experiments"
-                / f"{EXPERIMENT_PREFIX}{stamp}"
-            )
-        else:
-            print(f"Resuming matching experiment: {experiment}", flush=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        experiment = (
+            REPO_ROOT / "openclaw_experiments"
+            / f"{EXPERIMENT_PREFIX}{stamp}"
+        )
     elif not experiment.is_absolute():
         experiment = REPO_ROOT / experiment
     experiment = experiment.resolve()

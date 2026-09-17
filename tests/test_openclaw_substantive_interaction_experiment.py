@@ -562,6 +562,9 @@ def test_substantive_modeling_phase_separates_transport_and_session_logs(
     monkeypatch.setattr(
         substantive, "write_interaction_added_content", lambda *_: None
     )
+    monkeypatch.setattr(
+        substantive, "run_consolidated_refinement_check", lambda *_: None
+    )
     prepared = {
         "openclaw": "openclaw",
         "agent_id": agent_id,
@@ -579,3 +582,50 @@ def test_substantive_modeling_phase_separates_transport_and_session_logs(
     solve = (tmp_path / "meta" / "solve.log").read_text(encoding="utf-8")
     assert "Completed report." in solve
     assert "provider-transport-fetch" not in solve
+
+
+def test_substantive_modeling_phase_recovers_missing_final_report(
+    tmp_path: Path, monkeypatch
+) -> None:
+    state = tmp_path / "state"
+    agent_id = "recovery-agent"
+    session_id = "recovery-session"
+    session_file = state / "agents" / agent_id / "sessions" / f"{session_id}.jsonl"
+    session_file.parent.mkdir(parents=True)
+    session_file.write_text("", encoding="utf-8")
+    request = tmp_path / "prompt.md"
+    request.write_text("Do the work.", encoding="utf-8")
+    report = tmp_path / "output" / "results" / "solution_report.md"
+    monkeypatch.setenv("OPENCLAW_STATE_DIR", str(state))
+    calls = []
+
+    def fake_stream(command, cwd, log_path, **kwargs):
+        calls.append(command)
+        message_path = Path(command[command.index("--message-file") + 1])
+        if message_path.name == "final_report_recovery_prompt.md":
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("# Recovered report\n", encoding="utf-8")
+
+    monkeypatch.setattr(substantive.baseline, "stream_command", fake_stream)
+    monkeypatch.setattr(
+        substantive, "write_interaction_added_content", lambda *_: None
+    )
+    monkeypatch.setattr(
+        substantive, "run_consolidated_refinement_check", lambda *_: None
+    )
+    prepared = {
+        "openclaw": "openclaw",
+        "agent_id": agent_id,
+        "run_dir": tmp_path,
+    }
+    args = type("Args", (), {"thinking": "high", "timeout": 60})()
+
+    substantive.run_substantive_modeling_phase(
+        prepared, session_id, request, args, report
+    )
+
+    assert len(calls) == 2
+    assert report.read_text(encoding="utf-8") == "# Recovered report\n"
+    recovery_prompt = tmp_path / "meta" / "final_report_recovery_prompt.md"
+    assert recovery_prompt.is_file()
+    assert str(report) in recovery_prompt.read_text(encoding="utf-8")

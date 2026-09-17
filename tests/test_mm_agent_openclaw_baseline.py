@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -10,6 +11,38 @@ from src.OpenClaw import run_mm_agent_baseline as runner
 
 
 class MMAgentBaselineTests(unittest.TestCase):
+    def test_judge_retries_after_process_level_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = root / "solution_report.md"
+            report.write_text("# Report\n", encoding="utf-8")
+            run_dir = root / "run-one"
+            result_path = (
+                root / "output_judge" / "OpenClaw" / "model" /
+                run_dir.name / "problem.json"
+            )
+            calls = 0
+
+            def fake_run(*_args, **_kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise subprocess.CalledProcessError(3221225477, ["judge"])
+                result_path.parent.mkdir(parents=True, exist_ok=True)
+                result_path.write_text('{"judgements": {}}', encoding="utf-8")
+
+            with patch.object(baseline, "REPO_ROOT", root), \
+                 patch.object(baseline, "JUDGER_DIR", root), \
+                 patch.object(baseline, "JUDGE_RETRY_DELAY_SECONDS", 0), \
+                 patch.object(baseline.subprocess, "run", side_effect=fake_run), \
+                 patch.object(baseline, "calculate_average_score", return_value=0.5):
+                actual = baseline.judge_final_report(
+                    "problem", report, "model", run_dir
+                )
+
+            self.assertEqual(actual, result_path)
+            self.assertEqual(calls, 2)
+
     def test_generated_skill_contains_complete_natural_language_workflow(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

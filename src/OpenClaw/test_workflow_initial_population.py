@@ -31,10 +31,13 @@ class InitialPopulationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             seeds = workflow.load_seed_population(root, False, None)
-            self.assertEqual(len(seeds), 3)
+            self.assertEqual(len(seeds), 2)
             self.assertEqual({seed['max_exchanges'] for seed in seeds}, {2})
-            self.assertEqual({seed['seed_operator'] for seed in seeds}, set(workflow.INTERACTION_OPERATORS))
-            self.assertEqual(len({seed['workflow_id'] for seed in seeds}), 3)
+            self.assertEqual(
+                {seed['seed_operator'] for seed in seeds},
+                {'assumption_audit', 'model_failure_mode'},
+            )
+            self.assertEqual(len({seed['workflow_id'] for seed in seeds}), 2)
             self.assertEqual(workflow.load_seed_population(root, True, None), seeds)
 
     def test_compact_population_persists_only_plural_seed_file(self):
@@ -43,7 +46,7 @@ class InitialPopulationTests(unittest.TestCase):
             seeds = workflow.load_seed_population(
                 root, False, None, persist_legacy_file=False
             )
-            self.assertEqual(len(seeds), 3)
+            self.assertEqual(len(seeds), 2)
             self.assertTrue((root / "initial_interaction_workflows.json").is_file())
             self.assertFalse((root / "initial_interaction_workflow.json").exists())
 
@@ -132,6 +135,7 @@ class InitialPopulationTests(unittest.TestCase):
                     private = json.loads(isolated.read_text(encoding="utf-8"))
                     self.assertTrue(private["agents"]["defaults"]["skipBootstrap"])
                     self.assertEqual(private["agents"]["list"], [])
+                    self.assertNotIn("tools", private)
                     self.assertEqual(
                         json.loads(source.read_text(encoding="utf-8")), original
                     )
@@ -141,6 +145,34 @@ class InitialPopulationTests(unittest.TestCase):
                     )
                 self.assertEqual(os.environ["OPENCLAW_CONFIG_PATH"], str(source))
                 self.assertFalse(isolated.exists())
+
+    def test_private_config_can_forbid_nested_solver_agents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "openclaw.json"
+            original = {
+                "agents": {"defaults": {}},
+                "tools": {"deny": ["browser"]},
+            }
+            source.write_text(json.dumps(original), encoding="utf-8")
+            with patch.dict(
+                "os.environ", {"OPENCLAW_CONFIG_PATH": str(source)}, clear=False
+            ):
+                isolated, previous = clean_baseline.activate_clean_openclaw_config(
+                    deny_nested_agents=True
+                )
+                try:
+                    private = json.loads(isolated.read_text(encoding="utf-8"))
+                    self.assertEqual(
+                        private["tools"]["deny"],
+                        ["browser", *clean_baseline.NESTED_AGENT_TOOL_DENY],
+                    )
+                    self.assertEqual(
+                        json.loads(source.read_text(encoding="utf-8")), original
+                    )
+                finally:
+                    clean_baseline.remove_clean_openclaw_config(
+                        isolated, previous
+                    )
 
     def test_workflow_optimizer_prompt_is_not_operator_evolution_prompt(self):
         prompt = workflow.build_workflow_evolution_prompt([])
@@ -161,7 +193,7 @@ class InitialPopulationTests(unittest.TestCase):
                 "evolution_operator": "initial_strategy",
                 "workflow": copy.deepcopy(seeds[index - 1]),
             }
-            for index, score in enumerate([0.70, 0.71, 0.69], 1)
+            for index, score in enumerate([0.70, 0.71], 1)
         ]
         nodes.extend(
             [
@@ -180,9 +212,9 @@ class InitialPopulationTests(unittest.TestCase):
             ]
         )
         selected = workflow.evolution_evidence_nodes(nodes)
-        self.assertEqual([item["round"] for item in selected], [1, 2, 3, 4])
+        self.assertEqual([item["round"] for item in selected], [1, 2, 4])
         self.assertEqual(
-            selected[3]["parent_archive_roles"],
+            selected[2]["parent_archive_roles"],
             [
                 {
                     "role": "global_best_parent",
@@ -195,11 +227,11 @@ class InitialPopulationTests(unittest.TestCase):
         self.assertNotIn("pareto", str(selected).lower())
 
     def test_evidence_archive_deduplicates_seed_that_is_global_best(self):
-        nodes = self.scored_nodes([0.90, 0.80, 0.70])
+        nodes = self.scored_nodes([0.90, 0.80])
         for node in nodes:
             node["evolution_operator"] = "initial_strategy"
         selected = workflow.evolution_evidence_nodes(nodes)
-        self.assertEqual([item["round"] for item in selected], [1, 2, 3])
+        self.assertEqual([item["round"] for item in selected], [1, 2])
         self.assertEqual(
             [role["role"] for role in selected[0]["parent_archive_roles"]],
             ["initial_parent", "global_best_parent"],
@@ -241,7 +273,7 @@ class InitialPopulationTests(unittest.TestCase):
         self.assertFalse(workflow.cpe_accepts(0.80, 0.80, 0.0))
         self.assertFalse(workflow.cpe_accepts(0.805, 0.80, 0.01))
 
-    def test_cpe_initial_training_parents_are_top_two_validation_seeds(self):
+    def test_cpe_initial_training_parents_are_two_shared_train_seeds(self):
         seeds = workflow.initial_strategy_population()
         seed_results = [
             {
@@ -251,22 +283,24 @@ class InitialPopulationTests(unittest.TestCase):
                 "utility": utility,
             }
             for index, (seed, utility) in enumerate(
-                zip(seeds, [0.04, 0.08, 0.06]), start=1
+                zip(seeds, [0.04, 0.08]), start=1
             )
         ]
         state = {}
         workflow.initialize_cpe_policies(state, seed_results)
         self.assertEqual(
             [item["workflow_id"] for item in state["training_elites"]],
-            [seeds[1]["workflow_id"], seeds[2]["workflow_id"]],
+            [seeds[1]["workflow_id"], seeds[0]["workflow_id"]],
         )
         self.assertEqual(
-            state["best_policy"]["workflow_id"], seeds[1]["workflow_id"]
+            state["current_policy"]["workflow_id"], seeds[1]["workflow_id"]
         )
+        self.assertIsNone(state["best_policy"])
 
     def test_cpe_train_accept_updates_working_policy_without_lowering_best(self):
         seeds = workflow.initial_strategy_population()
         candidate = copy.deepcopy(seeds[1])
+        candidate["name"] = "Distinct candidate workflow"
         candidate["workflow_id"] = workflow.workflow_id(candidate)
         state = {
             "sampling_seed": 7,
@@ -286,18 +320,18 @@ class InitialPopulationTests(unittest.TestCase):
                 {
                     "rank": 1,
                     "source_round": 1,
-                    "source_phase": "initial_validation",
+                    "source_phase": "initial_train_parent",
                     "workflow_id": seeds[0]["workflow_id"],
                     "workflow": seeds[0],
                     "selection_utility": 0.90,
                 },
                 {
                     "rank": 2,
-                    "source_round": 3,
-                    "source_phase": "initial_validation",
-                    "workflow_id": seeds[2]["workflow_id"],
-                    "workflow": seeds[2],
-                    "selection_utility": 0.80,
+                    "source_round": 2,
+                    "source_phase": "initial_train_parent",
+                    "workflow_id": seeds[1]["workflow_id"],
+                    "workflow": seeds[1],
+                    "selection_utility": 0.60,
                 },
             ],
             "best_policy": {
@@ -310,7 +344,7 @@ class InitialPopulationTests(unittest.TestCase):
         scores = {
             "train_parent_1": 0.70,
             "train_parent_2": 0.60,
-            "train_candidate": 0.65,
+            "train_candidate": 0.75,
             "validation": 0.85,
         }
         phases = []
@@ -324,7 +358,7 @@ class InitialPopulationTests(unittest.TestCase):
             active = call_args[5]
             return (
                 {
-                    "round": 4,
+                    "round": 3,
                     "utility": scores[phase],
                     "workflow": active,
                     "workflow_id": active["workflow_id"],
@@ -335,7 +369,7 @@ class InitialPopulationTests(unittest.TestCase):
             )
 
         args = SimpleNamespace(
-            max_rounds=4,
+            max_rounds=3,
             selection_epsilon=0.0,
             enforce_substantive_interaction_gate=False,
             baseline_report_root="unused",
@@ -359,7 +393,9 @@ class InitialPopulationTests(unittest.TestCase):
                 workflow,
                 "persist_cpe_round_result",
                 side_effect=lambda _path, result: [result],
-            ):
+            ), patch.object(
+                workflow, "maybe_evolve_cpe_operator_for_validation_stagnation"
+            ) as evolve_operator:
                 workflow.run_cpe_evolved_rounds(
                     root,
                     results_path,
@@ -371,18 +407,23 @@ class InitialPopulationTests(unittest.TestCase):
                     args,
                     state,
                     {},
+                    dialogue_operator_evolution=False,
                 )
+        evolve_operator.assert_not_called()
         self.assertEqual(set(phases[:2]), {"train_parent_1", "train_parent_2"})
         self.assertEqual(phases[2:], ["train_candidate", "validation"])
         self.assertEqual(
-            state["current_policy"]["workflow_id"], seeds[0]["workflow_id"]
+            state["current_policy"]["workflow_id"], candidate["workflow_id"]
         )
         self.assertEqual(
             [item["workflow_id"] for item in state["training_elites"]],
-            [seeds[0]["workflow_id"], candidate["workflow_id"]],
+            [candidate["workflow_id"], seeds[0]["workflow_id"]],
         )
         self.assertEqual(state["best_policy"]["workflow_id"], seeds[0]["workflow_id"])
         self.assertFalse(state["patch_history"][0]["validation_accepted"])
+        self.assertNotIn(
+            "stagnation_operator_evolution", state["patch_history"][0]
+        )
 
     def test_cpe_prompt_enforces_champion_information_boundaries(self):
         seeds = workflow.initial_strategy_population()
@@ -620,6 +661,51 @@ class InitialPopulationTests(unittest.TestCase):
             candidate["operator_evolution_trigger"]["operator_id"],
             "dialogue_operator_new",
         )
+
+    def test_disabled_operator_evolution_only_retries_workflow_proposals(self):
+        seeds = workflow.initial_strategy_population()
+        duplicate = copy.deepcopy(seeds[0])
+        duplicate["changed_components"] = ["stop_condition"]
+        duplicate["evolution_mode"] = "mutation"
+        novel = copy.deepcopy(seeds[1])
+        novel["changed_components"] = ["entry_action", "actions"]
+        novel["evolution_mode"] = "crossover"
+        parents = [
+            {
+                "parent_rank": rank,
+                "workflow_id": seed["workflow_id"],
+                "workflow": workflow.optimizer_workflow(seed),
+                "net_utility_on_current_training_batch": 0.1 - rank * 0.01,
+                "training_evidence": {"training_runs": []},
+            }
+            for rank, seed in enumerate(seeds[:2], start=1)
+        ]
+        args = SimpleNamespace(
+            optimizer_retries=4,
+            opt_model="offline-test-model",
+            candidate_similarity_threshold=0.90,
+        )
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            workflow.interaction.local,
+            "optimizer_response",
+            side_effect=[duplicate, duplicate, duplicate, novel],
+        ), patch.object(
+            workflow, "evolve_cpe_dialogue_operator"
+        ) as evolve:
+            root = Path(directory)
+            (root / "round_4").mkdir()
+            candidate = workflow.propose_cpe_workflow(
+                parents,
+                {"workflow": seeds[0], "utility": 0.1},
+                [{"round": 1, "utility": 0.1, "workflow": seeds[0]}],
+                [],
+                4,
+                root / "round_4",
+                args,
+                dialogue_operator_evolution=False,
+            )
+        evolve.assert_not_called()
+        self.assertNotIn("operator_evolution_trigger", candidate)
 
     def test_cpe_validation_plateau_triggers_operator_after_five_rounds(self):
         state = {

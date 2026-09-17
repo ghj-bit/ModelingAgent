@@ -53,8 +53,13 @@ def active_openclaw_config_path() -> Path:
     return (state_dirs[0] / "openclaw.json").resolve()
 
 
-def activate_clean_openclaw_config() -> tuple[Path, str | None]:
-    """Use a private config whose Agents never seed workspace bootstrap files."""
+NESTED_AGENT_TOOL_DENY = ("sessions_spawn", "sessions_send", "subagents")
+
+
+def activate_clean_openclaw_config(
+    *, deny_nested_agents: bool = False
+) -> tuple[Path, str | None]:
+    """Use a private config with optional single-Agent execution enforcement."""
     source = active_openclaw_config_path()
     try:
         config = json.loads(source.read_text(encoding="utf-8"))
@@ -63,6 +68,14 @@ def activate_clean_openclaw_config() -> tuple[Path, str | None]:
     agents = config.setdefault("agents", {})
     agents.setdefault("defaults", {})["skipBootstrap"] = True
     agents["list"] = []
+    if deny_nested_agents:
+        tools = config.setdefault("tools", {})
+        existing_deny = tools.get("deny") or []
+        if not isinstance(existing_deny, list):
+            raise RuntimeError("OpenClaw tools.deny must be a JSON list")
+        tools["deny"] = list(
+            dict.fromkeys([*existing_deny, *NESTED_AGENT_TOOL_DENY])
+        )
 
     handle, filename = tempfile.mkstemp(prefix="modelingagent-clean-", suffix=".json")
     config_path = Path(filename)
@@ -336,9 +349,12 @@ def main() -> None:
     )
     run_args = runtime_args(args)
     run_args.evaluation_round_dir = round_dir
+    existing_result = strategy.workflow_evolution.read_json(
+        round_dir / "result.json", {}
+    )
     result = strategy.interaction.evaluate_round(
         experiment, 1, {"rubric_id": "clean_baseline_no_interaction"},
-        problems, prompt_path, run_args,
+        problems, prompt_path, run_args, existing_result=existing_result,
     )
     result.pop("rubric", None)
     result.pop("rubric_id", None)

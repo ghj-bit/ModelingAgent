@@ -43,8 +43,8 @@ class PipelinedAgentExecutionTests(unittest.TestCase):
         with (
             patch.object(refinement.sys, "argv", ["runner"]),
             patch.object(
-                refinement.clean_baseline,
-                "activate_clean_openclaw_config",
+                refinement,
+                "activate_subagent_enabled_openclaw_config",
                 return_value=(isolated, "original-openclaw.json"),
             ) as activate,
             patch.object(
@@ -57,9 +57,126 @@ class PipelinedAgentExecutionTests(unittest.TestCase):
 
         activate.assert_called_once_with()
         workflow_main.assert_called_once_with(
-            cpe_mode=True, compact_experiment_inputs=True
+            cpe_mode=True,
+            compact_experiment_inputs=True,
+            dialogue_operator_evolution=False,
         )
         remove.assert_called_once_with(isolated, "original-openclaw.json")
+
+    def test_solver_prompt_allows_nested_agents(self):
+        seed = refinement.workflow.initial_strategy_population()[0]
+        prompt = refinement._original_build_workflow_refinement_prompt(seed)
+        self.assertNotIn("## Single-Agent Execution Boundary", prompt)
+        self.assertNotIn("Do not spawn, call,", prompt)
+        for tool_name in refinement.clean_baseline.NESTED_AGENT_TOOL_DENY:
+            self.assertNotIn(f"`{tool_name}`", prompt)
+
+    def test_subagent_enabled_config_removes_nested_tool_denies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "openclaw.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "agents": {"defaults": {}},
+                        "tools": {
+                            "deny": [
+                                "browser",
+                                *refinement.clean_baseline.NESTED_AGENT_TOOL_DENY,
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                "os.environ", {"OPENCLAW_CONFIG_PATH": str(source)}, clear=False
+            ):
+                isolated, previous = refinement.activate_subagent_enabled_openclaw_config()
+                try:
+                    private = json.loads(isolated.read_text(encoding="utf-8"))
+                    self.assertEqual(private["tools"]["deny"], ["browser"])
+                finally:
+                    refinement.clean_baseline.remove_clean_openclaw_config(
+                        isolated, previous
+                    )
+
+    def test_clean_baseline_mutation_prompt_requires_new_interaction_operator(self):
+        prompt = refinement.build_clean_baseline_cpe_workflow_evolution_prompt(
+            [{"workflow": {"name": "parent_a"}}, {"workflow": {"name": "parent_b"}}],
+            {"workflow": {"name": "champion"}},
+            [],
+            {},
+        )
+        self.assertIn("evolution_mode` is `mutation`", prompt)
+        self.assertIn("new workflow-level interaction operator", prompt)
+        self.assertIn("qualitatively different, decision-relevant information function", prompt)
+
+    def test_clean_baseline_utility_uses_report_score_and_lambda_point_zero_five(self):
+        previous_basis = refinement.workflow.CPE_UTILITY_BASIS
+        previous_lambda = refinement.workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT
+        try:
+            refinement.workflow.CPE_UTILITY_BASIS = (
+                refinement.CLEAN_BASELINE_CPE_UTILITY_BASIS
+            )
+            refinement.workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = (
+                refinement.CLEAN_BASELINE_CPE_COST_LAMBDA
+            )
+            result = {
+                "problem_results": [
+                    {
+                        "problem_id": "example",
+                        "average_score": 0.8,
+                        "run_dir": "unused",
+                    }
+                ]
+            }
+            with patch.object(
+                refinement.workflow,
+                "cpe_interaction_cost",
+                return_value={"interaction_cost": 0.4},
+            ):
+                refinement.workflow.apply_cpe_net_utility(result, {})
+        finally:
+            refinement.workflow.CPE_UTILITY_BASIS = previous_basis
+            refinement.workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = previous_lambda
+
+        self.assertAlmostEqual(result["utility"], 0.78)
+        self.assertEqual(
+            result["utility_basis"],
+            "mean_report_score_minus_interaction_cost",
+        )
+        self.assertNotIn("original_report_utility", result)
+
+    def test_clean_baseline_removes_cpe_and_dialogue_round_caps(self):
+        previous_minimum = refinement.workflow.MIN_CPE_EVOLUTION_ROUNDS
+        previous_maximum = refinement.workflow.MAX_WORKFLOW_EXCHANGES
+        try:
+            refinement.workflow.MIN_CPE_EVOLUTION_ROUNDS = None
+            refinement.workflow.MAX_WORKFLOW_EXCHANGES = None
+            refinement.workflow.validate_workflow(
+                {
+                    "name": "uncapped dialogue workflow",
+                    "purpose": "Use repeated expert exchanges when the workflow needs them.",
+                    "entry_action": "ask_expert",
+                    "actions": [
+                        {
+                            "action_id": "ask_expert",
+                            "action_type": "expert_exchange",
+                            "rule": "Ask the expert for a decision-relevant qualitative boundary.",
+                        },
+                        {
+                            "action_id": "close_dialogue",
+                            "action_type": "close",
+                            "rule": "Integrate the supported consequence and stop the dialogue.",
+                        },
+                    ],
+                    "max_exchanges": 4,
+                    "stop_condition": "Stop when the workflow's evidence condition is met.",
+                }
+            )
+        finally:
+            refinement.workflow.MIN_CPE_EVOLUTION_ROUNDS = previous_minimum
+            refinement.workflow.MAX_WORKFLOW_EXCHANGES = previous_maximum
 
     def test_current_clean_pool_defaults_to_three_concurrent_tasks(self):
         parsed = SimpleNamespace(

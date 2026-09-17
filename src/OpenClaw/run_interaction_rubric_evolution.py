@@ -1060,6 +1060,19 @@ def validate_interaction_run(result: dict, rubric: dict) -> dict:
     return receipt
 
 
+def short_judge_workspace_parent(run_dir: Path) -> Path:
+    """Return a short, stable parent for transient Judge workspaces.
+
+    CPE runs nest a task beneath an experiment, evaluation, and workflow path.
+    Adding ``meta/.judge/.../final_submission/solution_report.md`` to that path
+    can exceed Windows' legacy 260-character limit.  The Judge only needs an
+    isolated temporary workspace; its durable checkpoint remains beside the
+    task run.
+    """
+    identity = hashlib.sha1(str(Path(run_dir).resolve()).encode("utf-8")).hexdigest()[:12]
+    return REPO_ROOT / "output_judge" / ".workspaces" / identity
+
+
 def judge_report(problem_id: str, result: dict, round_number: int, experiment: Path, args) -> dict:
     stability_path = result["run_dir"] / "meta" / "judge_stability.json"
     payload = run_judge_stability.evaluate_reports_repeated(
@@ -1068,7 +1081,7 @@ def judge_report(problem_id: str, result: dict, round_number: int, experiment: P
         args.judge_repeats,
         f"interaction-rubric-{experiment.name}-r{round_number}",
         stability_path,
-        result["run_dir"] / "meta",
+        short_judge_workspace_parent(result["run_dir"]),
         concurrency=args.judge_concurrency,
         judgers=EVALUATION_DIMENSIONS,
     )
@@ -1487,8 +1500,12 @@ def append_expert_dialogue(
 
 
 def write_json_atomic(path: Path, payload: dict) -> None:
+    path = workflow_evolution._json_filesystem_path(Path(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    # CPE run directories are deeply nested. Repeating the destination filename
+    # in the temporary name can push an otherwise valid Windows path beyond the
+    # legacy MAX_PATH limit, so keep the same-directory temporary name short.
+    temporary = path.with_name(f".tmp-{uuid.uuid4().hex[:16]}")
     temporary.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )

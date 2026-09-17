@@ -46,6 +46,11 @@ DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD = 0.90
 STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION = 5
 SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION = 3
 CPE_TRAINING_PARENT_COUNT = 2
+MIN_CPE_EVOLUTION_ROUNDS: int | None = CPE_TRAINING_PARENT_COUNT + 1
+# Opt-in compatibility switch used by launchers that want the two seed parents,
+# their first child, and that child's validation to comprise CPE round 1.
+CPE_COLLAPSE_INITIAL_PARENTS = False
+MAX_WORKFLOW_EXCHANGES: int | None = 3
 FIRST_STAGNATION_COUNTED_ROUND = 4
 OPERATOR_SIMILARITY_THRESHOLD = 0.90
 REPORT_CHANGE_SUMMARY_MAX_CHARS = 50
@@ -64,6 +69,11 @@ DEFAULT_CPE_EXCHANGE_COST_WEIGHT = 0.5
 DEFAULT_CPE_TOKEN_COST_WEIGHT = 0.4
 DEFAULT_CPE_LATENCY_COST_WEIGHT = 0.1
 DEFAULT_CPE_COST_PENALTY_WEIGHT = 0.01
+CPE_UTILITY_BASIS_QUALITY_GAIN = "mean_quality_gain_minus_interaction_cost"
+CPE_UTILITY_BASIS_ABSOLUTE_SCORE = "mean_report_score_minus_interaction_cost"
+# Entry points may select the absolute-score basis for experiments whose
+# baseline reports are inputs rather than a quality reference.
+CPE_UTILITY_BASIS = CPE_UTILITY_BASIS_QUALITY_GAIN
 EXPERT_REPLY_LATENCY_PATTERN = re.compile(
     r"completed exchange\s+(\d+)\s+reply\s+\([^;]*;\s*([0-9]+(?:\.[0-9]+)?)s\)"
 )
@@ -234,8 +244,10 @@ def initial_strategy_population() -> list[dict[str, Any]]:
             "seed_operator": "data_parameter_boundary",
         },
     ]
+    # CPE starts directly from the two parent mechanisms. The former third
+    # data-grounding seed is no longer an initial validation rollout.
     population = []
-    for workflow in definitions:
+    for workflow in definitions[:CPE_TRAINING_PARENT_COUNT]:
         workflow["evolution_operator"] = "initial_strategy"
         validate_workflow(workflow)
         workflow["workflow_id"] = workflow_id(workflow)
@@ -346,7 +358,7 @@ def load_or_create_cpe_state(
             "selection_epsilon": float(selection_epsilon),
             "train_sampling": "independent_batches_with_replacement_across_rounds",
             "validation_problems": validation_pool,
-            "utility_basis": "mean_quality_gain_minus_interaction_cost",
+            "utility_basis": CPE_UTILITY_BASIS,
             "interaction_cost": {
                 "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
                 "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
@@ -391,7 +403,7 @@ def load_or_create_cpe_state(
         "selection_epsilon": float(selection_epsilon),
         "validation_problems": list(validation_pool),
         "train_sampling": "independent_batches_with_replacement_across_rounds",
-        "utility_basis": "mean_quality_gain_minus_interaction_cost",
+        "utility_basis": CPE_UTILITY_BASIS,
         "interaction_cost": {
             "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
             "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
@@ -428,6 +440,22 @@ def reserve_cpe_train_batch(state: dict[str, Any], round_number: int) -> list[st
     batch = random.Random(f"{seed}:round:{round_number}").sample(pool, batch_size)
     round_state["train_batch"] = batch
     round_state["batch_reserved_at"] = now()
+    state["updated_at"] = now()
+    return batch
+
+
+def reserve_cpe_initial_train_batch(state: dict[str, Any]) -> list[str]:
+    """Reserve one shared batch for the two initial training parents."""
+    existing = state.get("initial_training_batch")
+    if isinstance(existing, list) and existing:
+        return [str(item) for item in existing]
+
+    pool = [str(item) for item in state["train_pool"]]
+    batch_size = int(state["train_batch_size"])
+    seed = int(state["sampling_seed"])
+    batch = random.Random(f"{seed}:initial_training").sample(pool, batch_size)
+    state["initial_training_batch"] = batch
+    state["initial_training_batch_reserved_at"] = now()
     state["updated_at"] = now()
     return batch
 
@@ -519,8 +547,16 @@ def validate_workflow(workflow: dict[str, Any]) -> None:
                 f"interaction workflow must not contain removed field {removed_field}"
             )
     max_exchanges = workflow.get("max_exchanges")
-    if not isinstance(max_exchanges, int) or not 1 <= max_exchanges <= 3:
-        raise ValueError("interaction workflow max_exchanges must be 1, 2, or 3")
+    if not isinstance(max_exchanges, int) or max_exchanges < 1:
+        raise ValueError("interaction workflow max_exchanges must be a positive integer")
+    if (
+        MAX_WORKFLOW_EXCHANGES is not None
+        and max_exchanges > MAX_WORKFLOW_EXCHANGES
+    ):
+        raise ValueError(
+            "interaction workflow max_exchanges exceeds the configured limit "
+            f"({MAX_WORKFLOW_EXCHANGES})"
+        )
     actions = workflow.get("actions")
     if not isinstance(actions, list) or not 2 <= len(actions) <= 8:
         raise ValueError("interaction workflow must contain two to eight actions")
@@ -601,7 +637,7 @@ def workflow_nodes(results: list[dict]) -> list[dict]:
 
 
 def evolution_evidence_nodes(results: list[dict]) -> list[dict]:
-    """Keep the three seeds and the all-history mean-utility champion."""
+    """Keep the two seeds and the all-history mean-utility champion."""
     nodes = workflow_nodes(results)
     initial = sorted(
         (
@@ -610,7 +646,7 @@ def evolution_evidence_nodes(results: list[dict]) -> list[dict]:
             if node.get("evolution_operator") == "initial_strategy"
         ),
         key=lambda item: int(item["round"]),
-    )[:3]
+    )[:CPE_TRAINING_PARENT_COUNT]
     best = max(
         nodes,
         key=lambda item: (float(item["utility"]), -int(item["round"])),
@@ -1221,7 +1257,7 @@ before selecting one proposal. Explain in evolution_rationale which supplied
 parent inputs motivated each substantive behavioral change and how every parent
 was considered. Extra reflection logs or paraphrases alone are insufficient.
 
-Workflow parent-input archive. It contains all three initial workflows and the
+Workflow parent-input archive. It contains both initial workflows and the
 all-history global-best workflow by mean utility across every completed round.
 If an initial workflow is also the historical best, it appears only once and
 its `parent_roles` field carries both roles. All listed workflows must be
@@ -1233,7 +1269,7 @@ scores. Its validation runs
 contain the complete expert dialogue, an at-most-50-character summary of report
 changes directly attributable to interaction, and LLM weakness summaries only
 for non-perfect `analysis_groundedness` and `modeling_groundedness` Judge
-feedback. Other Judge dimensions are omitted. Compare the three seed mechanisms
+feedback. Other Judge dimensions are omitted. Compare the two seed mechanisms
 explicitly and use the all-history global best as evidence of successful
 evolution.
 Treat final-report weaknesses as workflow evidence only when the dialogue process
@@ -1358,13 +1394,16 @@ def propose_cpe_workflow(
     round_number: int,
     round_dir: Path,
     args,
+    dialogue_operator_evolution: bool = True,
 ) -> dict[str, Any]:
     """Evolve from two Judge-free training parents under CPE boundaries."""
     workflow_prompt_base = build_cpe_workflow_evolution_prompt(
         training_parents,
         validation_champion,
         patch_history,
-        available_dialogue_operators(round_dir.parent),
+        available_dialogue_operators(
+            round_dir.parent if dialogue_operator_evolution else None
+        ),
     )
     previous = workflow_nodes(previous_results)
     last_error: Exception | None = None
@@ -1429,7 +1468,8 @@ def propose_cpe_workflow(
                     f"{duplicate[0]} (similarity={duplicate[1]:.4f})"
                 )
                 if (
-                    similarity_rejections
+                    dialogue_operator_evolution
+                    and similarity_rejections
                     == SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION
                 ):
                     operator_event = evolve_cpe_dialogue_operator(
@@ -1467,16 +1507,17 @@ def propose_cpe_workflow(
                         .get("training_evidence", {})
                         .get("training_runs", [])
                     ],
-                    "operator_evolution_trigger": (
-                        {
-                            "trigger_reason": operator_event["trigger_reason"],
-                            "operator_id": operator_event["operator"]["operator_id"],
-                        }
-                        if operator_event is not None
-                        else None
-                    ),
                 }
             )
+            if dialogue_operator_evolution:
+                candidate["operator_evolution_trigger"] = (
+                    {
+                        "trigger_reason": operator_event["trigger_reason"],
+                        "operator_id": operator_event["operator"]["operator_id"],
+                    }
+                    if operator_event is not None
+                    else None
+                )
             return candidate
         except Exception as error:
             last_error = error
@@ -1817,7 +1858,10 @@ def parse_args() -> argparse.Namespace:
 def restore_cpe_net_utilities(results: list[dict]) -> list[dict]:
     """Restore net CPE utility after the shared absolute-score normalizer."""
     for item in results:
-        if item.get("utility_basis") != "mean_quality_gain_minus_interaction_cost":
+        if item.get("utility_basis") not in {
+            CPE_UTILITY_BASIS_QUALITY_GAIN,
+            CPE_UTILITY_BASIS_ABSOLUTE_SCORE,
+        }:
             continue
         problem_results = item.get("problem_results", [])
         net_utilities = [
@@ -2040,17 +2084,18 @@ def persist_cpe_round_result(results_path: Path, result: dict[str, Any]) -> list
 
 
 def initialize_cpe_policies(
-    state: dict[str, Any], seed_results: list[dict[str, Any]]
+    state: dict[str, Any],
+    seed_results: list[dict[str, Any]],
 ) -> None:
-    """Initialize two training parents from the two strongest validation seeds."""
+    """Initialize two training parents from one shared initial train batch."""
     if (
         state.get("current_policy")
         and state.get("best_policy")
         and len(state.get("training_elites", [])) == CPE_TRAINING_PARENT_COUNT
     ):
         return
-    if len(seed_results) != 3:
-        raise ValueError("CPE initialization requires exactly three seed results")
+    if len(seed_results) != CPE_TRAINING_PARENT_COUNT:
+        raise ValueError("CPE initialization requires exactly two seed results")
     ranked = sorted(
         seed_results,
         key=lambda item: (-float(item["utility"]), int(item["round"])),
@@ -2060,34 +2105,184 @@ def initialize_cpe_policies(
         "source_round": int(best["round"]),
         "workflow_id": best["workflow_id"],
         "workflow": without_removed_workflow_fields(best["workflow"]),
-        "validation_utility": float(best["utility"]),
-        "utility_basis": "mean_quality_gain_minus_interaction_cost",
+        "train_utility": float(best["utility"]),
+        "utility_basis": CPE_UTILITY_BASIS,
     }
     state["current_policy"] = copy.deepcopy(policy)
-    state["best_policy"] = copy.deepcopy(policy)
+    state["best_policy"] = None
     state["training_elites"] = [
         {
             "rank": rank,
             "source_round": int(item["round"]),
-            "source_phase": "initial_validation",
+            "source_phase": "initial_train_parent",
             "workflow_id": item["workflow_id"],
             "workflow": without_removed_workflow_fields(item["workflow"]),
             "selection_utility": float(item["utility"]),
-            "selection_basis": "initial_validation_net_utility",
+            "selection_basis": "initial_shared_training_batch_net_utility",
         }
         for rank, item in enumerate(
             ranked[:CPE_TRAINING_PARENT_COUNT], start=1
         )
     ]
-    state["initial_seed_validation"] = [
+    state["initial_seed_train"] = [
         {
             "round": int(item["round"]),
             "workflow_id": item["workflow_id"],
-            "validation_utility": float(item["utility"]),
+            "train_utility": float(item["utility"]),
         }
         for item in sorted(seed_results, key=lambda item: int(item["round"]))
     ]
     state["updated_at"] = now()
+
+
+def run_cpe_collapsed_initial_parent_evaluations(
+    experiment: Path,
+    initial_problem_ids: list[str],
+    initial_population: list[dict[str, Any]],
+    fixed_rubric: dict[str, Any],
+    problems: dict,
+    run_args,
+    args,
+    state: dict[str, Any],
+    original_scores: dict[str, dict[str, Any]],
+) -> None:
+    """Evaluate both seed parents inside CPE round 1 before creating its child.
+
+    This opt-in path deliberately keeps the parent training and validation
+    artifacts separate from the round-level result.  The latter remains the
+    evolved child, just as it does in every later CPE round.
+    """
+    if len(initial_population) != CPE_TRAINING_PARENT_COUNT:
+        raise ValueError("Collapsed CPE initialization requires two seed workflows")
+    initialization_mode = "collapsed_initial_parents_in_round_1"
+    saved_mode = state.get("initialization_mode")
+    if saved_mode not in (None, initialization_mode):
+        raise ValueError(
+            "This experiment was created with a different CPE initialization mode; "
+            "start a new experiment directory instead of resuming it."
+        )
+    existing_rounds = normalized_results(experiment / "workflows" / "results.json")
+    if (
+        saved_mode is None
+        and any(int(item.get("round", 0)) in (1, 2) for item in existing_rounds)
+    ):
+        raise ValueError(
+            "This experiment contains legacy initial-parent rounds. Start a new "
+            "experiment directory for collapsed round-1 CPE scheduling."
+        )
+    state["initialization_mode"] = initialization_mode
+    validation_problems = [str(item) for item in state["validation_problems"]]
+    parent_train_results: list[dict[str, Any] | None] = [None] * CPE_TRAINING_PARENT_COUNT
+    print(
+        "Running two initial training-parent workflows in parallel "
+        "inside CPE round 1",
+        flush=True,
+    )
+    with ThreadPoolExecutor(max_workers=CPE_TRAINING_PARENT_COUNT) as executor:
+        futures = {
+            executor.submit(
+                execute_cpe_evaluation,
+                experiment,
+                1,
+                f"initial_train_parent_{parent_rank}",
+                "train",
+                initial_problem_ids,
+                without_removed_workflow_fields(parent),
+                fixed_rubric,
+                problems,
+                run_args,
+                args.enforce_substantive_interaction_gate,
+                original_scores,
+            ): parent_rank
+            for parent_rank, parent in enumerate(initial_population, start=1)
+        }
+        for future in as_completed(futures):
+            parent_rank = futures[future]
+            result, failures = future.result()
+            if failures:
+                raise RuntimeError(
+                    f"{len(failures)} initial training-parent run(s) failed the "
+                    "substantive gate"
+                )
+            parent_train_results[parent_rank - 1] = result
+    parent_train_results = [
+        result for result in parent_train_results if result is not None
+    ]
+    if len(parent_train_results) != CPE_TRAINING_PARENT_COUNT:
+        raise RuntimeError("Initial CPE parent training did not produce two results")
+
+    original_scores.update(
+        ensure_cpe_original_report_scores(experiment, validation_problems, run_args)
+    )
+    parent_validation_results: list[dict[str, Any] | None] = [None] * CPE_TRAINING_PARENT_COUNT
+    print(
+        "Running the two initial parent validations in parallel inside CPE round 1",
+        flush=True,
+    )
+    with ThreadPoolExecutor(max_workers=CPE_TRAINING_PARENT_COUNT) as executor:
+        futures = {
+            executor.submit(
+                execute_cpe_evaluation,
+                experiment,
+                1,
+                f"initial_validation_parent_{parent_rank}",
+                "validation",
+                validation_problems,
+                without_removed_workflow_fields(parent),
+                fixed_rubric,
+                problems,
+                run_args,
+                args.enforce_substantive_interaction_gate,
+                original_scores,
+            ): parent_rank
+            for parent_rank, parent in enumerate(initial_population, start=1)
+        }
+        for future in as_completed(futures):
+            parent_rank = futures[future]
+            result, failures = future.result()
+            if failures:
+                raise RuntimeError(
+                    f"{len(failures)} initial parent validation run(s) failed the "
+                    "substantive gate"
+                )
+            parent_validation_results[parent_rank - 1] = result
+    parent_validation_results = [
+        result for result in parent_validation_results if result is not None
+    ]
+    if len(parent_validation_results) != CPE_TRAINING_PARENT_COUNT:
+        raise RuntimeError("Initial CPE parent validation did not produce two results")
+
+    state["initial_parent_train_results"] = copy.deepcopy(parent_train_results)
+    state["initial_parent_validation_results"] = copy.deepcopy(parent_validation_results)
+    state["initial_seed_train"] = [
+        {
+            "round": 1,
+            "workflow_id": result["workflow_id"],
+            "train_utility": float(result["utility"]),
+        }
+        for result in parent_train_results
+    ]
+    state["training_elites"] = select_cpe_training_elites(parent_train_results)
+    best_train = state["training_elites"][0]
+    state["current_policy"] = {
+        **copy.deepcopy(best_train),
+        "train_utility": float(best_train["selection_utility"]),
+        "utility_basis": CPE_UTILITY_BASIS,
+    }
+    validation_champion = max(
+        parent_validation_results,
+        key=lambda result: (float(result["utility"]), str(result["workflow_id"])),
+    )
+    state["best_policy"] = {
+        "source_round": 1,
+        "source_phase": "initial_validation_parent",
+        "workflow_id": validation_champion["workflow_id"],
+        "workflow": without_removed_workflow_fields(validation_champion["workflow"]),
+        "validation_utility": float(validation_champion["utility"]),
+        "utility_basis": CPE_UTILITY_BASIS,
+    }
+    state["updated_at"] = now()
+    workflow_evolution.write_json(cpe_state_path(experiment), state)
 
 
 def select_cpe_training_elites(
@@ -2144,6 +2339,7 @@ def maybe_evolve_cpe_operator_for_validation_stagnation(
     if len(stagnant) < STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION:
         return None
     trigger_rounds = stagnant[-STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION:]
+    champion = state.get("best_policy")
     event = evolve_cpe_dialogue_operator(
         workflows_dir,
         args,
@@ -2152,8 +2348,10 @@ def maybe_evolve_cpe_operator_for_validation_stagnation(
         "validation_champion_stagnation",
         {
             "stagnant_rounds": trigger_rounds,
-            "historical_validation_utility": float(
-                state["best_policy"]["validation_utility"]
+            "historical_validation_utility": (
+                float(champion["validation_utility"])
+                if isinstance(champion, dict)
+                else None
             ),
         },
     )
@@ -2362,17 +2560,21 @@ def cpe_interaction_cost(run_dir: Path) -> dict[str, Any]:
 def apply_cpe_net_utility(
     result: dict[str, Any], original_scores: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:
-    """Apply quality-gain-minus-interaction-cost utility to an evolution result."""
+    """Apply the configured CPE score-minus-interaction-cost utility."""
     problem_results = result.get("problem_results", [])
     if not problem_results:
         raise ValueError("Cannot calculate CPE net utility without problem results")
-    missing = [
-        str(item.get("problem_id"))
-        for item in problem_results
-        if str(item.get("problem_id")) not in original_scores
-    ]
-    if missing:
-        raise ValueError("Missing original-report scores for: " + ", ".join(missing))
+    use_quality_gain = CPE_UTILITY_BASIS == CPE_UTILITY_BASIS_QUALITY_GAIN
+    if use_quality_gain:
+        missing = [
+            str(item.get("problem_id"))
+            for item in problem_results
+            if str(item.get("problem_id")) not in original_scores
+        ]
+        if missing:
+            raise ValueError(
+                "Missing original-report scores for: " + ", ".join(missing)
+            )
 
     gains = []
     original_utilities = []
@@ -2382,9 +2584,17 @@ def apply_cpe_net_utility(
     net_utilities = []
     for item in problem_results:
         problem_id = str(item["problem_id"])
-        original_utility = float(original_scores[problem_id]["utility"])
         refined_utility = float(item["average_score"])
-        gain = refined_utility - original_utility
+        original_utility = (
+            float(original_scores[problem_id]["utility"])
+            if use_quality_gain
+            else None
+        )
+        quality_component = (
+            refined_utility - original_utility
+            if original_utility is not None
+            else refined_utility
+        )
         repetitions = item.get("repetitions") or [item]
         run_costs = [
             cpe_interaction_cost(Path(str(repetition["run_dir"])))
@@ -2394,35 +2604,40 @@ def apply_cpe_net_utility(
             float(run_cost["interaction_cost"]) for run_cost in run_costs
         ) / len(run_costs)
         penalty = DEFAULT_CPE_COST_PENALTY_WEIGHT * interaction_cost
-        net_utility = gain - penalty
-        item["original_report_utility"] = original_utility
+        net_utility = quality_component - penalty
+        if original_utility is not None:
+            item["original_report_utility"] = original_utility
         item["refined_report_utility"] = refined_utility
-        item["quality_gain"] = gain
-        item["utility_gain"] = gain
+        if original_utility is not None:
+            item["quality_gain"] = quality_component
+            item["utility_gain"] = quality_component
         item["interaction_cost"] = interaction_cost
         item["interaction_penalty"] = penalty
         item["net_utility"] = net_utility
         item["interaction_cost_runs"] = run_costs
-        original_utilities.append(original_utility)
+        if original_utility is not None:
+            original_utilities.append(original_utility)
         refined_utilities.append(refined_utility)
-        gains.append(gain)
+        if original_utility is not None:
+            gains.append(quality_component)
         interaction_costs.append(interaction_cost)
         penalties.append(penalty)
         net_utilities.append(net_utility)
 
     result["absolute_utility"] = sum(refined_utilities) / len(refined_utilities)
-    result["original_report_utility"] = sum(original_utilities) / len(
-        original_utilities
-    )
-    result["quality_gain"] = sum(gains) / len(gains)
-    result["utility_gain"] = result["quality_gain"]
+    if original_utilities:
+        result["original_report_utility"] = sum(original_utilities) / len(
+            original_utilities
+        )
+        result["quality_gain"] = sum(gains) / len(gains)
+        result["utility_gain"] = result["quality_gain"]
     result["interaction_cost"] = sum(interaction_costs) / len(
         interaction_costs
     )
     result["interaction_penalty"] = sum(penalties) / len(penalties)
     result["net_utility"] = sum(net_utilities) / len(net_utilities)
     result["utility"] = result["net_utility"]
-    result["utility_basis"] = "mean_quality_gain_minus_interaction_cost"
+    result["utility_basis"] = CPE_UTILITY_BASIS
     result["interaction_cost_parameters"] = {
         "max_exchanges": DEFAULT_CPE_MAX_EXCHANGES,
         "total_token_reference": DEFAULT_CPE_TOTAL_TOKEN_REFERENCE,
@@ -2437,7 +2652,13 @@ def apply_cpe_net_utility(
 
 def cpe_validation_champion_signal(state: dict[str, Any]) -> dict[str, Any]:
     """Expose exactly the validation champion workflow and net utility."""
-    champion = state["best_policy"]
+    champion = state.get("best_policy")
+    if not isinstance(champion, dict):
+        return {
+            "workflow": None,
+            "utility": None,
+            "status": "no_validation_champion_yet",
+        }
     return {
         "workflow": optimizer_workflow(champion["workflow"]),
         "utility": float(champion["validation_utility"]),
@@ -2455,18 +2676,34 @@ def run_cpe_evolved_rounds(
     args,
     state: dict[str, Any],
     original_scores: dict[str, dict[str, Any]],
+    dialogue_operator_evolution: bool = True,
 ) -> list[dict[str, Any]]:
-    """Run net-utility CPE train gating and full-validation champion gating."""
+    """Run two-parent train gating and validation only after strict improvement."""
     seed_count = len(initial_population)
-    seed_results = [
-        item for item in initial_results if 1 <= int(item.get("round", 0)) <= seed_count
-    ]
-    initialize_cpe_policies(state, seed_results)
+    collapsed_initial_round = CPE_COLLAPSE_INITIAL_PARENTS
+    if collapsed_initial_round:
+        seed_results = list(state.get("initial_parent_train_results", []))
+        if len(seed_results) != CPE_TRAINING_PARENT_COUNT:
+            raise ValueError(
+                "Collapsed CPE initialization requires two stored parent train results"
+            )
+        first_evolved_round = 1
+    else:
+        seed_results = [
+            item
+            for item in initial_results
+            if 1 <= int(item.get("round", 0)) <= seed_count
+        ]
+        initialize_cpe_policies(
+            state,
+            seed_results,
+        )
+        first_evolved_round = seed_count + 1
     workflow_evolution.write_json(cpe_state_path(experiment), state)
     results = initial_results
     validation_problems = [str(item) for item in state["validation_problems"]]
 
-    for round_number in range(seed_count + 1, args.max_rounds + 1):
+    for round_number in range(first_evolved_round, args.max_rounds + 1):
         round_state = state.setdefault("rounds", {}).setdefault(
             str(round_number), {}
         )
@@ -2476,7 +2713,11 @@ def run_cpe_evolved_rounds(
                 results = persist_cpe_round_result(results_path, stored_result)
             continue
 
-        train_batch = reserve_cpe_train_batch(state, round_number)
+        if round_number == first_evolved_round:
+            train_batch = reserve_cpe_initial_train_batch(state)
+            round_state.setdefault("train_batch", list(train_batch))
+        else:
+            train_batch = reserve_cpe_train_batch(state, round_number)
         workflow_evolution.write_json(cpe_state_path(experiment), state)
         ensure_cpe_baseline_reports(
             experiment,
@@ -2495,49 +2736,70 @@ def run_cpe_evolved_rounds(
         workflow_evolution.write_json(
             round_dir / "training_elites_at_start.json", elite_policies
         )
-        parent_results = [None] * CPE_TRAINING_PARENT_COUNT
-        parent_failures = []
-        print(
-            "Running two training-parent workflows in parallel "
-            "(per-parent problem concurrency="
-            f"{getattr(run_args, 'concurrency', 1)})",
-            flush=True,
+        initial_parent_by_id = {
+            str(result.get("workflow_id")): result for result in seed_results
+        }
+        reuse_initial_parent_results = (
+            round_number == first_evolved_round
+            and len(seed_results) == CPE_TRAINING_PARENT_COUNT
+            and all(
+                str(elite["workflow_id"]) in initial_parent_by_id
+                for elite in elite_policies
+            )
         )
-        with ThreadPoolExecutor(max_workers=CPE_TRAINING_PARENT_COUNT) as executor:
-            futures = {
-                executor.submit(
-                    execute_cpe_evaluation,
-                    experiment,
-                    round_number,
-                    f"train_parent_{parent_rank}",
-                    "train",
-                    train_batch,
-                    without_removed_workflow_fields(elite["workflow"]),
-                    fixed_rubric,
-                    problems,
-                    run_args,
-                    args.enforce_substantive_interaction_gate,
-                    original_scores,
-                ): parent_rank
-                for parent_rank, elite in enumerate(elite_policies, start=1)
-            }
-            for future in as_completed(futures):
-                parent_rank = futures[future]
-                parent_result, failures = future.result()
-                parent_results[parent_rank - 1] = parent_result
-                parent_failures.extend(failures)
-        parent_results = [
-            result for result in parent_results if result is not None
-        ]
-        if len(parent_results) != CPE_TRAINING_PARENT_COUNT:
-            raise RuntimeError(
-                "A parallel training-parent evaluation produced no result"
+        if reuse_initial_parent_results:
+            print(
+                "Reusing the two initial shared-training-batch parent results",
+                flush=True,
             )
-        if parent_failures:
-            raise RuntimeError(
-                f"{len(parent_failures)} training-parent run(s) failed the "
-                "substantive gate"
+            parent_results = [
+                copy.deepcopy(initial_parent_by_id[str(elite["workflow_id"])])
+                for elite in elite_policies
+            ]
+        else:
+            parent_results = [None] * CPE_TRAINING_PARENT_COUNT
+            parent_failures = []
+            print(
+                "Running two training-parent workflows in parallel "
+                "(per-parent problem concurrency="
+                f"{getattr(run_args, 'concurrency', 1)})",
+                flush=True,
             )
+            with ThreadPoolExecutor(max_workers=CPE_TRAINING_PARENT_COUNT) as executor:
+                futures = {
+                    executor.submit(
+                        execute_cpe_evaluation,
+                        experiment,
+                        round_number,
+                        f"train_parent_{parent_rank}",
+                        "train",
+                        train_batch,
+                        without_removed_workflow_fields(elite["workflow"]),
+                        fixed_rubric,
+                        problems,
+                        run_args,
+                        args.enforce_substantive_interaction_gate,
+                        original_scores,
+                    ): parent_rank
+                    for parent_rank, elite in enumerate(elite_policies, start=1)
+                }
+                for future in as_completed(futures):
+                    parent_rank = futures[future]
+                    parent_result, failures = future.result()
+                    parent_results[parent_rank - 1] = parent_result
+                    parent_failures.extend(failures)
+            parent_results = [
+                result for result in parent_results if result is not None
+            ]
+            if len(parent_results) != CPE_TRAINING_PARENT_COUNT:
+                raise RuntimeError(
+                    "A parallel training-parent evaluation produced no result"
+                )
+            if parent_failures:
+                raise RuntimeError(
+                    f"{len(parent_failures)} training-parent run(s) failed the "
+                    "substantive gate"
+                )
 
         training_parent_evidence = [
             cpe_training_parent_evidence(
@@ -2564,6 +2826,7 @@ def run_cpe_evolved_rounds(
             round_number,
             round_dir,
             args,
+            dialogue_operator_evolution,
         )
         workflow_evolution.write_json(round_dir / "workflow.json", candidate)
 
@@ -2586,12 +2849,11 @@ def run_cpe_evolved_rounds(
                 "substantive gate"
             )
 
-        weakest_parent_utility = min(
-            float(result["utility"]) for result in parent_results
-        )
+        parent_utilities = [float(result["utility"]) for result in parent_results]
+        train_reference_utility = max(parent_utilities)
         train_accepted = cpe_accepts(
             train_candidate["utility"],
-            weakest_parent_utility,
+            train_reference_utility,
             args.selection_epsilon,
         )
         next_elites = select_cpe_training_elites(
@@ -2601,11 +2863,16 @@ def run_cpe_evolved_rounds(
         state["current_policy"] = {
             **copy.deepcopy(next_elites[0]),
             "train_utility": float(next_elites[0]["selection_utility"]),
-            "utility_basis": "mean_quality_gain_minus_interaction_cost",
+            "utility_basis": CPE_UTILITY_BASIS,
         }
         validation_result = None
         validation_accepted = None
         if train_accepted:
+            original_scores.update(
+                ensure_cpe_original_report_scores(
+                    experiment, validation_problems, run_args
+                )
+            )
             validation_result, validation_failures = execute_cpe_evaluation(
                 experiment,
                 round_number,
@@ -2624,10 +2891,15 @@ def run_cpe_evolved_rounds(
                     f"{len(validation_failures)} validation run(s) failed the "
                     "substantive gate"
                 )
-            validation_accepted = cpe_accepts(
-                validation_result["utility"],
-                state["best_policy"]["validation_utility"],
-                args.selection_epsilon,
+            existing_champion = state.get("best_policy")
+            validation_accepted = (
+                True
+                if not isinstance(existing_champion, dict)
+                else cpe_accepts(
+                    validation_result["utility"],
+                    existing_champion["validation_utility"],
+                    args.selection_epsilon,
+                )
             )
             if validation_accepted:
                 state["best_policy"] = {
@@ -2635,10 +2907,9 @@ def run_cpe_evolved_rounds(
                     "workflow_id": candidate["workflow_id"],
                     "workflow": without_removed_workflow_fields(candidate),
                     "validation_utility": float(validation_result["utility"]),
-                    "utility_basis": "mean_quality_gain_minus_interaction_cost",
+                    "utility_basis": CPE_UTILITY_BASIS,
                 }
 
-        parent_utilities = [float(result["utility"]) for result in parent_results]
         patch_event = {
             "round": round_number,
             "candidate_workflow_id": candidate["workflow_id"],
@@ -2651,6 +2922,8 @@ def run_cpe_evolved_rounds(
             "parent_train_net_utilities": parent_utilities,
             "candidate_train_net_utility": float(train_candidate["utility"]),
             "train_pre_utility": max(parent_utilities),
+            "train_acceptance_reference_utility": train_reference_utility,
+            "train_acceptance_rule": "must_beat_all_training_parents",
             "train_post_utility": float(train_candidate["utility"]),
             "train_pre_net_utility": max(parent_utilities),
             "train_post_net_utility": float(train_candidate["utility"]),
@@ -2671,28 +2944,29 @@ def run_cpe_evolved_rounds(
         history.append(patch_event)
         state["patch_history"] = history
 
-        if candidate.get("operator_evolution_trigger"):
-            state["validation_stagnation_rounds"] = []
-            stagnation_operator_event = None
-        else:
-            stagnation_operator_event = (
-                maybe_evolve_cpe_operator_for_validation_stagnation(
-                    state,
-                    results_path.parent,
-                    args,
-                    training_parent_evidence,
-                    round_number,
-                    validation_accepted is True,
+        if dialogue_operator_evolution:
+            if candidate.get("operator_evolution_trigger"):
+                state["validation_stagnation_rounds"] = []
+                stagnation_operator_event = None
+            else:
+                stagnation_operator_event = (
+                    maybe_evolve_cpe_operator_for_validation_stagnation(
+                        state,
+                        results_path.parent,
+                        args,
+                        training_parent_evidence,
+                        round_number,
+                        validation_accepted is True,
+                    )
                 )
+            patch_event["stagnation_operator_evolution"] = (
+                {
+                    "trigger_reason": stagnation_operator_event["trigger_reason"],
+                    "operator_id": stagnation_operator_event["operator"]["operator_id"],
+                }
+                if stagnation_operator_event is not None
+                else None
             )
-        patch_event["stagnation_operator_evolution"] = (
-            {
-                "trigger_reason": stagnation_operator_event["trigger_reason"],
-                "operator_id": stagnation_operator_event["operator"]["operator_id"],
-            }
-            if stagnation_operator_event is not None
-            else None
-        )
 
         result = {
             **train_candidate,
@@ -2726,10 +3000,16 @@ def run_cpe_evolved_rounds(
                 if validation_result is not None
                 else None
             ),
-            "best_validation_utility": float(
-                state["best_policy"]["validation_utility"]
+            "best_validation_utility": (
+                float(state["best_policy"]["validation_utility"])
+                if isinstance(state.get("best_policy"), dict)
+                else None
             ),
-            "best_workflow_id": state["best_policy"]["workflow_id"],
+            "best_workflow_id": (
+                state["best_policy"]["workflow_id"]
+                if isinstance(state.get("best_policy"), dict)
+                else None
+            ),
             "cpe_round_complete": True,
         }
         round_state.update(
@@ -3067,6 +3347,7 @@ def main(
     *,
     cpe_mode: bool = False,
     compact_experiment_inputs: bool = False,
+    dialogue_operator_evolution: bool = True,
 ) -> None:
     args = parse_args()
     numeric = (
@@ -3094,8 +3375,15 @@ def main(
         raise ValueError("candidate similarity threshold must be in (0, 1]")
     if args.selection_epsilon < 0:
         raise ValueError("selection epsilon must be non-negative")
-    if cpe_mode and args.max_rounds < 3:
-        raise ValueError("CPE mode requires at least three initial workflow rounds")
+    if (
+        cpe_mode
+        and MIN_CPE_EVOLUTION_ROUNDS is not None
+        and args.max_rounds < MIN_CPE_EVOLUTION_ROUNDS
+    ):
+        raise ValueError(
+            "CPE mode requires at least "
+            f"{MIN_CPE_EVOLUTION_ROUNDS} rounds"
+        )
     if cpe_mode and (args.train_batch_size < 1 or args.validation_size < 1):
         raise ValueError("CPE train batch size and validation size must be positive")
 
@@ -3167,8 +3455,8 @@ def main(
         args.initial_workflow,
         persist_legacy_file=not compact_experiment_inputs,
     )
-    if cpe_mode and len(initial_population) != 3:
-        raise ValueError("CPE mode requires exactly three initial workflows")
+    if cpe_mode and len(initial_population) != CPE_TRAINING_PARENT_COUNT:
+        raise ValueError("CPE mode requires exactly two initial workflows")
 
     cpe_state = None
     if cpe_mode:
@@ -3181,7 +3469,7 @@ def main(
             args.sampling_seed,
             args.selection_epsilon,
         )
-        initial_problem_ids = list(cpe_state["validation_problems"])
+        initial_problem_ids = reserve_cpe_initial_train_batch(cpe_state)
         report_problem_ids = list(initial_problem_ids)
     else:
         initial_problem_ids = list(args.problem_id)
@@ -3253,24 +3541,7 @@ def main(
             range(1, min(len(initial_population), args.max_rounds) + 1)
         ),
         "evolved_rounds_serial": True,
-        "stagnation_operator_evolution": {
-            "enabled": True,
-            "rounds_without_strict_improvement": (
-                STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION
-            ),
-            "strict_improvement": True,
-            "registry": str(evolved_operator_registry_path(workflows_dir).resolve()),
-            "objective": (
-                "historical_best_validation_net_utility"
-                if cpe_mode
-                else "historical_best_round_utility"
-            ),
-            "similarity_retry_trigger": (
-                SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION
-                if cpe_mode
-                else None
-            ),
-        },
+        "standalone_dialogue_operator_evolution": dialogue_operator_evolution,
         "round_dimension_plot": (
             None
             if cpe_mode
@@ -3304,10 +3575,14 @@ def main(
             "sampling_seed": cpe_state["sampling_seed"] if cpe_state else None,
             "selection_epsilon": args.selection_epsilon if cpe_mode else None,
             "initial_seed_protocol": (
-                "rounds_1_to_3_run_the_same_full_validation_set_in_parallel"
+                "two_initial_workflows_run_on_one_shared_training_batch"
                 if cpe_mode
                 else None
             ),
+            "initial_seed_count": (
+                CPE_TRAINING_PARENT_COUNT if cpe_mode else None
+            ),
+            "initial_seed_split": "train" if cpe_mode else None,
             "training_parent_count": (
                 CPE_TRAINING_PARENT_COUNT if cpe_mode else None
             ),
@@ -3319,20 +3594,29 @@ def main(
                 args.concurrency if cpe_mode else None
             ),
             "initial_training_parents": (
-                "top_two_initial_validation_workflows" if cpe_mode else None
+                "two_initial_shared_training_batch_workflows"
+                if cpe_mode
+                else None
             ),
             "training_parent_selection": (
                 "top_two_distinct_workflows_on_current_shared_training_batch"
                 if cpe_mode
                 else None
             ),
-            "candidate_enters_population_if_better_than_weakest_parent": cpe_mode,
+            "candidate_enters_population_if_better_than_weakest_parent": False,
+            "candidate_requires_beating_all_training_parents": cpe_mode,
             "best_policy_requires_validation_accept": cpe_mode,
             "utility_basis": (
-                "mean_quality_gain_minus_interaction_cost" if cpe_mode else None
+                CPE_UTILITY_BASIS if cpe_mode else None
             ),
             "original_report_role": (
-                "quality_reference_only_no_net_utility" if cpe_mode else None
+                (
+                    "quality_reference_only_no_net_utility"
+                    if CPE_UTILITY_BASIS == CPE_UTILITY_BASIS_QUALITY_GAIN
+                    else "not_scored_for_utility"
+                )
+                if cpe_mode
+                else None
             ),
             "interaction_cost": (
                 {
@@ -3425,6 +3709,25 @@ def main(
         "validation_repetitions": args.validation_repetitions,
         "updated_at": now(),
     }
+    if dialogue_operator_evolution:
+        config["stagnation_operator_evolution"] = {
+            "enabled": True,
+            "rounds_without_strict_improvement": (
+                STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION
+            ),
+            "strict_improvement": True,
+            "registry": str(evolved_operator_registry_path(workflows_dir).resolve()),
+            "objective": (
+                "historical_best_validation_net_utility"
+                if cpe_mode
+                else "historical_best_round_utility"
+            ),
+            "similarity_retry_trigger": (
+                SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION
+                if cpe_mode
+                else None
+            ),
+        }
     if not compact_experiment_inputs:
         config.update(
             {
@@ -3476,10 +3779,28 @@ def main(
             experiment, initial_problem_ids, run_args
         )
 
+    collapsed_initial_round = cpe_mode and CPE_COLLAPSE_INITIAL_PARENTS
+    if collapsed_initial_round:
+        run_cpe_collapsed_initial_parent_evaluations(
+            experiment,
+            initial_problem_ids,
+            initial_population,
+            fixed_rubric,
+            problems,
+            run_args,
+            args,
+            cpe_state,
+            cpe_original_scores,
+        )
+
     # The initial strategies are independent population members. Start all
     # unfinished seed rounds together, then wait for the entire population
     # before allowing any score-dependent evolution.
-    seed_count = min(len(initial_population), args.max_rounds)
+    seed_count = (
+        0
+        if collapsed_initial_round
+        else min(len(initial_population), args.max_rounds)
+    )
     results = normalized_results(results_path)
     pending_seeds = []
     for round_number in range(1, seed_count + 1):
@@ -3504,8 +3825,8 @@ def main(
     initial_errors = []
     if pending_seeds:
         # Each independent seed round receives the full per-round problem
-        # concurrency. The three seed workflows all use the same held-out
-        # validation set and start together before score-dependent evolution.
+        # concurrency. They use one shared initial split and start together
+        # before score-dependent evolution.
         per_round_concurrency = args.concurrency
         print(
             f"Running {len(pending_seeds)} independent initial workflow rounds "
@@ -3518,17 +3839,33 @@ def main(
                 seed_args = copy.copy(run_args)
                 seed_args.concurrency = per_round_concurrency
                 seed_args.retry_concurrency = args.retry_concurrency
-                future = executor.submit(
-                    execute_workflow_round,
-                    experiment,
-                    round_number,
-                    workflow,
-                    fixed_rubric,
-                    problems,
-                    seed_args,
-                    existing,
-                    args.enforce_substantive_interaction_gate,
-                )
+                if cpe_mode:
+                    future = executor.submit(
+                        execute_cpe_evaluation,
+                        experiment,
+                        round_number,
+                        f"initial_train_parent_{round_number}",
+                        "train",
+                        initial_problem_ids,
+                        workflow,
+                        fixed_rubric,
+                        problems,
+                        seed_args,
+                        args.enforce_substantive_interaction_gate,
+                        cpe_original_scores,
+                    )
+                else:
+                    future = executor.submit(
+                        execute_workflow_round,
+                        experiment,
+                        round_number,
+                        workflow,
+                        fixed_rubric,
+                        problems,
+                        seed_args,
+                        existing,
+                        args.enforce_substantive_interaction_gate,
+                    )
                 futures[future] = round_number
             for future in as_completed(futures):
                 round_number = futures[future]
@@ -3554,14 +3891,15 @@ def main(
 
     results = normalized_results(results_path)
     if cpe_mode:
-        for result in results:
-            if 1 <= int(result.get("round", 0)) <= seed_count:
-                apply_cpe_net_utility(result, cpe_original_scores)
-                workflow_evolution.write_json(
-                    workflows_dir / f"round_{result['round']}" / "result.json",
-                    result,
-                )
-        workflow_evolution.write_json(results_path, results)
+        if not collapsed_initial_round:
+            for result in results:
+                if 1 <= int(result.get("round", 0)) <= seed_count:
+                    apply_cpe_net_utility(result, cpe_original_scores)
+                    workflow_evolution.write_json(
+                        workflows_dir / f"round_{result['round']}" / "result.json",
+                        result,
+                    )
+            workflow_evolution.write_json(results_path, results)
         results = run_cpe_evolved_rounds(
             experiment,
             results_path,
@@ -3573,6 +3911,7 @@ def main(
             args,
             cpe_state,
             cpe_original_scores,
+            dialogue_operator_evolution,
         )
         best_path = workflows_dir / "best_workflow.json"
         print(f"CPE best workflow: {best_path}", flush=True)
@@ -3581,7 +3920,8 @@ def main(
     # This also handles a resumed experiment that had already reached a plateau
     # before the operator-evolution rule was introduced.
     results = normalized_results(results_path)
-    maybe_evolve_dialogue_operator(results, workflows_dir, args, problems)
+    if dialogue_operator_evolution:
+        maybe_evolve_dialogue_operator(results, workflows_dir, args, problems)
 
     # Every evolved round depends on all earlier scores, so these rounds remain
     # strictly serial even though problems within one round may run concurrently.
@@ -3626,7 +3966,8 @@ def main(
                 f"{len(failures)} run(s) failed the substantive-interaction gate; "
                 f"see {round_dir / 'result.json'}"
             )
-        maybe_evolve_dialogue_operator(results, workflows_dir, args, problems)
+        if dialogue_operator_evolution:
+            maybe_evolve_dialogue_operator(results, workflows_dir, args, problems)
 
     final_results = normalized_results(results_path)
     incomplete_rounds = [

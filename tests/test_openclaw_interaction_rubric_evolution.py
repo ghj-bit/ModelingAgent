@@ -87,6 +87,7 @@ class InteractionRubricEvolutionTests(unittest.TestCase):
             interaction.INITIAL_RUBRIC["rubric_id"],
             "interaction_initial_minimal_v3",
         )
+
         self.assertNotIn("purpose", interaction.INITIAL_RUBRIC)
         self.assertNotIn("success_test", interaction.INITIAL_RUBRIC)
         self.assertEqual(
@@ -121,6 +122,46 @@ class InteractionRubricEvolutionTests(unittest.TestCase):
         self.assertNotIn("innovativeness", interaction.EVALUATION_DIMENSIONS)
         self.assertNotIn("data_groundedness", interaction.EVALUATION_DIMENSIONS)
         self.assertEqual(len(interaction.EVALUATION_DIMENSIONS), 4)
+
+    def test_judge_report_uses_short_workspace_parent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary) / ("nested_" * 20)
+            result = {
+                "run_dir": run_dir,
+                "final_report": run_dir / "output/results/solution_report.md",
+            }
+            args = SimpleNamespace(judge_repeats=1, judge_concurrency=1)
+            payload = {
+                "average_scores": {"round_report": {
+                    "trial_count": 1,
+                    "average_dimension_scores": {
+                        name: 0.8 for name in interaction.EVALUATION_DIMENSIONS
+                    },
+                }},
+                "evaluations": {"report": [{"raw_result": "judge.json"}]},
+            }
+            with patch.object(
+                interaction.run_judge_stability,
+                "evaluate_reports_repeated",
+                return_value=payload,
+            ) as evaluate:
+                interaction.judge_report("problem", result, 2, run_dir, args)
+
+            workspace_parent = evaluate.call_args.args[5]
+            self.assertEqual(
+                workspace_parent,
+                interaction.short_judge_workspace_parent(run_dir),
+            )
+            self.assertTrue(str(workspace_parent).startswith(str(REPO_ROOT)))
+            self.assertLess(
+                len(
+                    str(
+                        workspace_parent / ".judge" / "j_test"
+                        / "final_submission" / "solution_report.md"
+                    )
+                ),
+                260,
+            )
 
     def test_dimension_aggregation_uses_both_validation_problems(self):
         scores = interaction.average_dimensions(

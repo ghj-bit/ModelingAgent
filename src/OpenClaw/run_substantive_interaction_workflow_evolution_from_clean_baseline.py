@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import sys
 from datetime import datetime
@@ -53,6 +54,23 @@ _original_prepare_refinement = (
 )
 _original_runtime_args = workflow.substantive.runtime_args
 _original_parse_args = workflow.parse_args
+_original_build_workflow_refinement_prompt = (
+    workflow.build_workflow_refinement_prompt
+)
+_original_build_cpe_workflow_evolution_prompt = (
+    workflow.build_cpe_workflow_evolution_prompt
+)
+_original_initial_strategy_population = workflow.initial_strategy_population
+_original_ensure_cpe_original_report_scores = (
+    workflow.ensure_cpe_original_report_scores
+)
+_original_cpe_utility_basis = workflow.CPE_UTILITY_BASIS
+_original_cpe_cost_penalty_weight = workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT
+_original_min_cpe_evolution_rounds = workflow.MIN_CPE_EVOLUTION_ROUNDS
+_original_max_workflow_exchanges = workflow.MAX_WORKFLOW_EXCHANGES
+
+CLEAN_BASELINE_CPE_UTILITY_BASIS = workflow.CPE_UTILITY_BASIS_ABSOLUTE_SCORE
+CLEAN_BASELINE_CPE_COST_LAMBDA = 0.05
 
 
 def source_experiment_from_report_root(report_root: Path) -> Path:
@@ -151,12 +169,69 @@ def prepare_refinement_from_clean_baseline(*args, **kwargs) -> dict:
     return prepared
 
 
+def build_clean_baseline_cpe_workflow_evolution_prompt(*args, **kwargs) -> str:
+    """Require mutations in this experiment to add a new expert interaction."""
+    prompt = _original_build_cpe_workflow_evolution_prompt(*args, **kwargs)
+    marker = "Return only one JSON object with name, purpose, entry_action, actions,\n"
+    mutation_requirement = """When `evolution_mode` is `mutation`, the candidate must include at
+least one new workflow-level interaction operator. Implement that operator as an
+`expert_exchange` action with a new action_id and rule. It must ask the expert
+for a qualitatively different, decision-relevant information function from
+every `expert_exchange` action in both parents: changing only ordering, scope,
+selection limits, conditions, wording, action IDs, or combining/splitting
+existing exchanges does not qualify. State the new operator explicitly in
+`changed_components`, including the distinct information it elicits and why
+the parent exchanges could not elicit it. Keep the agent responsible for all
+technical translation, implementation, calculation, and validation.
+
+"""
+    if marker not in prompt:
+        raise RuntimeError("CPE evolution prompt has an unexpected return section")
+    prompt = prompt.replace(
+        "The workflow may use one to three expert exchanges.",
+        "The workflow may use any positive number of expert exchanges.",
+        1,
+    )
+    return prompt.replace(marker, mutation_requirement + marker, 1)
+
+
+def skip_original_report_scoring(*_args, **_kwargs) -> dict:
+    """The clean baseline is an input draft, not this experiment's utility base."""
+    return {}
+
+
+def two_initial_training_workflows() -> list[dict]:
+    """Use the assumption and failure-mode seeds, not data grounding."""
+    return copy.deepcopy(_original_initial_strategy_population()[:2])
+
+
 def runtime_args_with_immediate_agent_start(*args, **kwargs):
     """Start each Agent immediately and enforce a bootstrap-free task workspace."""
     run_args = _original_runtime_args(*args, **kwargs)
     run_args.pipeline_agent_start = True
     run_args.require_clean_task_workspace = True
     return run_args
+
+
+def activate_subagent_enabled_openclaw_config() -> tuple[Path, str | None]:
+    """Use the clean private config while allowing solver Agents to delegate."""
+    isolated_config, previous_config = clean_baseline.activate_clean_openclaw_config(
+        deny_nested_agents=False
+    )
+    config = json.loads(isolated_config.read_text(encoding="utf-8"))
+    tools = config.get("tools")
+    if isinstance(tools, dict) and isinstance(tools.get("deny"), list):
+        denied = [
+            tool
+            for tool in tools["deny"]
+            if tool not in clean_baseline.NESTED_AGENT_TOOL_DENY
+        ]
+        if denied:
+            tools["deny"] = denied
+        else:
+            tools.pop("deny", None)
+    workflow.workflow_evolution.write_json(isolated_config, config)
+    return isolated_config, previous_config
 
 
 def parse_args_with_current_pool_defaults():
@@ -228,7 +303,17 @@ def record_initial_draft_config() -> None:
             "agent_registration_policy": "serialized_shared_config_mutation",
             "isolated_openclaw_config": True,
             "openclaw_bootstrap_suppressed_before_agent_registration": True,
+            "nested_solver_agents_enabled": True,
+            "solver_agent_tool_deny": [],
+            "solver_execution_scope": "solver_agent_may_delegate_to_subagents",
             "workspace_root_entries": ["code", "data", "results", "logs"],
+            "standalone_dialogue_operator_evolution": False,
+            "mutation_requires_new_workflow_interaction_operator": True,
+            "utility_formula": (
+                "mean(refined_report_score) - 0.05 * mean(interaction_cost)"
+            ),
+            "cpe_minimum_rounds_validation_limit": None,
+            "workflow_max_exchanges_validation_limit": None,
         }
     )
     cpe = config.get("cpe")
@@ -239,7 +324,23 @@ def record_initial_draft_config() -> None:
         cpe["validation_pool"] = list(VALIDATION_PROBLEMS)
         cpe["validation_size"] = len(VALIDATION_PROBLEMS)
         cpe["validation_problems"] = list(VALIDATION_PROBLEMS)
+        cpe["initial_seed_protocol"] = (
+            "two_initial_workflows_run_on_one_shared_training_batch"
+        )
+        cpe["initial_seed_count"] = 2
+        cpe["initial_seed_split"] = "train"
+        cpe["initial_training_parents"] = (
+            "two_initial_shared_training_batch_workflows"
+        )
+        cpe["candidate_enters_population_if_better_than_weakest_parent"] = False
+        cpe["candidate_requires_beating_all_training_parents"] = True
+        cpe["utility_basis"] = CLEAN_BASELINE_CPE_UTILITY_BASIS
+        cpe["original_report_role"] = "not_scored_for_utility"
+        interaction_cost = cpe.get("interaction_cost")
+        if isinstance(interaction_cost, dict):
+            interaction_cost["penalty_weight_lambda"] = CLEAN_BASELINE_CPE_COST_LAMBDA
     config.pop("initial_draft_source_experiment", None)
+    config.pop("stagnation_operator_evolution", None)
     workflow.workflow_evolution.write_json(config_path, config)
 
 
@@ -256,16 +357,44 @@ def main() -> None:
         prepare_refinement_from_clean_baseline
     )
     workflow.substantive.runtime_args = runtime_args_with_immediate_agent_start
+    workflow.build_workflow_refinement_prompt = (
+        _original_build_workflow_refinement_prompt
+    )
+    workflow.build_cpe_workflow_evolution_prompt = (
+        build_clean_baseline_cpe_workflow_evolution_prompt
+    )
+    workflow.initial_strategy_population = two_initial_training_workflows
+    workflow.CPE_UTILITY_BASIS = CLEAN_BASELINE_CPE_UTILITY_BASIS
+    workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = CLEAN_BASELINE_CPE_COST_LAMBDA
+    workflow.ensure_cpe_original_report_scores = skip_original_report_scoring
+    workflow.MIN_CPE_EVOLUTION_ROUNDS = None
+    workflow.MAX_WORKFLOW_EXCHANGES = None
     workflow.experiment_path = experiment_path
     isolated_config = None
     previous_config = None
     try:
         if "--initialize-only" not in sys.argv[1:]:
-            isolated_config, previous_config = (
-                clean_baseline.activate_clean_openclaw_config()
-            )
-        workflow.main(cpe_mode=True, compact_experiment_inputs=True)
+            isolated_config, previous_config = activate_subagent_enabled_openclaw_config()
+        workflow.main(
+            cpe_mode=True,
+            compact_experiment_inputs=True,
+            dialogue_operator_evolution=False,
+        )
     finally:
+        workflow.initial_strategy_population = _original_initial_strategy_population
+        workflow.build_workflow_refinement_prompt = (
+            _original_build_workflow_refinement_prompt
+        )
+        workflow.build_cpe_workflow_evolution_prompt = (
+            _original_build_cpe_workflow_evolution_prompt
+        )
+        workflow.CPE_UTILITY_BASIS = _original_cpe_utility_basis
+        workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = _original_cpe_cost_penalty_weight
+        workflow.ensure_cpe_original_report_scores = (
+            _original_ensure_cpe_original_report_scores
+        )
+        workflow.MIN_CPE_EVOLUTION_ROUNDS = _original_min_cpe_evolution_rounds
+        workflow.MAX_WORKFLOW_EXCHANGES = _original_max_workflow_exchanges
         record_initial_draft_config()
         if isolated_config is not None:
             clean_baseline.remove_clean_openclaw_config(

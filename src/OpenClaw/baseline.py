@@ -845,21 +845,24 @@ def judge_final_report(
     for attempt in range(1, JUDGE_MAX_ATTEMPTS + 1):
         judge_env = os.environ.copy()
         judge_env["PYTHONIOENCODING"] = "utf-8"
-        subprocess.run(command, cwd=JUDGER_DIR, check=True, env=judge_env)
-        if not result_path.is_file():
-            raise RuntimeError(
-                f"Judge did not produce the expected result: {result_path}"
-            )
-
         try:
+            subprocess.run(command, cwd=JUDGER_DIR, check=True, env=judge_env)
+            if not result_path.is_file():
+                raise RuntimeError(
+                    f"Judge did not produce the expected result: {result_path}"
+                )
             calculate_average_score(result_path, judgers)
             return result_path
-        except RuntimeError as error:
+        except (subprocess.CalledProcessError, RuntimeError) as error:
             if attempt == JUDGE_MAX_ATTEMPTS:
                 raise
+            if isinstance(error, subprocess.CalledProcessError):
+                detail = f"process exited with code {error.returncode}"
+            else:
+                detail = str(error)
             print(
-                f"Judge attempt {attempt}/{JUDGE_MAX_ATTEMPTS} produced an "
-                f"incomplete result ({error}). Retrying failed or missing "
+                f"Judge attempt {attempt}/{JUDGE_MAX_ATTEMPTS} failed "
+                f"({detail}). Retrying failed or missing "
                 f"metrics in {JUDGE_RETRY_DELAY_SECONDS:g}s...",
                 flush=True,
             )

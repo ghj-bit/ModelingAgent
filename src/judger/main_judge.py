@@ -151,8 +151,19 @@ class MainJudger:
             print(f"All judgements already exist for {gold_id}")
             return results
         
-        # Run only missing judgers in parallel
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        # Give every pending Judge for this problem its own worker.  This is
+        # deliberately independent of the outer problem/repetition concurrency:
+        # once a report reaches the Judge stage, all of its requested dimensions
+        # must start immediately instead of waiting behind a fixed-size pool.
+        pending_judgers = [
+            name for name in self.judgers if name in missing_judgers
+        ]
+        print(
+            f"[Judge] Starting {len(pending_judgers)} judgers fully concurrently "
+            f"for {gold_id}",
+            flush=True,
+        )
+        with ThreadPoolExecutor(max_workers=len(pending_judgers)) as executor:
             future_to_judger = {
                 executor.submit(
                     self.run_judger, 
@@ -161,7 +172,7 @@ class MainJudger:
                     roles if name in self.role_based_judgers else None,
                     grading_points if name == "scoring_decomposition" else None
                 ): name
-                for name in missing_judgers
+                for name in pending_judgers
             }
             
             for future in as_completed(future_to_judger):

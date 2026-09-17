@@ -8,6 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts import run_clean_baseline_train as launcher
+from scripts import run_clean_baseline_test as test_launcher
+from draft_gen import run_clean_baseline_test_initial_draft as draft_test_launcher
+from draft_gen import run_clean_baseline_train_initial_draft as draft_train_launcher
+from draft_gen import run_clean_baseline_val_initial_draft as draft_val_launcher
 
 try:
     from . import run_substantive_interaction_strategy_clean_baseline as clean
@@ -16,6 +20,247 @@ except ImportError:
 
 
 class CleanBaselineWorkspaceTests(unittest.TestCase):
+    def test_initial_draft_launchers_resume_only_explicit_experiments(self):
+        launchers = (
+            (draft_train_launcher, "modeling_data_train.json"),
+            (draft_val_launcher, "modeling_data_validation.json"),
+            (draft_test_launcher, "modeling_data_test.json"),
+        )
+        for draft_launcher, dataset_name in launchers:
+            with self.subTest(launcher=draft_launcher.__name__), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                task_ids = [f"task_{index}" for index in range(6)]
+                dataset = root / "data" / dataset_name
+                dataset.parent.mkdir()
+                dataset.write_text(
+                    json.dumps({problem_id: {} for problem_id in task_ids}),
+                    encoding="utf-8",
+                )
+                old_experiment = root / "openclaw_experiments/old"
+                runs = old_experiment / "runs"
+                round_dir = runs / "round_1"
+                round_dir.mkdir(parents=True)
+                (runs / "config.json").write_text(
+                    json.dumps({"validation_problems": task_ids[:5]}),
+                    encoding="utf-8",
+                )
+                completed = {
+                    problem_id: {"1": {"problem_id": problem_id}}
+                    for problem_id in task_ids[:2]
+                }
+                (round_dir / "evaluation_checkpoint.json").write_text(
+                    json.dumps({"completed": completed, "failed": {}}),
+                    encoding="utf-8",
+                )
+                (round_dir / "result.json").write_text(
+                    json.dumps(
+                        {
+                            "problem_results": [
+                                {"problem_id": problem_id}
+                                for problem_id in task_ids[:2]
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                successful = draft_launcher.subprocess.CompletedProcess([], 0)
+
+                with (
+                    patch.object(draft_launcher, "REPO_ROOT", root),
+                    patch.object(
+                        draft_launcher.subprocess, "run", return_value=successful
+                    ) as run,
+                    patch.object(
+                        sys,
+                        "argv",
+                        [
+                            "launcher",
+                            "--num-problems",
+                            "5",
+                            "--experiment",
+                            str(old_experiment),
+                        ],
+                    ),
+                ):
+                    self.assertEqual(draft_launcher.main(), 0)
+                resumed_command = run.call_args.args[0]
+                self.assertEqual(
+                    Path(resumed_command[resumed_command.index("--exp") + 1]),
+                    old_experiment.resolve(),
+                )
+                self.assertEqual(
+                    resumed_command[resumed_command.index("--concurrency") + 1],
+                    "3",
+                )
+
+                with (
+                    patch.object(draft_launcher, "REPO_ROOT", root),
+                    patch.object(
+                        draft_launcher.subprocess, "run", return_value=successful
+                    ) as run,
+                    patch.object(
+                        sys,
+                        "argv",
+                        ["launcher", "--num-problems", "5"],
+                    ),
+                ):
+                    self.assertEqual(draft_launcher.main(), 0)
+                new_command = run.call_args_list[0].args[0]
+                generated = Path(new_command[new_command.index("--exp") + 1])
+                self.assertNotEqual(generated, old_experiment.resolve())
+
+                all_existing_completed = {
+                    problem_id: {"1": {"problem_id": problem_id}}
+                    for problem_id in task_ids[:5]
+                }
+                (round_dir / "evaluation_checkpoint.json").write_text(
+                    json.dumps(
+                        {"completed": all_existing_completed, "failed": {}}
+                    ),
+                    encoding="utf-8",
+                )
+                (round_dir / "result.json").write_text(
+                    json.dumps(
+                        {
+                            "problem_results": [
+                                {"problem_id": problem_id}
+                                for problem_id in task_ids[:5]
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                with (
+                    patch.object(draft_launcher, "REPO_ROOT", root),
+                    patch.object(
+                        draft_launcher.subprocess, "run", return_value=successful
+                    ) as run,
+                    patch.object(
+                        sys,
+                        "argv",
+                        [
+                            "launcher",
+                            "--problem-id",
+                            "task_1",
+                            "task_5",
+                            "--experiment",
+                            str(old_experiment),
+                        ],
+                    ),
+                ):
+                    self.assertEqual(draft_launcher.main(), 0)
+                incremental_command = run.call_args.args[0]
+                supplied_ids = incremental_command[
+                    incremental_command.index("--problem-id") + 1 :
+                ]
+                self.assertEqual(supplied_ids, task_ids)
+                self.assertEqual(supplied_ids.count("task_1"), 1)
+                self.assertEqual(
+                    incremental_command[
+                        incremental_command.index("--concurrency") + 1
+                    ],
+                    "1",
+                )
+
+    def test_test_launcher_resumes_only_unfinished_scored_tasks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            task_ids = [f"task_{index:02d}" for index in range(18)]
+            dataset = root / "data/modeling_data_test.json"
+            dataset.parent.mkdir()
+            dataset.write_text(
+                json.dumps({problem_id: {} for problem_id in task_ids}),
+                encoding="utf-8",
+            )
+            experiment = root / "openclaw_experiments/test"
+            runs = experiment / "runs"
+            round_dir = runs / "round_1"
+            round_dir.mkdir(parents=True)
+            (runs / "config.json").write_text(
+                json.dumps({"validation_problems": task_ids}), encoding="utf-8"
+            )
+            (round_dir / "evaluation_checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "completed": {
+                            problem_id: {"1": {"problem_id": problem_id}}
+                            for problem_id in task_ids[:15]
+                        },
+                        "failed": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = test_launcher.subprocess.CompletedProcess([], 0)
+            with (
+                patch.object(test_launcher, "REPO_ROOT", root),
+                patch.object(
+                    test_launcher.subprocess, "run", return_value=completed
+                ) as run,
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "launcher",
+                        "--num-problems",
+                        "18",
+                        "--experiment",
+                        str(experiment),
+                    ],
+                ),
+            ):
+                self.assertEqual(test_launcher.main(), 0)
+
+            run.assert_called_once()
+            command = run.call_args.args[0]
+            self.assertEqual(command[command.index("--concurrency") + 1], "3")
+            self.assertEqual(command[command.index("--retry-concurrency") + 1], "3")
+            self.assertEqual(
+                len(command[command.index("--problem-id") + 1 :]), 18
+            )
+
+    def test_test_launcher_finalizes_a_complete_checkpoint_without_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "data/modeling_data_test.json"
+            dataset.parent.mkdir()
+            dataset.write_text(json.dumps({"task": {}}), encoding="utf-8")
+            experiment = root / "openclaw_experiments/test"
+            round_dir = experiment / "runs/round_1"
+            round_dir.mkdir(parents=True)
+            (experiment / "runs/config.json").write_text(
+                json.dumps({"validation_problems": ["task"]}), encoding="utf-8"
+            )
+            (round_dir / "evaluation_checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "completed": {"task": {"1": {"problem_id": "task"}}},
+                        "failed": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = test_launcher.subprocess.CompletedProcess([], 0)
+            with (
+                patch.object(test_launcher, "REPO_ROOT", root),
+                patch.object(
+                    test_launcher.subprocess, "run", return_value=completed
+                ) as run,
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "launcher",
+                        "--num-problems",
+                        "1",
+                        "--experiment",
+                        str(experiment),
+                    ],
+                ),
+            ):
+                self.assertEqual(test_launcher.main(), 0)
+            run.assert_called_once()
+
     def test_launcher_resumes_only_an_explicit_experiment(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -64,15 +309,68 @@ class CleanBaselineWorkspaceTests(unittest.TestCase):
             resumed = Path(resumed_command[resumed_command.index("--exp") + 1])
             self.assertEqual(resumed, existing.resolve())
 
+    def test_launcher_runs_training_tasks_in_cumulative_batches_of_five(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "data/modeling_data_train.json"
+            dataset.parent.mkdir()
+            dataset.write_text(
+                json.dumps({f"task_{index:02d}": {} for index in range(12)}),
+                encoding="utf-8",
+            )
+            completed = launcher.subprocess.CompletedProcess([], 0)
+            experiment = root / "openclaw_experiments/train"
+            with (
+                patch.object(launcher, "REPO_ROOT", root),
+                patch.object(launcher.subprocess, "run", return_value=completed) as run,
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "launcher",
+                        "--num-problems",
+                        "12",
+                        "--experiment",
+                        str(experiment),
+                    ],
+                ),
+            ):
+                self.assertEqual(launcher.main(), 0)
+
+            commands = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(len(commands), 3)
+            self.assertEqual(
+                [
+                    command[command.index("--concurrency") + 1]
+                    for command in commands
+                ],
+                ["5", "5", "2"],
+            )
+            self.assertEqual(
+                [
+                    len(command[command.index("--problem-id") + 1 :])
+                    for command in commands
+                ],
+                [5, 10, 12],
+            )
+
     def test_reference_prompt_is_packaged_with_source(self):
         reference = clean.strategy.REFERENCE_BASELINE_PROMPT_PATH
         self.assertEqual(reference.parent.name, "prompts")
         self.assertTrue(reference.is_file())
         self.assertNotIn("openclaw_experiments", reference.parts)
+        prompt = clean.strategy.reference_baseline_prompt_template()
         self.assertIn(
             "Search only for external evidence necessary",
-            clean.strategy.reference_baseline_prompt_template(),
+            prompt,
         )
+
+    def test_initial_draft_prompt_has_no_refine_only_agent_boundary(self):
+        prompt = clean.build_clean_baseline_prompt({})
+        self.assertNotIn("Single-Agent Execution Boundary", prompt)
+        self.assertNotIn("sessions_spawn", prompt)
+        self.assertNotIn("sessions_send", prompt)
+        self.assertNotIn("`subagents`", prompt)
 
     def test_clean_workspace_recovers_nonempty_report_without_interaction(self):
         interaction = clean.strategy.interaction
@@ -132,13 +430,15 @@ class CleanBaselineWorkspaceTests(unittest.TestCase):
                 patch.object(interaction, "VALIDATION_PROBLEMS", ("task",)),
                 patch.object(interaction, "prepare_validation_problem", interaction.prepare_validation_problem),
                 patch.object(interaction, "run_validation_problem", interaction.run_validation_problem),
-                patch.object(interaction, "judge_report", return_value={"average_score": 0.8, "dimension_scores": {"quality": 0.8}}),
+                patch.object(interaction, "judge_report", return_value={"average_score": 0.8, "dimension_scores": {"quality": 0.8}}) as judge,
                 patch.object(clean.strategy, "run_end_to_end_modeling_phase", side_effect=solve) as agent,
                 patch.object(clean.strategy, "main", side_effect=AssertionError("No strategy evolution")),
             ):
                 clean.main()
+                (experiment / "runs/round_1/evaluation_checkpoint.json").unlink()
                 clean.main()
                 agent.assert_called_once()
+                judge.assert_called_once()
             self.assertEqual([path.name for path in experiment.iterdir()], ["runs"])
             self.assertFalse(list(experiment.rglob("workflow.json")))
             self.assertFalse(list(experiment.rglob("strategy.json")))

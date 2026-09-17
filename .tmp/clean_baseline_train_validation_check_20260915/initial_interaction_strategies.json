@@ -1,0 +1,98 @@
+[
+  {
+    "name": "结构与假设发现时序工作流",
+    "purpose": "完成Step 2后调用结构与假设发现算子，再根据专家提供的现实边界完成Step 3及后续建模。",
+    "entry_action": "complete_through_assumptions",
+    "actions": [
+      {
+        "action_id": "complete_through_assumptions",
+        "action_type": "agent_modeling",
+        "stage": "through_step_2",
+        "rule": "Complete Steps 1 and 2 and record the problem understanding and modeling assumptions."
+      },
+      {
+        "action_id": "challenge_structure_and_assumptions",
+        "action_type": "expert_exchange",
+        "stage": "after_step_2",
+        "interaction_stage": 2,
+        "operator_id": "structure_assumption_discovery",
+        "rule": "Select the highest-priority unresolved structural assumption and apply the referenced operator."
+      },
+      {
+        "action_id": "model_from_challenged_assumptions",
+        "action_type": "agent_modeling",
+        "stage": "steps_3_to_7",
+        "rule": "Incorporate relevant advice into the model, validate affected results, and complete Steps 3 through 7."
+      }
+    ],
+    "max_exchanges": 1,
+    "stop_condition": "Stop after completing the model and validating the consultation's downstream effects.",
+    "seed_operator": "structure_assumption_discovery",
+    "evolution_operator": "initial_strategy",
+    "workflow_id": "interaction_workflow_b156ac1758b6"
+  },
+  {
+    "name": "实现模型解释一致性时序工作流",
+    "purpose": "完成可执行模型后调用实现模型解释一致性算子，消解现实解释、公式、结果和报告之间的冲突。",
+    "entry_action": "build_and_audit_provisional_model",
+    "actions": [
+      {
+        "action_id": "build_and_audit_provisional_model",
+        "action_type": "agent_modeling",
+        "stage": "through_step_5",
+        "rule": "Complete Steps 1 through 5 and audit the provisional model and outputs for high-risk inconsistencies."
+      },
+      {
+        "action_id": "resolve_implemented_interpretations",
+        "action_type": "expert_exchange",
+        "stage": "after_step_5",
+        "interaction_stage": 5,
+        "operator_id": "implemented_model_interpretation_audit",
+        "rule": "Select the highest-priority interpretation-dependent inconsistency and apply the referenced operator."
+      },
+      {
+        "action_id": "repair_and_regression_test",
+        "action_type": "agent_validation",
+        "stage": "steps_5_to_7",
+        "rule": "Apply relevant advice, regenerate dependent outputs, run the existing regression checks, and complete Steps 6 and 7."
+      }
+    ],
+    "max_exchanges": 1,
+    "stop_condition": "Stop after testing the focal conflict and reconciling its dependent outputs.",
+    "seed_operator": "implemented_model_interpretation_audit",
+    "evolution_operator": "initial_strategy",
+    "workflow_id": "interaction_workflow_46fd1b610ff3"
+  },
+  {
+    "name": "验证失败信号证伪时序工作流",
+    "purpose": "初步验证后调用验证失败信号算子，针对残留差异、边界情景和外部比较目标执行独立证伪。",
+    "entry_action": "screen_sensitive_weak_inputs",
+    "actions": [
+      {
+        "action_id": "screen_sensitive_weak_inputs",
+        "action_type": "agent_validation",
+        "stage": "through_step_6",
+        "rule": "Complete Steps 1 through 5 and use existing outputs plus one lightweight preliminary check to identify the single residual gap most likely to change the main decision."
+      },
+      {
+        "action_id": "elicit_validation_failure_signals",
+        "action_type": "expert_exchange",
+        "stage": "during_step_6",
+        "interaction_stage": 6,
+        "operator_id": "validation_failure_signal_probe",
+        "rule": "Select the highest-priority residual validation gap and apply the referenced operator."
+      },
+      {
+        "action_id": "verify_recalibrate_and_finish",
+        "action_type": "agent_validation",
+        "stage": "finish_steps_6_and_7",
+        "rule": "Test the focal signal with at most one bounded analytic check or small scenario comparison, revise only the affected claim, and complete Steps 6 and 7 without interaction-driven broad search, nested optimization, Monte Carlo, or multi-parameter sweeps."
+      }
+    ],
+    "max_exchanges": 1,
+    "stop_condition": "Stop after one bounded test of the focal gap and one localized claim revision.",
+    "seed_operator": "validation_failure_signal_probe",
+    "evolution_operator": "initial_strategy",
+    "workflow_id": "interaction_workflow_007148c34fad"
+  }
+]

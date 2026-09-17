@@ -1214,7 +1214,8 @@ def run_substantive_modeling_phase(
         }
     )
     workflow_evolution.write_json(metadata_path, metadata)
-    try:
+
+    def run_agent(current_message_file: Path) -> None:
         baseline.stream_command(
             [
                 prepared["openclaw"],
@@ -1225,7 +1226,7 @@ def run_substantive_modeling_phase(
                 "--session-id",
                 session_id,
                 "--message-file",
-                str(message_file),
+                str(current_message_file),
                 "--thinking",
                 args.thinking,
                 "--timeout",
@@ -1235,9 +1236,51 @@ def run_substantive_modeling_phase(
             transport_log,
             completion_artifact=completion_artifact,
         )
+
+    def artifact_ready() -> bool:
+        if completion_artifact is None:
+            return True
+        try:
+            return bool(
+                completion_artifact.is_file()
+                and completion_artifact.read_text(encoding="utf-8").strip()
+            )
+        except (OSError, UnicodeDecodeError):
+            return False
+
+    try:
+        run_agent(message_file)
+        if not artifact_ready():
+            recovery_prompt = meta_dir / "final_report_recovery_prompt.md"
+            recovery_prompt.write_text(
+                "# Final-report recovery\n\n"
+                "The previous turn completed without creating the required final "
+                "report. Resume the existing work in this same workspace and "
+                "session. Do not restart completed analysis, repeat web research, "
+                "or request another expert interaction. Inspect the existing draft, "
+                "code, data, computed results, and expert feedback, then write the "
+                "complete final report to this exact path:\n\n"
+                f"`{completion_artifact}`\n\n"
+                "Answer every original task, include the necessary assumptions, "
+                "model, results, validation, and limitations, and do not generate "
+                "images. Verify that the report exists and is non-empty before "
+                "ending.\n",
+                encoding="utf-8",
+            )
+            print(
+                "OpenClaw exited before writing the final report; resuming the "
+                "same session once to complete the artifact.",
+                flush=True,
+            )
+            run_agent(recovery_prompt)
     finally:
         render_openclaw_session_log(
             prepared["agent_id"], session_id, message_file, solve_log
+        )
+    if not artifact_ready():
+        raise RuntimeError(
+            "OpenClaw did not produce the required non-empty completion artifact "
+            f"after one same-session recovery attempt: {completion_artifact}"
         )
     write_interaction_added_content(prepared["run_dir"])
     output_dir = Path(prepared.get("output_dir", prepared["run_dir"] / "output"))

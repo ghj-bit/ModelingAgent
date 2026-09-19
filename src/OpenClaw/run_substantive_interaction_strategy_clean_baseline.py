@@ -1,32 +1,40 @@
-"""Run a no-interaction baseline with a minimal modeling prompt.
+"""Run a no-interaction baseline on ModelingBench or MM-Bench.
 
 This variant reuses the execution and evaluation behavior of
 ``run_substantive_interaction_strategy_baseline.py`` while removing the staged
 process-report contract and the additional report-integration instructions.
 By default, run every task in data/modeling_data_train.json with one worker
-per task. Explicit problem IDs and concurrency flags override these defaults.
+per task. MM-Bench mode currently accepts only native task ``2003_C`` and uses
+its unchanged problem definition, dataset directory, and native evaluator.
 """
 
 from __future__ import annotations
 
+import argparse
 import atexit
 import json
 import os
+import shutil
 import sys
 import tempfile
 import uuid
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 try:
     from . import run_substantive_interaction_strategy_evolution as strategy
+    from . import run_substantive_interaction_workflow_test_from_initial_draft as mmbench_support
 except ImportError:
     import run_substantive_interaction_strategy_evolution as strategy
+    import run_substantive_interaction_workflow_test_from_initial_draft as mmbench_support
 
 
 EXPERIMENT_TYPE = "substantive_interaction_strategy_clean_baseline"
 EXPERIMENT_PREFIX = "interaction_strategy_clean_baseline"
 TRAIN_DATASET = Path(__file__).resolve().parents[2] / "data" / "modeling_data_train.json"
+DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
+SUPPORTED_MMBENCH_PROBLEMS = ("2003_C", "2003_B")
 
 _ORIGINAL_PARSE_ARGS = strategy.parse_args
 _ORIGINAL_VALIDATE_ARGS = strategy.validate_args
@@ -96,7 +104,9 @@ def remove_clean_openclaw_config(path: Path, previous: str | None) -> None:
     path.unlink(missing_ok=True)
 
 
-def build_clean_baseline_prompt(_strategy: dict) -> str:
+def build_clean_baseline_prompt(
+    _strategy: dict, benchmark: str = "modelingbench"
+) -> str:
     """Return the no-interaction prompt without staged artifact requirements."""
     prompt = strategy.reference_baseline_prompt_template()
 
@@ -149,6 +159,22 @@ def build_clean_baseline_prompt(_strategy: dict) -> str:
         "Before finishing,",
         1,
     )
+    if benchmark == "mmbench":
+        prompt = prompt.replace("# ModelingBench Task", "# MM-Bench Task", 1)
+        prompt = prompt.replace("ModelingBench Judge", "MM-Bench Judge", 1)
+        workspace_marker = (
+            "Create these directories when needed. Use the problem statement "
+            "above as the task definition."
+        )
+        mmbench_workspace = (
+            "Create these directories when needed. Use the problem statement "
+            "above as the task definition. Use only the native benchmark files staged "
+            "in the Data directory as supplied task data, and do not alter the "
+            "native problem requirements or dataset definitions."
+        )
+        if prompt.count(workspace_marker) != 1:
+            raise RuntimeError("Shared prompt has an unexpected workspace section")
+        prompt = prompt.replace(workspace_marker, mmbench_workspace, 1)
     return prompt
 
 
@@ -158,7 +184,76 @@ def runtime_args(args):
     run_args.prepare_interaction_artifacts = False
     run_args.require_clean_task_workspace = True
     run_args.pipeline_agent_start = True
+    run_args.benchmark = args.benchmark
+    run_args.mmbench_root = args.mmbench_root
+    run_args.mmbench_judge_model = args.mmbench_judge_model
+    run_args.mmbench_judge_api_key = args.mmbench_judge_api_key
+    run_args.mmbench_judge_base_url = args.mmbench_judge_base_url
+    run_args.mmbench_judge_timeout = args.mmbench_judge_timeout
     return run_args
+
+
+def prepare_mmbench_validation_problem(
+    mmbench_root: Path,
+    problem_id: str,
+    problem: dict,
+    prompt_path: Path,
+    round_number: int,
+    repetition: int,
+    experiment: Path,
+    args,
+) -> dict:
+    """Prepare a fresh clean-baseline run and stage native MM-Bench data."""
+    prepared = strategy.PREPARE_FRESH_PROBLEM(
+        problem_id,
+        problem,
+        prompt_path,
+        round_number,
+        repetition,
+        experiment,
+        args,
+    )
+    if prepared["recovered"]:
+        return prepared
+
+    source_root = Path(mmbench_root).resolve() / "dataset" / problem_id
+    declared_paths = problem.get("dataset_path", [])
+    if source_root.is_dir():
+        data_dir = Path(prepared["output_dir"]) / "data"
+        for source in sorted(source_root.rglob("*")):
+            target = data_dir / source.relative_to(source_root)
+            if source.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            elif source.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+    elif declared_paths:
+        raise FileNotFoundError(
+            "MM-Bench problem declares dataset files but no dataset directory "
+            f"exists: {source_root}"
+        )
+    else:
+        print(
+            f"MM-Bench problem {problem_id} declares no dataset; staging nothing.",
+            flush=True,
+        )
+
+    metadata_path = Path(prepared["run_dir"]) / "meta" / "run.json"
+    metadata = strategy.workflow_evolution.read_json(metadata_path, {})
+    metadata.update(
+        {
+            "benchmark": "mmbench",
+            "mmbench_problem_file": str(
+                (Path(mmbench_root).resolve() / "problem" / f"{problem_id}.json")
+            ),
+            "mmbench_dataset_source": (
+                str(source_root) if source_root.is_dir() else ""
+            ),
+            "mmbench_declared_dataset_paths": declared_paths,
+        }
+    )
+    strategy.workflow_evolution.write_json(metadata_path, metadata)
+    return prepared
 
 
 def run_baseline_validation_problem(
@@ -220,15 +315,60 @@ def run_baseline_validation_problem(
 
 
 def parse_args():
-    args = _ORIGINAL_PARSE_ARGS()
+    extension_parser = argparse.ArgumentParser(add_help=False)
+    extension_parser.add_argument(
+        "--benchmark",
+        choices=("modelingbench", "mmbench"),
+        default="modelingbench",
+    )
+    extension_parser.add_argument(
+        "--mmbench-root", type=Path, default=DEFAULT_MMBENCH_ROOT
+    )
+    extension_parser.add_argument(
+        "--mmbench-judge-model", default="deepseek-v4-flash"
+    )
+    extension_parser.add_argument("--mmbench-judge-api-key")
+    extension_parser.add_argument("--mmbench-judge-base-url")
+    extension_parser.add_argument(
+        "--mmbench-judge-timeout", type=float, default=600.0
+    )
+    raw_argv = sys.argv[1:]
+    extension, remaining = extension_parser.parse_known_args(raw_argv)
+    original_argv = sys.argv
+    sys.argv = [sys.argv[0], *remaining]
+    try:
+        args = _ORIGINAL_PARSE_ARGS()
+    finally:
+        sys.argv = original_argv
+    args.benchmark = extension.benchmark
+    args.mmbench_root = extension.mmbench_root.resolve()
+    args.mmbench_judge_model = extension.mmbench_judge_model
+    args.mmbench_judge_api_key = extension.mmbench_judge_api_key
+    args.mmbench_judge_base_url = extension.mmbench_judge_base_url
+    args.mmbench_judge_timeout = extension.mmbench_judge_timeout
 
     def supplied(option: str) -> bool:
         return any(
             value == option or value.startswith(option + "=")
-            for value in sys.argv[1:]
+            for value in raw_argv
         )
 
-    if not supplied("--problem-id"):
+    if args.benchmark == "mmbench":
+        if not supplied("--problem-id"):
+            args.problem_id = list(SUPPORTED_MMBENCH_PROBLEMS)
+        unsupported = [
+            problem_id
+            for problem_id in args.problem_id
+            if problem_id not in SUPPORTED_MMBENCH_PROBLEMS
+        ]
+        if unsupported:
+            raise ValueError(
+                "This clean-baseline MM-Bench integration currently supports only "
+                + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
+                + "; got: "
+                + ", ".join(unsupported)
+            )
+    elif not supplied("--problem-id"):
         problems = json.loads(TRAIN_DATASET.read_text(encoding="utf-8"))
         if not isinstance(problems, dict) or not problems:
             raise ValueError(f"Training dataset must be a non-empty task mapping: {TRAIN_DATASET}")
@@ -243,6 +383,8 @@ def parse_args():
 
 def validate_args(args) -> None:
     _ORIGINAL_VALIDATE_ARGS(args)
+    if args.mmbench_judge_timeout <= 0:
+        raise ValueError("--mmbench-judge-timeout must be positive")
     if args.exp:
         config_path = Path(args.exp) / "runs" / "config.json"
         if not config_path.is_file():
@@ -251,6 +393,12 @@ def validate_args(args) -> None:
             config = json.loads(config_path.read_text(encoding="utf-8"))
             if config.get("experiment_type") != EXPERIMENT_TYPE:
                 raise ValueError("--exp is not a clean-baseline experiment")
+            saved_benchmark = config.get("benchmark", "modelingbench")
+            if saved_benchmark != args.benchmark:
+                raise ValueError(
+                    "Cannot resume a clean baseline with a different benchmark; "
+                    "use a new --exp directory."
+                )
             saved_problems = config.get("validation_problems")
             requested_problems = list(args.problem_id)
             can_extend = (
@@ -282,8 +430,18 @@ def validate_args(args) -> None:
         )
 
 
-def install_runtime_hooks() -> None:
-    strategy.interaction.prepare_validation_problem = strategy.PREPARE_FRESH_PROBLEM
+def install_runtime_hooks(args, problems: dict) -> None:
+    if args.benchmark == "mmbench":
+        strategy.interaction.prepare_validation_problem = partial(
+            prepare_mmbench_validation_problem, args.mmbench_root
+        )
+        strategy.interaction.judge_report = partial(
+            mmbench_support.judge_report_with_mmbench,
+            problems,
+            args.mmbench_root,
+        )
+    else:
+        strategy.interaction.prepare_validation_problem = strategy.PREPARE_FRESH_PROBLEM
     strategy.interaction.run_validation_problem = run_baseline_validation_problem
 
 
@@ -291,7 +449,13 @@ def main() -> None:
     """Run one clean baseline without creating strategy-evolution artifacts."""
     args = parse_args()
     validate_args(args)
-    problems = strategy.baseline.load_problems()
+    if args.benchmark == "mmbench":
+        problems, selected_problem_ids = mmbench_support.load_mmbench_problems(
+            args.mmbench_root, list(args.problem_id)
+        )
+        args.problem_id = selected_problem_ids
+    else:
+        problems = strategy.baseline.load_problems()
     unknown = [problem_id for problem_id in args.problem_id if problem_id not in problems]
     if unknown:
         raise ValueError("Unknown problem ID(s): " + ", ".join(unknown))
@@ -301,7 +465,13 @@ def main() -> None:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment = (
         Path(args.exp).resolve() if args.exp else
-        TRAIN_DATASET.parents[1] / "openclaw_experiments" / f"{EXPERIMENT_PREFIX}_{stamp}"
+        TRAIN_DATASET.parents[1]
+        / "openclaw_experiments"
+        / (
+            f"{EXPERIMENT_PREFIX}_mmbench_{stamp}"
+            if args.benchmark == "mmbench"
+            else f"{EXPERIMENT_PREFIX}_{stamp}"
+        )
     )
     if experiment.is_dir() and any(path.name != "runs" for path in experiment.iterdir()):
         raise ValueError(
@@ -311,11 +481,24 @@ def main() -> None:
     round_dir = experiment / "runs" / "round_1"
     round_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = round_dir / "prompt.md"
-    prompt_path.write_text(build_clean_baseline_prompt({}), encoding="utf-8")
+    prompt = (
+        build_clean_baseline_prompt({}, "mmbench")
+        if args.benchmark == "mmbench"
+        else build_clean_baseline_prompt({})
+    )
+    prompt_path.write_text(
+        prompt, encoding="utf-8"
+    )
     config = {
         "experiment_type": EXPERIMENT_TYPE,
         "execution_mode": "clean_baseline_no_interaction",
         "initial_draft_used": False,
+        "benchmark": args.benchmark,
+        "split": (
+            "mmbench_dataset_tasks"
+            if args.benchmark == "mmbench"
+            else "modelingbench_train"
+        ),
         "max_rounds": 1,
         "validation_problems": args.problem_id,
         "model": args.model,
@@ -331,6 +514,13 @@ def main() -> None:
         "validation_repetitions": args.validation_repetitions,
         "judge_repeats": args.judge_repeats,
     }
+    if args.benchmark == "mmbench":
+        config.update(
+            {
+                "mmbench_root": str(args.mmbench_root),
+                "mmbench_judge_model": args.mmbench_judge_model,
+            }
+        )
     strategy.workflow_evolution.write_json(experiment / "runs" / "config.json", config)
     print(f"Experiment: {experiment}", flush=True)
     print(f"Problems: {len(args.problem_id)}; concurrency: {args.concurrency}", flush=True)
@@ -339,7 +529,7 @@ def main() -> None:
         return
 
     strategy.interaction.VALIDATION_PROBLEMS = tuple(args.problem_id)
-    install_runtime_hooks()
+    install_runtime_hooks(args, problems)
     strategy.workflow_evolution.configure_completion_grace(
         strategy.baseline.run_problem, args.completion_grace
     )

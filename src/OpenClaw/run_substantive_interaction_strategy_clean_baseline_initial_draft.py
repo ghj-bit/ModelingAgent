@@ -269,9 +269,13 @@ def run_initial_draft_validation_problem(
     }
 
 
-def install_initial_draft_runtime_hooks() -> None:
-    """Use the clean runner's evaluator with draft-aware preparation."""
-    _BASE_INSTALL_RUNTIME_HOOKS()
+def install_initial_draft_runtime_hooks(*args, **kwargs) -> None:
+    """Use the clean runner's evaluator with draft-aware preparation.
+
+    The base hook takes the clean runner's own arguments; forward them so this
+    override tracks whatever signature ``baseline.install_runtime_hooks`` has.
+    """
+    _BASE_INSTALL_RUNTIME_HOOKS(*args, **kwargs)
     baseline.strategy.interaction.prepare_validation_problem = (
         prepare_initial_draft_validation_problem
     )

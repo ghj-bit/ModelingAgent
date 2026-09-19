@@ -913,7 +913,7 @@ def parse_args() -> argparse.Namespace:
         default=substantive.EXPERT_REQUEST_TIMEOUT,
     )
     parser.add_argument("--expert-attempts", type=int, default=3)
-    parser.add_argument("--thinking", default="high")
+    parser.add_argument("--thinking", default="off")
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--completion-grace", type=float, default=60.0)
     parser.add_argument("--concurrency", type=int, default=1)

@@ -2,7 +2,12 @@
 
 This is intentionally separate from the clean-baseline refinement launcher. It
 starts each Solver from a planning blueprint, not from an inherited completed
-solution report, and supplies two planning-derived initial workflows.
+solution report, and supplies a single planning-derived initial workflow.
+
+Exactly one interaction strategy is live at any time: the initial strategy is
+also the initial best strategy, and every later round evolves one candidate from
+the current best parent.  The pipeline runs on either benchmark; MM-Bench mode
+uses a fixed year-based split of the native ``MMBench/problem`` tasks.
 """
 
 from __future__ import annotations
@@ -15,14 +20,17 @@ import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 try:
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
+    from .interaction_policy import MODELING_STRATEGY_ESCALATION
 except ImportError:
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
+    from src.OpenClaw.interaction_policy import MODELING_STRATEGY_ESCALATION
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,151 +48,80 @@ PLANNING_DRAFT_VALIDATION_ROOT = (
 )
 TRAIN_PROBLEMS: list[str] = []
 VALIDATION_PROBLEMS: list[str] = []
-DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE = 4
+DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE = 2
+DEFAULT_INITIAL_DRAFT_VALIDATION_SIZE = 5
+# Experiments live under their own subtree with a short name.  Everything below
+# a run directory is long (cpe_evaluations/round_N/<phase>/runs/round_N/
+# r1pN_<stamp>/meta/mmbench_judge/trial_N/evaluation_result/solution/...), so a
+# short prefix buys real headroom against the Windows 260-character path limit.
+EXPERIMENT_ROOT = REPO_ROOT / "openclaw_experiments" / "evolve_exp"
+EXPERIMENT_PREFIX = "evolve"
+# Each report is scored by this many Judge calls running in parallel; the run
+# records their mean.  Judge noise within a phase is large enough that a single
+# call is not a usable fitness signal.
+DEFAULT_JUDGE_REPEATS = 3
+# Each training problem is run this many times per round and their scores are
+# averaged, so a train batch of three costs six agent runs.  A single run of one
+# problem can swing by 0.03-0.06, which is larger than the differences the
+# evolution is chasing, so one run per problem cannot support a gate decision.
+DEFAULT_TRAIN_REPETITIONS = 2
+# A candidate must beat the incumbent train utility by more than this to be
+# worth a validation run.  The margin is a noise floor: with one run per problem
+# the observed spread of the *same* policy re-run exceeds 0.01.  The champion
+# gate compares five-task validation means, which are less noisy, so it carries
+# the tighter margin.
+DEFAULT_TRAIN_ACCEPTANCE_MARGIN = 0.01
+DEFAULT_VALIDATION_ACCEPTANCE_MARGIN = 0.005
+# Thinking level for the solving agent.  The DeepSeek provider collapses
+# minimal/low/medium/high onto one wire value (reasoning_effort="high"), so only
+# "off" is a distinct setting: reasoning falls to 0% of output tokens and
+# generated tokens per call drop by roughly 46%.  Overridable with --thinking.
+DEFAULT_THINKING_LEVEL = "off"
 INTERACTION_WORKFLOW_PLACEHOLDER = "{{INTERACTION_WORKFLOW}}"
 DRAFT_PATH_PLACEHOLDER = "{{DRAFT_PATH}}"
 
-INITIAL_STRATEGIC_UNCERTAINTY_POLICY = """# Human Expert Interaction
-
-## Principle
-
-The agent should solve the modeling problem autonomously.
-
-Human feedback is only used for resolving high-impact strategic decisions that cannot be solved through standard modeling knowledge and self-analysis.
-
----
-
-## Trigger Conditions
-
-Request expert feedback only when ALL conditions hold:
-
-1. Multiple feasible strategies remain.
-2. The choice may change the modeling direction or conclusions.
-3. The uncertainty cannot be resolved autonomously.
-4. Expert feedback can produce a clear decision.
-
-Do NOT request feedback for:
-
-- implementation, coding, debugging;
-- parameter tuning;
-- derivations;
-- computation or routine validation.
-
-Maximum interactions: 1.
-
-If multiple uncertainties exist, select the highest-impact one.
-
----
-
-## Interaction Workflow
-
-When requesting feedback, provide:
-
-- current problem understanding and modeling stage;
-- key strategic uncertainty and its impact;
-- candidate strategies with trade-offs.
-
-Ask the expert to classify suggestions as:
-
-- **Required**: necessary for the original objective;
-- **Optional**: extensions or improvements.
-
-Only apply Required suggestions to the core model.
-
-After feedback:
-
-- update the strategy if necessary;
-- evaluate feasibility and cost;
-- continue autonomously.
-
-Freeze the modeling scope after applying feedback. Treat new issues as assumptions, limitations, or sensitivity analysis.
-
----
-
-## Interaction Termination
-
-Terminate interaction when:
-
-- the strategic uncertainty is resolved;
-- the modeling direction is determined;
-- remaining tasks can be completed autonomously."""
-
-INITIAL_STRATEGIC_CHECKPOINT_POLICY = """# Human Expert Interaction
-
-## Principle
-
-The agent should complete the modeling process independently while using human feedback as a strategic alignment mechanism at predefined modeling checkpoints.
-
-Human feedback is used to validate critical modeling assumptions, problem formulation, and overall solution direction before irreversible modeling decisions are made.
-
-Human interaction should prevent major deviations in modeling objectives rather than solve routine modeling tasks or technical details.
-
----
-
-## Trigger Conditions
-
-Request expert feedback at predefined strategic checkpoints:
-
-1. After initial problem understanding and requirement analysis.
-2. Before selecting the final modeling framework or paradigm.
-3. Before introducing major assumptions that significantly affect the solution.
-4. Before executing a modeling pipeline with substantial downstream impact.
-
-Do NOT request feedback for:
-
-- implementation, coding, debugging;
-- parameter tuning;
-- mathematical derivations;
-- computation or routine validation;
-- minor assumption adjustments.
-
-Maximum interactions: 1.
-
-If multiple checkpoints are reached, select the earliest checkpoint with the highest potential impact on the final modeling outcome.
-
----
-
-## Interaction Workflow
-
-When requesting feedback, provide:
-
-- current understanding of the problem and modeling objectives;
-- current modeling stage and planned next steps;
-- key decisions requiring strategic alignment;
-- possible directions with advantages, limitations, and expected consequences.
-
-Ask the expert to provide:
-
-- **Confirmation**: whether the current direction is consistent with the objective;
-- **Correction**: necessary changes to assumptions, formulation, or framework;
-- **Suggestion**: optional improvements or extensions.
-
-Only apply Confirmation and Correction to the core modeling process.
-
-Optional suggestions should only be considered if they do not expand the original modeling scope.
-
-After feedback:
-
-- revise the modeling strategy if required;
-- record confirmed assumptions and decisions;
-- continue the remaining modeling process autonomously.
-
-Once the strategic direction is confirmed, do not reopen the same decision unless new evidence fundamentally invalidates the assumption.
-
----
-
-## Interaction Termination
-
-Terminate interaction when:
-
-- the strategic direction has been confirmed;
-- critical assumptions have been validated;
-- the remaining modeling process can proceed autonomously."""
+DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
+# Fixed MM-Bench split, selected by publication year over MMBench/problem/*.json
+# (111 tasks, 2000-2025):
+#   test       = every task from 2021 onward                              (32)
+#   validation = the five newest tasks dated 2020 or earlier (2020_B..2020_F)
+#   train      = the thirty newest remaining tasks (2014_C..2020_A)       (30)
+# The 44 tasks older than the training window are deliberately unused.
+MMBENCH_TEST_PROBLEMS = (
+    "2021_A", "2021_B", "2021_C", "2021_D", "2021_E", "2021_F",
+    "2022_A", "2022_B", "2022_C", "2022_D", "2022_E", "2022_F",
+    "2023_A", "2023_B", "2023_C", "2023_D", "2023_E", "2023_F",
+    "2023_Y", "2023_Z",
+    "2024_A", "2024_B", "2024_C", "2024_D", "2024_E", "2024_F",
+    "2025_A", "2025_B", "2025_C", "2025_D", "2025_E", "2025_F",
+)
+MMBENCH_VALIDATION_PROBLEMS = (
+    "2020_B", "2020_C", "2020_D", "2020_E", "2020_F",
+)
+MMBENCH_TRAIN_PROBLEMS = (
+    "2014_C",
+    "2015_A", "2015_B", "2015_C", "2015_D",
+    "2016_A", "2016_B", "2016_C", "2016_D", "2016_E", "2016_F",
+    "2017_A", "2017_B", "2017_C", "2017_D", "2017_E", "2017_F",
+    "2018_A", "2018_B", "2018_C", "2018_D", "2018_E", "2018_F",
+    "2019_A", "2019_B", "2019_C", "2019_D", "2019_E", "2019_F",
+    "2020_A",
+)
 
 _active_experiment: Path | None = None
 _draft_train_root: Path | None = None
 _draft_validation_root: Path | None = None
 _initialize_only = False
+_benchmark = "modelingbench"
+_mmbench_root: Path = DEFAULT_MMBENCH_ROOT
+# Resolved once in main(); injected into run_args so the shared preparation hook
+# can find each task's planning draft.
+_mmbench_draft_reports: dict[str, str] = {}
+_mmbench_judge: dict[str, object] = {}
+_mmbench_problems: dict = {}
+# Captured while the patches below are active; record_config() runs after they
+# are restored, so it cannot read the live constants.
+_effective_evolution: dict[str, object] = {}
 
 _original_prepare_refinement = workflow.substantive.prepare_refinement_validation_problem
 _original_runtime_args = workflow.substantive.runtime_args
@@ -219,6 +156,12 @@ _original_write_interaction_added_content = (
 _original_run_consolidated_refinement_check = (
     workflow.substantive.run_consolidated_refinement_check
 )
+_original_training_parent_count = workflow.CPE_TRAINING_PARENT_COUNT
+_original_evolution_modes = workflow.CPE_EVOLUTION_MODES
+_original_train_epsilon = workflow.CPE_TRAIN_ACCEPTANCE_EPSILON
+_original_validation_epsilon = workflow.CPE_VALIDATION_ACCEPTANCE_EPSILON
+_original_interaction_judge_report = workflow.interaction.judge_report
+_original_load_problems = workflow.baseline.load_problems
 
 
 def parse_planning_draft_sources() -> argparse.Namespace:
@@ -226,6 +169,31 @@ def parse_planning_draft_sources() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--planning-draft-train-root", type=Path)
     parser.add_argument("--planning-draft-validation-root", type=Path)
+    parser.add_argument(
+        "--benchmark",
+        choices=("modelingbench", "mmbench"),
+        default="modelingbench",
+        help="Problem/data/evaluation source (default: modelingbench).",
+    )
+    parser.add_argument(
+        "--mmbench-root",
+        type=Path,
+        default=DEFAULT_MMBENCH_ROOT,
+        help=f"MM-Bench root (default: {DEFAULT_MMBENCH_ROOT}).",
+    )
+    parser.add_argument(
+        "--planning-draft-root",
+        type=Path,
+        nargs="+",
+        help=(
+            "MM-Bench roots holding the planning drafts. Defaults to every "
+            "interaction_strategy_clean_baseline_initial_draft_mmbench_* run."
+        ),
+    )
+    parser.add_argument("--mmbench-judge-model", default="deepseek-v4-flash")
+    parser.add_argument("--mmbench-judge-api-key")
+    parser.add_argument("--mmbench-judge-base-url")
+    parser.add_argument("--mmbench-judge-timeout", type=float, default=600.0)
     values, remainder = parser.parse_known_args(sys.argv[1:])
     sys.argv = [sys.argv[0], *remainder]
     return values
@@ -248,7 +216,10 @@ def run_initial_draft_parent_evaluations(
 ) -> None:
     """Validate seed policies in round 0, then train them in round 1."""
     if len(initial_population) != workflow.CPE_TRAINING_PARENT_COUNT:
-        raise ValueError("Initial-draft CPE initialization requires two seed workflows")
+        raise ValueError(
+            "Initial-draft CPE initialization requires "
+            f"{workflow.CPE_TRAINING_PARENT_COUNT} seed workflow(s)"
+        )
 
     initialization_mode = "round_0_validation_then_round_1_training"
     saved_mode = state.get("initialization_mode")
@@ -275,7 +246,7 @@ def run_initial_draft_parent_evaluations(
         None
     ] * workflow.CPE_TRAINING_PARENT_COUNT
     print(
-        "Running the two initial parent validations in parallel in CPE round 0",
+        "Running the initial parent validations in parallel in CPE round 0",
         flush=True,
     )
     with ThreadPoolExecutor(
@@ -337,7 +308,7 @@ def run_initial_draft_parent_evaluations(
         None
     ] * workflow.CPE_TRAINING_PARENT_COUNT
     print(
-        "Running the two initial training-parent workflows in parallel in CPE round 1",
+        "Running the initial training-parent workflows in parallel in CPE round 1",
         flush=True,
     )
     with ThreadPoolExecutor(
@@ -449,6 +420,15 @@ def resolve_planning_draft(problem_id: str, _unused_root: Path) -> Path:
     # placeholder avoids requiring draft roots merely to materialize seeds.
     if _initialize_only:
         return Path(__file__).resolve()
+    if _benchmark == "mmbench":
+        # MM-Bench drafts have no train/validation root split; main() already
+        # resolved one draft path per task, so use it directly.
+        resolved = _mmbench_draft_reports.get(problem_id)
+        if not resolved:
+            raise FileNotFoundError(
+                f"No planning draft resolved for MM-Bench problem {problem_id}"
+            )
+        return Path(resolved)
     root = source_root_for_problem(problem_id)
     candidates = []
     for draft in root.glob("**/output/results/draft.md"):
@@ -467,6 +447,16 @@ def resolve_planning_draft(problem_id: str, _unused_root: Path) -> Path:
 
 
 def planning_draft_matches_problem(problem_id: str, draft: Path) -> bool:
+    if _benchmark == "mmbench":
+        # main() pinned one draft per task, so identity is the whole check and
+        # there is no train/validation root to be relative to.
+        resolved = _mmbench_draft_reports.get(problem_id)
+        if not resolved:
+            return False
+        try:
+            return Path(draft).resolve() == Path(resolved).resolve()
+        except OSError:
+            return False
     expected_root = source_root_for_problem(problem_id).resolve()
     try:
         Path(draft).resolve().relative_to(expected_root)
@@ -567,6 +557,120 @@ def policy_text_for_evolution(workflow_value: dict) -> str:
     return "\n".join(lines).strip()
 
 
+def evolution_history_entries(patch_history: list[dict]) -> list[dict]:
+    """Compact prior rounds into what changed, what was predicted, what happened.
+
+    Each round is otherwise independent, so without this the optimizer
+    re-derives the same plausible change every round and cannot learn that a
+    direction already failed validation.
+    """
+    entries = []
+    for event in patch_history or []:
+        if not isinstance(event, dict):
+            continue
+        entry = {
+            "round": event.get("round"),
+            "evolution_mode": event.get("evolution_mode"),
+            "changed_components": event.get("changed_components", []),
+            "parent_train_net_utilities": event.get("parent_train_net_utilities"),
+            "candidate_train_net_utility": event.get("candidate_train_net_utility"),
+            "train_accepted": event.get("train_accepted"),
+            "validation_utility": event.get("validation_utility"),
+            "validation_accepted": event.get("validation_accepted"),
+        }
+        predicted = event.get("predicted_effect")
+        if isinstance(predicted, dict):
+            entry["predicted_effect"] = predicted
+        entries.append(entry)
+    return entries
+
+
+EVOLUTION_PROMPT_HEAD = """System prompt. You are a senior interaction-policy engineer.
+The downstream solver agent solves MM-Bench modeling tasks from a planning draft
+and may consult a human expert while it works. You must respond with one JSON
+object only (no markdown fences), matching the schema in §3.
+
+§1 Optimization goals. Evolve one executable human-expert interaction policy for
+a modeling agent that starts from a planning draft and otherwise solves
+autonomously. Treat the policy as the communication contract: it governs only how
+the agent audits the modeling state, asks the human expert, translates the reply
+into a decision, follows up, and stops.
+
+The evidence JSON holds the single training parent and its rollouts on the current
+training batch, the historical validation champion, and every round already run.
+Each sampled task carries its problem statement, the complete expert dialogue, the
+interaction-attributable report change, and its scores. Judge prose is withheld;
+work from the dialogues, the report changes, and the scores.
+
+Use the parent's rollouts to identify communication failures and transferable
+successes, and treat the aggregate net utilities and the decision history as
+coarse fitness signals. Propose a targeted behavioural patch rather than a
+task-specific solution: never copy task-specific facts, entities, parameters,
+methods, or conclusions out of the rollouts, and do not name a task inside the
+policy.
+
+The solver agent keeps all calculation, implementation, external-data validation,
+simulation, debugging, and report writing; the expert supplies high-impact
+strategic judgment only. Every exchange after the first must build on an earlier
+reply and serve a distinct decision-relevant purpose. Keep the policy compact.
+
+A candidate whose behavioural similarity to a round already evaluated reaches
+{similarity_threshold} is rejected before it runs.
+
+§2 Modification requirements.
+
+- Mutate the parent policy. Only one policy is live; crossover is unavailable.
+- Return the policy in the shape the parent uses: `name`, `purpose`, `policy_text`,
+  `maximum_expert_interactions`, `termination_condition`, and `actions`.
+- Design the process as an ordered `actions` list, then render that same graph
+  into `policy_text`. `policy_text` is the deliverable and the only thing the
+  solver agent receives; it never sees the graph. It must stand alone and match
+  the graph's stage order, budget, and termination rule.
+- Each action is an object with `action_id` (lowercase, unique inside the
+  workflow, matching `[a-z][a-z0-9_]*`), `action_type` (`agent_audit`,
+  `expert_exchange`, `agent_analysis`, or `close`), and `rule` (at least 20
+  characters). The list holds two to eight actions in execution order and at
+  least one `expert_exchange`.
+- Do not use the fields `transitions`, `completion_output`, or `success_test`.
+"""
+
+
+EVOLUTION_OUTPUT_SCHEMA = """§3 Output JSON schema.
+
+{
+  "name": "<concise policy name>",
+  "purpose": "<the strategic role of human interaction>",
+  "interaction_policy": "<the complete evolved policy, one Markdown string>",
+  "actions": [
+    {
+      "action_id": "<lowercase, [a-z][a-z0-9_]*>",
+      "action_type": "<agent_audit|expert_exchange|agent_analysis|close>",
+      "rule": "<at least 20 characters>"
+    }
+  ],
+  "maximum_expert_interactions": <positive integer>,
+  "termination_condition": "<concise textual stopping rule>",
+  "evolution_mode": "mutation",
+  "changed_components": ["<non-empty list of behavioural changes>"],
+  "evolution_rationale": "<why the changes fit the parent policy's evidence>",
+  "predicted_effect_metric": "<the metric this mutation should move>",
+  "predicted_effect_direction": "<increase|decrease>",
+  "predicted_effect_magnitude": <number on that metric's own scale>
+}
+"""
+
+
+EVOLUTION_EVIDENCE_GUIDE = """§4 Evidence
+
+The JSON object below is the input for this round. Its `net_utility` is the
+quantity §1 asks you to raise.
+"""
+
+
+EVOLUTION_PROMPT_FOOT = """§5 Final instruction. Emit one JSON object as in §3.
+No markdown outside that JSON."""
+
+
 def build_initial_draft_cpe_workflow_evolution_prompt(
     training_parents: list[dict],
     validation_champion: dict,
@@ -575,7 +679,6 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
 ) -> str:
     """Build policy evolution evidence without the retired operator catalogue."""
     del dialogue_operators
-    del patch_history
     if len(training_parents) != workflow.CPE_TRAINING_PARENT_COUNT:
         raise ValueError(
             f"CPE workflow evolution requires {workflow.CPE_TRAINING_PARENT_COUNT} "
@@ -585,9 +688,11 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
     champion_workflow = validation_champion.get("workflow", {})
     evidence_parents = []
     for parent in training_parents:
+        # Keep the cost model and the average penalty.  Without them the
+        # operator cannot tell whether a low net utility came from weak report
+        # quality or from expensive interaction, and would have to guess which
+        # side of the objective to move.
         training_evidence = copy.deepcopy(parent.get("training_evidence", {}))
-        training_evidence.pop("average_interaction_penalty", None)
-        training_evidence.pop("interaction_cost_parameters", None)
         evidence_parent = {
             "parent_rank": parent.get("parent_rank"),
             "workflow_id": parent.get("workflow_id"),
@@ -607,76 +712,27 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
             "interaction_policy": policy_text_for_evolution(champion_workflow),
             "mean_net_utility": validation_champion.get("utility"),
         },
+        "evolution_history": evolution_history_entries(patch_history),
     }
     workflow.assert_no_cpe_judge_evidence(evidence_bundle)
     evidence_json = json.dumps(evidence_bundle, ensure_ascii=False, indent=2)
-    return f"""Evolve one executable human-expert interaction policy for a modeling
-agent that starts from a planning draft and otherwise solves autonomously.
-
-The evidence JSON contains two parent policies. Each policy is stored as a complete
-Markdown string in `interaction_policy`, alongside its sampled-task executions,
-expert dialogues, report-change summaries, aggregate net utility, and interaction
-cost. Compare how the parents define:
-
-- when strategic expert feedback is required;
-- what context and decision alternatives are presented to the expert;
-- how the reply changes the subsequent modeling strategy;
-- when interaction terminates and autonomous execution resumes.
-
-Choose one evidence-based evolution mode:
-
-- `crossover`: write one coherent text policy that combines compatible or
-  complementary behavioral strengths from both parents;
-- `mutation`: retain one parent as the textual base and make a focused behavioral
-  revision when combining the policies would create redundancy, conflict, or
-  unnecessary interaction.
-
-Use both parents as evidence regardless of the selected mode. Evolve the policy's
-behavior and wording directly; do not reconstruct an action graph or operator-based
-workflow.
-
-## Evolution evidence
-
-The following single JSON object contains each interaction policy as a Markdown text
-string, together with the parent utilities, every sampled task, complete expert-
-interaction history, interaction-attributable report changes, interaction costs, the
-validation-champion policy and utility. Treat each
-`interaction_policy` value as the complete policy text; it is text stored in JSON, not
-a nested JSON workflow definition.
-
-```json
-{evidence_json}
-```
-
-Analyze how each parent policy shaped when expert feedback was requested, what
-strategic information was elicited, how the reply changed the subsequent modeling
-work, and when interaction stopped. Use aggregate net utility and the sampled-task
-interaction evidence as coarse fitness signals. Evolve a general interaction policy rather than any
-task-specific model, parameter, method, or conclusion.
-
-The evolved policy must preserve autonomous modeling: the agent owns all calculation,
-implementation, external-data validation, simulation, debugging, and report writing.
-Human feedback is limited to high-impact strategic judgment. Avoid repeated
-confirmation of an already resolved decision, and state a clear interaction limit and
-termination condition.
-
-Return only one JSON object with these fields:
-
-- `name`: concise policy name;
-- `purpose`: the strategic role of human interaction;
-- `interaction_policy`: the complete evolved policy as one Markdown text string,
-  using the same Principle, Trigger Conditions, Interaction Workflow, and Interaction
-  Constraints style as the parent policies;
-- `maximum_expert_interactions`: a positive integer;
-- `termination_condition`: a concise textual stopping rule;
-- `evolution_mode`: exactly `crossover` or `mutation`;
-- `changed_components`: a non-empty list describing the behavioral changes;
-- `evolution_rationale`: why the selected mode and changes fit both parents' evidence.
-
-Do not return `entry_action`, `actions`, `action_id`, `action_type`, operator names, or
-a nested workflow graph. The value of `interaction_policy` must be policy prose stored
-as a JSON string.
-"""
+    return "\n".join(
+        [
+            EVOLUTION_PROMPT_HEAD.replace(
+                "{similarity_threshold}",
+                f"{workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD:.2f}",
+            ),
+            EVOLUTION_OUTPUT_SCHEMA,
+            EVOLUTION_EVIDENCE_GUIDE,
+            "",
+            "```json",
+            evidence_json,
+            "```",
+            "",
+            EVOLUTION_PROMPT_FOOT,
+            "",
+        ]
+    )
 
 
 def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
@@ -733,8 +789,75 @@ def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
     _original_validate_workflow(workflow_value)
 
 
+# Emitted only in MM-Bench mode.  The Markdown report alone is not a complete
+# submission there: the native evaluator reads this container instead, so the
+# solver has to be told to produce it.  Placeholders are resolved downstream,
+# exactly like the rest of the solver prompt.
+MMBENCH_SOLUTION_FILE_SECTION = """\
+## MM-Bench Solution File
+
+When the task is an MM-Bench problem, the Markdown report is not the complete
+submission. Also write the machine-readable solution container that MM-Bench
+Judge reads:
+
+`{{RESULTS_DIR}}/solution.json`
+
+It must be valid UTF-8 JSON with exactly this shape:
+
+```json
+{
+  "tasks": [
+    {
+      "task_description": "...",
+      "task_analysis": "...",
+      "preliminary_formulas": "...",
+      "mathematical_modeling_process": "...",
+      "task_code": "...",
+      "is_pass": true,
+      "execution_result": "...",
+      "solution_interpretation": "...",
+      "subtask_outcome_analysis": "..."
+    }
+  ]
+}
+```
+
+### Subtask Granularity
+
+Write one element in `tasks` for each subproblem the problem statement asks
+about, in the original order. Do not merge several subproblems into one element,
+and do not split one subproblem across elements. A special deliverable the
+problem requires (memo, position paper, schedule, recommendation) belongs to the
+subtask that asks for it, not to an element of its own.
+
+### Field Content
+
+| Field | Content |
+| --- | --- |
+| `task_description` | What this subtask must deliver and how it fits the overall problem decomposition. |
+| `task_analysis` | Modeling analysis of this subtask: objective, assumptions and their justification, chosen method, alternatives considered, technical risks. |
+| `preliminary_formulas` | Notation, variables and parameters with units, and the core mathematical relations, written in LaTeX. |
+| `mathematical_modeling_process` | The complete modeling and solution process for this subtask: model construction, parameter estimation, algorithm and implementation steps. |
+| `task_code` | The code actually executed for this subtask, or an empty string when the subtask needs no computation. |
+| `is_pass` | `true` only when that computation ran successfully and its outputs passed basic checks; otherwise `false`. |
+| `execution_result` | The key numerical outputs produced by the executed computation. |
+| `solution_interpretation` | How the results are read and the direct answer to this subtask. |
+| `subtask_outcome_analysis` | Conclusions, interpretation limits, and the data, model, and computational bias analysis for this subtask. |
+
+Every field is a plain string, and LaTeX is allowed inside strings. Escape
+newlines, quotes, and backslashes so the file parses as strict JSON. Do not wrap
+the file in a Markdown code fence, and do not embed images, charts, base64
+payloads, or data URLs. The solution file must state the same models, numbers,
+and conclusions as the report.
+
+"""
+
+
 def build_interactive_solver_prompt(workflow_value: dict) -> str:
     """Build the Planner-to-Solver prompt with a workflow insertion point."""
+    mmbench_section = (
+        MMBENCH_SOLUTION_FILE_SECTION if _benchmark == "mmbench" else ""
+    )
     template = f"""# ModelingBench Task — Interactive Modeling Solver Agent
 
 You are an advanced mathematical modeling solver agent.
@@ -836,6 +959,8 @@ Do not generate or include images.
 
 ---
 
+{mmbench_section}---
+
 # Workspace
 
 Workspace: `{{{{OUTPUT_DIR}}}}`
@@ -866,74 +991,33 @@ Start by reading draft.md and reviewing the proposed modeling plan.
     )
 
 
+def fixed_initial_workflow() -> dict:
+    """Return the one frozen interaction policy used by the whole run.
+
+    The policy text is shared with the workflow-test runner, so the initial
+    strategy here is byte-identical to the one that runner pins per task.
+    """
+    selected = {
+        "name": "Modeling strategy escalation policy",
+        "purpose": (
+            "Resolve one high-impact modeling-strategy uncertainty only when "
+            "autonomous analysis cannot produce a clear decision."
+        ),
+        "policy_text": MODELING_STRATEGY_ESCALATION,
+        "max_exchanges": 3,
+        "stop_condition": (
+            "Stop without consultation unless every trigger condition holds; "
+            "otherwise stop after three expert replies and continue autonomously."
+        ),
+    }
+    validate_workflow_with_inferred_start(selected)
+    selected["workflow_id"] = workflow.workflow_id(selected)
+    return selected
+
+
 def initial_planning_workflows() -> list[dict]:
-    """Use the two user-specified strategic policies as the initial population."""
-    definitions = [
-        {
-            "name": "Strategic uncertainty interaction policy",
-            "purpose": "Resolve one highest-impact strategic uncertainty only when it cannot be settled autonomously and expert feedback can produce a clear decision.",
-            "policy_text": INITIAL_STRATEGIC_UNCERTAINTY_POLICY,
-            "actions": [
-                {
-                    "action_id": "audit_strategic_uncertainty",
-                    "action_type": "agent_audit",
-                    "rule": "Solve autonomously. Request feedback only when all four conditions hold: multiple feasible strategies remain; the choice may change the modeling direction or conclusions; standard modeling knowledge and self-analysis cannot resolve it; and expert feedback can produce a clear decision. Never escalate implementation, coding, debugging, parameter tuning, derivations, computation, or routine validation. If several uncertainties qualify, select only the highest-impact one.",
-                },
-                {
-                    "action_id": "request_required_optional_decision",
-                    "action_type": "expert_exchange",
-                    "rule": "Present the current problem understanding and modeling stage, the single highest-impact strategic uncertainty and its impact, and candidate strategies with trade-offs. Ask the expert to classify each suggestion as Required when necessary for the original objective or Optional when it is an extension or improvement.",
-                },
-                {
-                    "action_id": "apply_required_guidance_and_freeze_scope",
-                    "action_type": "agent_analysis",
-                    "rule": "Evaluate the reply and the feasibility and cost of the guidance. Apply only Required suggestions to the core model, update the strategy when necessary, then freeze the modeling scope and continue autonomously. Treat new issues as assumptions, limitations, or sensitivity analysis rather than reopening or expanding the core scope.",
-                },
-                {
-                    "action_id": "close_interaction",
-                    "action_type": "close",
-                    "rule": "Terminate when the strategic uncertainty is resolved, the modeling direction is determined, or the remaining tasks can be completed autonomously. Do not exceed one expert interaction.",
-                },
-            ],
-            "max_exchanges": 1,
-            "stop_condition": "Stop without interaction unless every trigger condition holds; otherwise stop after the single reply has resolved the strategic uncertainty and the scope has been frozen.",
-        },
-        {
-            "name": "Strategic checkpoint alignment policy",
-            "purpose": "Use one high-impact predefined checkpoint to confirm or correct critical assumptions, problem formulation, and solution direction before an irreversible modeling decision.",
-            "policy_text": INITIAL_STRATEGIC_CHECKPOINT_POLICY,
-            "actions": [
-                {
-                    "action_id": "select_strategic_checkpoint",
-                    "action_type": "agent_audit",
-                    "rule": "Request feedback only after initial problem and requirement analysis, before final framework selection, before introducing a major outcome-sensitive assumption, or before executing a pipeline with substantial downstream impact. If several checkpoints have been reached, select the earliest one with the highest potential impact. Never escalate implementation, coding, debugging, parameter tuning, mathematical derivations, computation, routine validation, or minor assumption adjustments.",
-                },
-                {
-                    "action_id": "request_confirmation_correction_suggestion",
-                    "action_type": "expert_exchange",
-                    "rule": "Present the current problem understanding and objectives, modeling stage and planned next steps, decisions requiring strategic alignment, and possible directions with advantages, limitations, and expected consequences. Ask the expert to classify feedback as Confirmation of alignment, Correction necessary to assumptions, formulation, or framework, or Suggestion for an optional improvement or extension.",
-                },
-                {
-                    "action_id": "apply_confirmations_and_corrections",
-                    "action_type": "agent_analysis",
-                    "rule": "Apply Confirmation and Correction to the core modeling process, revise the strategy when required, and record the confirmed assumptions and decisions. Consider Suggestions only when they do not expand the original scope, then continue the remaining modeling process autonomously.",
-                },
-                {
-                    "action_id": "close_checkpoint",
-                    "action_type": "close",
-                    "rule": "Terminate after the strategic direction and critical assumptions are confirmed and the remaining process can proceed autonomously. Do not reopen the same decision unless new evidence fundamentally invalidates its assumption, and never exceed one interaction.",
-                },
-            ],
-            "max_exchanges": 1,
-            "stop_condition": "Stop after the single selected checkpoint has confirmed or corrected the strategic direction and critical assumptions; continue the remaining modeling process autonomously.",
-        },
-    ]
-    population = []
-    for value in definitions:
-        validate_workflow_with_inferred_start(value)
-        value["workflow_id"] = workflow.workflow_id(value)
-        population.append(value)
-    return population
+    """Use the single frozen policy as the initial and the initial best strategy."""
+    return [fixed_initial_workflow()]
 
 
 def prepare_from_planning_draft(
@@ -1140,6 +1224,15 @@ def runtime_args_with_immediate_agent_start(*args, **kwargs):
     run_args = _original_runtime_args(*args, **kwargs)
     run_args.pipeline_agent_start = True
     run_args.require_clean_task_workspace = True
+    if _benchmark == "mmbench":
+        # The shared parser knows nothing about MM-Bench, and the planning
+        # drafts were resolved once in main() rather than discovered per task.
+        run_args.benchmark = "mmbench"
+        run_args.mmbench_root = _mmbench_root
+        run_args.baseline_reports = dict(_mmbench_draft_reports)
+        for name, value in _mmbench_judge.items():
+            if value is not None:
+                setattr(run_args, f"mmbench_judge_{name}", value)
     return run_args
 
 
@@ -1160,14 +1253,27 @@ def execute_cpe_evaluation_with_phase_concurrency(
     if not problem_ids:
         raise ValueError(f"CPE {split_name} phase has no problems")
     phase_args = copy.copy(run_args)
-    phase_concurrency = len(problem_ids)
-    phase_args.concurrency = phase_concurrency
-    phase_args.retry_concurrency = phase_concurrency
-    phase_args.judge_concurrency = phase_concurrency
+    # Training problems repeat so the phase score is an average over several
+    # independent agent runs; validation keeps the configured repetition count.
+    repetitions = (
+        DEFAULT_TRAIN_REPETITIONS
+        if split_name == "train"
+        else run_args.validation_repetitions
+    )
+    phase_args.validation_repetitions = repetitions
+    # One worker per agent run this phase will actually execute.  Derived from
+    # the problem count and the repetition count instead of pinned, so changing
+    # either keeps the phase fully parallel.
+    run_count = len(problem_ids) * repetitions
+    phase_args.concurrency = run_count
+    phase_args.retry_concurrency = run_count
+    # Judging happens once per aggregated problem result, not once per run.
+    phase_args.judge_concurrency = len(problem_ids)
     phase_args.pipeline_agent_start = True
     print(
         f"CPE {split_name} phase {phase}: problems={len(problem_ids)}, "
-        f"agent concurrency={phase_concurrency}, immediate start enabled",
+        f"repetitions={repetitions} ({run_count} agent runs), "
+        f"agent concurrency={run_count}, immediate start enabled",
         flush=True,
     )
     return _original_execute_cpe_evaluation(
@@ -1191,8 +1297,21 @@ def parse_args_with_pool_defaults():
     def supplied(option: str) -> bool:
         return any(value == option or value.startswith(option + "=") for value in sys.argv[1:])
 
+    # Scoped to this launcher: the shared engine keeps its own --thinking
+    # default, so other experiments that delegate to it are unaffected.
+    if not supplied("--thinking"):
+        args.thinking = DEFAULT_THINKING_LEVEL
     if not supplied("--train-batch-size"):
         args.train_batch_size = DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE
+    # record_config() runs after the monkey-patches are restored, so capture the
+    # effective margins here rather than reading the module globals later.
+    _effective_evolution["train_acceptance_margin"] = DEFAULT_TRAIN_ACCEPTANCE_MARGIN
+    _effective_evolution["validation_acceptance_margin"] = (
+        DEFAULT_VALIDATION_ACCEPTANCE_MARGIN
+    )
+    # Every report is judged this many times in parallel and averaged.
+    if not supplied("--judge-repeats"):
+        args.judge_repeats = DEFAULT_JUDGE_REPEATS
     if not supplied("--validation-size"):
         args.validation_size = len(VALIDATION_PROBLEMS)
     # CPE evaluations replace this base value with the size of their current
@@ -1214,7 +1333,7 @@ def experiment_path(value: str | None) -> tuple[Path, bool]:
         _active_experiment = path
         return path, path.is_dir()
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = REPO_ROOT / "openclaw_experiments" / f"interaction_workflow_initial_draft_solution_{stamp}"
+    path = EXPERIMENT_ROOT / f"{EXPERIMENT_PREFIX}_{stamp}"
     _active_experiment = path
     return path, False
 
@@ -1242,13 +1361,29 @@ def record_config() -> None:
             },
             "interaction_latency_cost_ignored": True,
             "solver_prompt": "interactive_modeling_solver_agent_from_planning_draft",
-            "initial_workflows": [
-                "strategic_uncertainty_interaction_policy",
-                "strategic_checkpoint_alignment_policy",
-            ],
+            "benchmark": _benchmark,
+            "mmbench_root": str(_mmbench_root) if _benchmark == "mmbench" else None,
+            "mmbench_split": (
+                {
+                    "test": list(MMBENCH_TEST_PROBLEMS),
+                    "validation": list(MMBENCH_VALIDATION_PROBLEMS),
+                    "train": list(MMBENCH_TRAIN_PROBLEMS),
+                    "unused_older_tasks": "44 tasks dated 2014_B and earlier",
+                }
+                if _benchmark == "mmbench"
+                else None
+            ),
+            "training_parent_count": _effective_evolution.get("training_parent_count"),
+            "evolution_modes": _effective_evolution.get("evolution_modes"),
+            "train_repetitions_per_problem": DEFAULT_TRAIN_REPETITIONS,
+            "train_acceptance_margin": _effective_evolution.get("train_acceptance_margin"),
+            "validation_acceptance_margin": _effective_evolution.get(
+                "validation_acceptance_margin"
+            ),
+            "initial_workflows": ["modeling_strategy_escalation_policy"],
             "initial_evaluation_schedule": {
-                "round_0": "validate_both_initial_parents",
-                "round_1": "train_both_parents_then_evolve_candidate",
+                "round_0": "validate_initial_parent",
+                "round_1": "train_initial_parent_then_evolve_candidate",
                 "round_1_parent_validation": False,
             },
         }
@@ -1256,11 +1391,63 @@ def record_config() -> None:
     workflow.workflow_evolution.write_json(path, config)
 
 
-def main() -> None:
-    global _draft_train_root, _draft_validation_root, _initialize_only
+def mmbench_support():
+    """Import the MMBench helpers, which import this module back."""
+    try:
+        from . import run_substantive_interaction_workflow_test_from_initial_draft as support
+    except ImportError:  # pragma: no cover - direct-file invocation support
+        from src.OpenClaw import (
+            run_substantive_interaction_workflow_test_from_initial_draft as support,
+        )
+    return support
+
+
+def default_mmbench_draft_roots() -> list[Path]:
+    """Every planner run that published MM-Bench planning drafts."""
+    return sorted(
+        (REPO_ROOT / "openclaw_experiments").glob(
+            "interaction_strategy_clean_baseline_initial_draft_mmbench_*"
+        )
+    )
+
+
+def configure_problem_pools(sources: argparse.Namespace) -> None:
+    """Populate the train/validation pools for the selected benchmark."""
+    global _draft_train_root, _draft_validation_root
+    global _benchmark, _mmbench_root, _mmbench_problems
     global TRAIN_PROBLEMS, VALIDATION_PROBLEMS
-    sources = parse_planning_draft_sources()
-    _initialize_only = "--initialize-only" in sys.argv[1:]
+    _benchmark = sources.benchmark
+    _mmbench_root = (sources.mmbench_root or DEFAULT_MMBENCH_ROOT).resolve()
+
+    if _benchmark == "mmbench":
+        # The MM-Bench split is fixed by publication year rather than discovered
+        # from draft artifacts, so every run uses the same pools.  Loading the
+        # problems and resolving their drafts here fails fast, before any agent
+        # starts, if a draft is missing.
+        TRAIN_PROBLEMS = list(MMBENCH_TRAIN_PROBLEMS)
+        VALIDATION_PROBLEMS = list(MMBENCH_VALIDATION_PROBLEMS)
+        _draft_train_root = _draft_validation_root = None
+        roots = [
+            path.resolve()
+            for path in (sources.planning_draft_root or default_mmbench_draft_roots())
+        ]
+        support = mmbench_support()
+        _mmbench_problems, problem_ids = support.load_mmbench_problems(
+            _mmbench_root, [*TRAIN_PROBLEMS, *VALIDATION_PROBLEMS]
+        )
+        _mmbench_draft_reports.update(
+            support.resolve_planning_drafts(roots, problem_ids)
+        )
+        print(
+            "MM-Bench split: "
+            f"train={len(TRAIN_PROBLEMS)}, validation={len(VALIDATION_PROBLEMS)}, "
+            f"test={len(MMBENCH_TEST_PROBLEMS)}; "
+            f"drafts={len(_mmbench_draft_reports)}; "
+            f"default train batch={DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE}",
+            flush=True,
+        )
+        return
+
     _draft_train_root = (
         sources.planning_draft_train_root or PLANNING_DRAFT_TRAIN_ROOT
     ).resolve()
@@ -1268,9 +1455,17 @@ def main() -> None:
         sources.planning_draft_validation_root or PLANNING_DRAFT_VALIDATION_ROOT
     ).resolve()
     TRAIN_PROBLEMS = discover_planning_draft_problem_ids(_draft_train_root)
-    VALIDATION_PROBLEMS = discover_planning_draft_problem_ids(
+    discovered_validation_problems = discover_planning_draft_problem_ids(
         _draft_validation_root
     )
+    if len(discovered_validation_problems) < DEFAULT_INITIAL_DRAFT_VALIDATION_SIZE:
+        raise ValueError(
+            "Planning-draft validation pool has fewer than "
+            f"{DEFAULT_INITIAL_DRAFT_VALIDATION_SIZE} completed drafts"
+        )
+    VALIDATION_PROBLEMS = discovered_validation_problems[
+        :DEFAULT_INITIAL_DRAFT_VALIDATION_SIZE
+    ]
     overlap = sorted(set(TRAIN_PROBLEMS) & set(VALIDATION_PROBLEMS))
     if overlap:
         raise ValueError(
@@ -1284,13 +1479,56 @@ def main() -> None:
         flush=True,
     )
 
+
+def main() -> None:
+    global _initialize_only
+    sources = parse_planning_draft_sources()
+    _initialize_only = "--initialize-only" in sys.argv[1:]
+    _mmbench_judge.update(
+        {
+            "model": sources.mmbench_judge_model,
+            "api_key": sources.mmbench_judge_api_key,
+            "base_url": sources.mmbench_judge_base_url,
+            "timeout": sources.mmbench_judge_timeout,
+        }
+    )
+    configure_problem_pools(sources)
+
     workflow.load_cpe_split = load_current_draft_split
     workflow.parse_args = parse_args_with_pool_defaults
     workflow.substantive.BASELINE_REPORT_ROOT = _draft_train_root or REPO_ROOT
     workflow.substantive.DEFAULT_PROBLEMS = tuple(VALIDATION_PROBLEMS)
     workflow.substantive.resolve_baseline_report = resolve_planning_draft
     workflow.substantive.baseline_report_matches_problem = planning_draft_matches_problem
-    workflow.substantive.prepare_refinement_validation_problem = prepare_from_planning_draft
+    # One interaction strategy at a time: the single constant that gates every
+    # parent/elite count in the shared module becomes 1, so the initial strategy
+    # is also the initial best strategy and each round evolves one candidate.
+    workflow.CPE_TRAINING_PARENT_COUNT = 1
+    # Crossover needs two parents; with one live policy only mutation is coherent.
+    workflow.CPE_EVOLUTION_MODES = frozenset({"mutation"})
+    # A gate has to clear the re-run noise of the score it compares, and the two
+    # gates compare scores of different variance.
+    workflow.CPE_TRAIN_ACCEPTANCE_EPSILON = DEFAULT_TRAIN_ACCEPTANCE_MARGIN
+    workflow.CPE_VALIDATION_ACCEPTANCE_EPSILON = DEFAULT_VALIDATION_ACCEPTANCE_MARGIN
+    _effective_evolution.update(
+        {
+            "training_parent_count": workflow.CPE_TRAINING_PARENT_COUNT,
+            "evolution_modes": sorted(workflow.CPE_EVOLUTION_MODES),
+        }
+    )
+    if _benchmark == "mmbench":
+        support = mmbench_support()
+        workflow.baseline.load_problems = lambda: _mmbench_problems
+        workflow.substantive.prepare_refinement_validation_problem = partial(
+            support.prepare_mmbench_from_planning_draft, _mmbench_root
+        )
+        workflow.interaction.judge_report = partial(
+            support.judge_report_with_mmbench, _mmbench_problems, _mmbench_root
+        )
+    else:
+        workflow.substantive.prepare_refinement_validation_problem = (
+            prepare_from_planning_draft
+        )
     workflow.substantive.write_interaction_added_content = (
         write_planning_draft_added_content
     )
@@ -1331,6 +1569,12 @@ def main() -> None:
             delattr(workflow.substantive, "baseline_report_matches_problem")
         else:
             workflow.substantive.baseline_report_matches_problem = _original_baseline_report_matches
+        workflow.CPE_TRAINING_PARENT_COUNT = _original_training_parent_count
+        workflow.CPE_EVOLUTION_MODES = _original_evolution_modes
+        workflow.CPE_TRAIN_ACCEPTANCE_EPSILON = _original_train_epsilon
+        workflow.CPE_VALIDATION_ACCEPTANCE_EPSILON = _original_validation_epsilon
+        workflow.interaction.judge_report = _original_interaction_judge_report
+        workflow.baseline.load_problems = _original_load_problems
         workflow.substantive.prepare_refinement_validation_problem = _original_prepare_refinement
         workflow.substantive.write_interaction_added_content = (
             _original_write_interaction_added_content

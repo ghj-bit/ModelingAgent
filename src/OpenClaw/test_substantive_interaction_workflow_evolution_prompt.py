@@ -117,7 +117,7 @@ def main() -> None:
     parser.add_argument(
         "--parent-similarity-threshold",
         type=float,
-        default=evolution.DEFAULT_PARENT_SIMILARITY_THRESHOLD,
+        default=evolution.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD,
     )
     args = parser.parse_args()
     experiment = args.experiment.resolve()

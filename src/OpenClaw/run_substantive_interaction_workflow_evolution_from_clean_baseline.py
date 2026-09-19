@@ -47,6 +47,11 @@ VALIDATION_PROBLEMS = (
 )
 TRAIN_PROBLEM_SET = frozenset(TRAIN_PROBLEMS)
 VALIDATION_PROBLEM_SET = frozenset(VALIDATION_PROBLEMS)
+# Thinking level for the solving agent.  The DeepSeek provider collapses
+# minimal/low/medium/high onto one wire value (reasoning_effort="high"), so only
+# "off" is a distinct setting: reasoning falls to 0% of output tokens and
+# generated tokens per call drop by roughly 46%.  Overridable with --thinking.
+DEFAULT_THINKING_LEVEL = "off"
 
 _active_experiment: Path | None = None
 _original_prepare_refinement = (
@@ -244,6 +249,10 @@ def parse_args_with_current_pool_defaults():
             for value in sys.argv[1:]
         )
 
+    # Scoped to this launcher: the shared engine keeps its own --thinking
+    # default, so other experiments that delegate to it are unaffected.
+    if not supplied("--thinking"):
+        args.thinking = DEFAULT_THINKING_LEVEL
     phase_concurrency = max(args.train_batch_size, len(VALIDATION_PROBLEMS))
     if not supplied("--validation-size"):
         args.validation_size = len(VALIDATION_PROBLEMS)

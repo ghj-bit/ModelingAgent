@@ -46,6 +46,9 @@ DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD = 0.90
 STAGNATION_ROUNDS_FOR_OPERATOR_EVOLUTION = 5
 SIMILARITY_REJECTIONS_FOR_OPERATOR_EVOLUTION = 3
 CPE_TRAINING_PARENT_COUNT = 2
+# Evolution operators the optimizer may return.  Launchers that keep a single
+# live policy narrow this to {"mutation"}, because crossover needs two parents.
+CPE_EVOLUTION_MODES = frozenset({"crossover", "mutation"})
 MIN_CPE_EVOLUTION_ROUNDS: int | None = CPE_TRAINING_PARENT_COUNT + 1
 # Opt-in compatibility switch used by launchers that want the two seed parents,
 # their first child, and that child's validation to comprise CPE round 1.
@@ -62,6 +65,9 @@ DEFAULT_CPE_SPLIT_PATH = REPO_ROOT / "data" / "modelingbench_train_test_split.js
 DEFAULT_CPE_TRAIN_BATCH_SIZE = 3
 DEFAULT_CPE_VALIDATION_SIZE = 10
 DEFAULT_CPE_SELECTION_EPSILON = 0.0
+# Per-gate tolerance overrides.  None means "use args.selection_epsilon".
+CPE_TRAIN_ACCEPTANCE_EPSILON: float | None = None
+CPE_VALIDATION_ACCEPTANCE_EPSILON: float | None = None
 DEFAULT_CPE_MAX_EXCHANGES = 3
 DEFAULT_CPE_TOTAL_TOKEN_REFERENCE = 5000
 DEFAULT_CPE_TOTAL_LATENCY_MAX_SECONDS = 540.0
@@ -465,6 +471,23 @@ def cpe_accepts(candidate_score: float, reference_score: float, epsilon: float) 
     return float(candidate_score) > float(reference_score) + float(epsilon)
 
 
+def cpe_acceptance_epsilon(args, purpose: str) -> float:
+    """Resolve the tolerance for one acceptance gate.
+
+    The train gate and the validation-champion gate answer different questions,
+    so launchers may give them different margins; ``None`` falls back to
+    ``--selection-epsilon``.
+    """
+    override = (
+        CPE_TRAIN_ACCEPTANCE_EPSILON
+        if purpose == "train"
+        else CPE_VALIDATION_ACCEPTANCE_EPSILON
+    )
+    if override is None:
+        return float(args.selection_epsilon)
+    return float(override)
+
+
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
@@ -844,13 +867,18 @@ def optimizer_interaction_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     ]
 
 
+# Judge *prose* stays out of CPE optimizer evidence, so the operator cannot
+# target the Judge's wording instead of the policy's behavior.  Judge *scores*
+# are deliberately allowed through: without a per-task, per-dimension
+# breakdown the operator cannot tell which task underperformed or why, and the
+# search degenerates into plausible-sounding guesswork that the evaluation
+# cannot confirm.  See ``training_run_scores`` for the numeric payload that is
+# exposed.
 CPE_WITHHELD_JUDGE_FIELDS = frozenset(
     {
-        "average_score",
-        "average_dimension_scores",
-        "dimension_scores",
         "judge_feedback",
         "judge_groundedness_weakness_summary",
+        "judge_result",
         "judge_stability_result",
         "original_report_utility",
         "refined_report_utility",
@@ -873,6 +901,27 @@ def assert_no_cpe_judge_evidence(value: Any, path: str = "evidence") -> None:
             assert_no_cpe_judge_evidence(child, f"{path}[{index}]")
 
 
+def training_run_scores(run: dict[str, Any]) -> dict[str, Any]:
+    """Numeric outcome of one training run, with no Judge prose.
+
+    This is the diagnostic the operator needs to localise a weakness: which
+    task scored low, on which dimension, and whether the shortfall came from
+    report quality or from interaction cost.
+    """
+    candidates = {
+        "report_score": run.get("average_score"),
+        "dimension_scores": run.get("dimension_scores"),
+        "interaction_cost": run.get("interaction_cost"),
+        "interaction_penalty": run.get("interaction_penalty"),
+        "net_utility": run.get("net_utility"),
+    }
+    return {
+        key: value
+        for key, value in candidates.items()
+        if isinstance(value, (int, float, dict)) and value is not None
+    }
+
+
 def cpe_training_parent_evidence(
     result: dict[str, Any],
     parent_rank: int,
@@ -880,7 +929,7 @@ def cpe_training_parent_evidence(
     evidence_dir: Path,
     args,
 ) -> dict[str, Any]:
-    """Expose one training parent and its rollouts without Judge outputs."""
+    """Expose one training parent and its rollouts without Judge prose."""
     training_runs = []
     for run in result.get("problem_results", []):
         problem_id = str(run["problem_id"])
@@ -890,6 +939,7 @@ def cpe_training_parent_evidence(
             "title": problem.get("title", problem_id),
             "question": problem["question"],
             "artifacts": optimizer_interaction_artifacts(Path(run["run_dir"])),
+            "scores": training_run_scores(run),
         }
         summary = summarize_interaction_report_changes(run, evidence_dir, args)
         if summary:
@@ -1449,9 +1499,10 @@ def propose_cpe_workflow(
             ):
                 raise ValueError("optimizer did not identify a changed workflow component")
             evolution_mode = str(candidate.get("evolution_mode", "")).strip().lower()
-            if evolution_mode not in {"crossover", "mutation"}:
+            if evolution_mode not in CPE_EVOLUTION_MODES:
                 raise ValueError(
-                    "optimizer evolution_mode must be crossover or mutation"
+                    "optimizer evolution_mode must be one of "
+                    + " or ".join(sorted(CPE_EVOLUTION_MODES))
                 )
             candidate["evolution_mode"] = evolution_mode
             validate_workflow(candidate)
@@ -2854,7 +2905,7 @@ def run_cpe_evolved_rounds(
         train_accepted = cpe_accepts(
             train_candidate["utility"],
             train_reference_utility,
-            args.selection_epsilon,
+            cpe_acceptance_epsilon(args, "train"),
         )
         next_elites = select_cpe_training_elites(
             [*parent_results, train_candidate] if train_accepted else parent_results
@@ -2898,7 +2949,7 @@ def run_cpe_evolved_rounds(
                 else cpe_accepts(
                     validation_result["utility"],
                     existing_champion["validation_utility"],
-                    args.selection_epsilon,
+                    cpe_acceptance_epsilon(args, "validation"),
                 )
             )
             if validation_accepted:
@@ -2919,6 +2970,17 @@ def run_cpe_evolved_rounds(
             ],
             "changed_components": candidate.get("changed_components", []),
             "evolution_rationale": candidate.get("evolution_rationale", ""),
+            # Carried into the next round's evidence so the operator can compare
+            # what it predicted against what the round actually produced.
+            "predicted_effect": {
+                key: candidate.get(key)
+                for key in (
+                    "predicted_effect_metric",
+                    "predicted_effect_direction",
+                    "predicted_effect_magnitude",
+                )
+                if candidate.get(key) is not None
+            },
             "parent_train_net_utilities": parent_utilities,
             "candidate_train_net_utility": float(train_candidate["utility"]),
             "train_pre_utility": max(parent_utilities),

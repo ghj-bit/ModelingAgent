@@ -11,7 +11,11 @@ import subprocess
 import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    ThreadPoolExecutor,
+    wait as futures_wait,
+)
 from datetime import datetime
 from pathlib import Path
 
@@ -2769,6 +2773,28 @@ def import_repeat_test_results(
     return imported
 
 
+def record_validation_failure(
+    checkpoint: dict,
+    failure_key: str,
+    attempt: int,
+    error: Exception,
+    stage: str | None = None,
+) -> None:
+    """Append one failed attempt to the checkpoint's failure history."""
+    previous = checkpoint.setdefault("failed", {}).get(failure_key, {})
+    history = list(previous.get("history", []))
+    failure = {"attempt": attempt, "error": repr(error), "time": now()}
+    if stage:
+        failure["stage"] = stage
+    history.append(failure)
+    checkpoint["failed"][failure_key] = {
+        "error": repr(error),
+        "time": now(),
+        "attempts": len(history),
+        "history": history,
+    }
+
+
 def evaluate_round(
     experiment: Path,
     round_number: int,
@@ -2821,10 +2847,19 @@ def evaluate_round(
     retry_concurrency = getattr(args, "retry_concurrency", 1)
     retry_delay = getattr(args, "validation_retry_delay", 10.0)
     pipeline_agent_start = getattr(args, "pipeline_agent_start", False)
+    # A failed problem is resubmitted the moment its future resolves instead of
+    # waiting for every sibling in the batch, so one slow problem no longer holds
+    # an already-failed one back.  Each problem still gets at most
+    # ``validation_attempts`` executions, retries share the batch pool so the
+    # worker cap keeps bounding concurrency, and the checkpoint is only ever
+    # written from this thread.
+    attempts_used: dict[tuple[str, int], int] = {}
     for attempt in range(1, validation_attempts + 1):
         if not pending:
             break
         if attempt > 1:
+            # Inline resubmission below normally drains every problem in one
+            # pass, so this sweep only runs if a previous pass was interrupted.
             print(
                 f"Round {round_number}: retrying {len(pending)} failed validation "
                 f"problem repetition(s), attempt {attempt}/{validation_attempts}, "
@@ -2837,6 +2872,15 @@ def evaluate_round(
             args.concurrency if attempt == 1 else retry_concurrency,
             len(pending),
         )
+        # Throttles a resubmitted problem without blocking the dispatch loop.
+        def submit_retry(executor, runner, problem_id, repetition, delay=retry_delay):
+            def delayed():
+                if delay:
+                    time.sleep(delay)
+                return runner(problem_id, repetition)
+
+            return executor.submit(delayed)
+
         if pipeline_agent_start:
             def prepare_and_run(problem_id: str, repetition: int):
                 try:
@@ -2864,41 +2908,51 @@ def evaluate_round(
                 return result, None, None
 
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
-                futures = {
+                in_flight = {
                     executor.submit(prepare_and_run, problem_id, repetition): (
                         problem_id,
                         repetition,
                     )
                     for problem_id, repetition in pending
                 }
-                for future in as_completed(futures):
-                    problem_id, repetition = futures[future]
-                    failure_key = f"{problem_id}::repeat_{repetition}"
-                    result, stage, error = future.result()
-                    if error is None:
-                        completed.setdefault(problem_id, {})[str(repetition)] = result
-                        checkpoint.get("failed", {}).pop(failure_key, None)
-                    else:
-                        previous = checkpoint.setdefault("failed", {}).get(
-                            failure_key, {}
-                        )
-                        history = list(previous.get("history", []))
-                        failure = {
-                            "attempt": attempt,
-                            "error": repr(error),
-                            "time": now(),
-                        }
-                        if stage == "agent_registration":
-                            failure["stage"] = stage
-                        history.append(failure)
-                        checkpoint["failed"][failure_key] = {
-                            "error": repr(error),
-                            "time": now(),
-                            "attempts": len(history),
-                            "history": history,
-                        }
-                    checkpoint["completed"] = completed
-                    workflow_evolution.write_json(checkpoint_path, checkpoint)
+                while in_flight:
+                    done, _ = futures_wait(
+                        list(in_flight), return_when=FIRST_COMPLETED
+                    )
+                    for future in done:
+                        problem_id, repetition = in_flight.pop(future)
+                        key = (problem_id, repetition)
+                        failure_key = f"{problem_id}::repeat_{repetition}"
+                        result, stage, error = future.result()
+                        if error is None:
+                            completed.setdefault(problem_id, {})[
+                                str(repetition)
+                            ] = result
+                            checkpoint.get("failed", {}).pop(failure_key, None)
+                            attempts_used.pop(key, None)
+                        else:
+                            used = attempts_used.get(key, 0) + 1
+                            attempts_used[key] = used
+                            record_validation_failure(
+                                checkpoint, failure_key, used, error, stage
+                            )
+                            if used < validation_attempts:
+                                print(
+                                    f"Round {round_number}: {failure_key} failed on "
+                                    f"attempt {used}/{validation_attempts}; "
+                                    "resubmitting without waiting for the batch",
+                                    flush=True,
+                                )
+                                in_flight[
+                                    submit_retry(
+                                        executor,
+                                        prepare_and_run,
+                                        problem_id,
+                                        repetition,
+                                    )
+                                ] = key
+                        checkpoint["completed"] = completed
+                        workflow_evolution.write_json(checkpoint_path, checkpoint)
             pending = [
                 (problem_id, repetition)
                 for repetition in range(1, target_repetitions + 1)
@@ -2921,62 +2975,76 @@ def evaluate_round(
                     args,
                 )
             except Exception as error:
-                previous = checkpoint.setdefault("failed", {}).get(failure_key, {})
-                history = list(previous.get("history", []))
-                history.append(
-                    {
-                        "attempt": attempt,
-                        "stage": "agent_registration",
-                        "error": repr(error),
-                        "time": now(),
-                    }
+                key = (problem_id, repetition)
+                used = attempts_used.get(key, 0) + 1
+                attempts_used[key] = used
+                record_validation_failure(
+                    checkpoint, failure_key, used, error, "agent_registration"
                 )
-                checkpoint["failed"][failure_key] = {
-                    "error": repr(error),
-                    "time": now(),
-                    "attempts": len(history),
-                    "history": history,
-                }
                 workflow_evolution.write_json(checkpoint_path, checkpoint)
         if not prepared_tasks:
             continue
         worker_count = min(worker_count, len(prepared_tasks))
+
+        def run_prepared(prepared):
+            return run_validation_problem(
+                prepared,
+                rubric,
+                round_number,
+                experiment,
+                args,
+            )
+
+        def run_fresh(problem_id: str, repetition: int):
+            """Re-register the problem so a retry gets a clean workspace."""
+            prepared = prepare_validation_problem(
+                problem_id,
+                problems[problem_id],
+                prompt_path,
+                round_number,
+                repetition,
+                experiment,
+                args,
+            )
+            return run_prepared(prepared)
+
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = {
-                executor.submit(
-                    run_validation_problem,
-                    prepared,
-                    rubric,
-                    round_number,
-                    experiment,
-                    args,
-                ): (problem_id, repetition)
+            in_flight = {
+                executor.submit(run_prepared, prepared): (problem_id, repetition)
                 for (problem_id, repetition), prepared in prepared_tasks.items()
             }
-            for future in as_completed(futures):
-                problem_id, repetition = futures[future]
-                failure_key = f"{problem_id}::repeat_{repetition}"
-                try:
-                    completed.setdefault(problem_id, {})[str(repetition)] = future.result()
-                    checkpoint.get("failed", {}).pop(failure_key, None)
-                except Exception as error:
-                    previous = checkpoint.setdefault("failed", {}).get(failure_key, {})
-                    history = list(previous.get("history", []))
-                    history.append(
-                        {
-                            "attempt": attempt,
-                            "error": repr(error),
-                            "time": now(),
-                        }
-                    )
-                    checkpoint["failed"][failure_key] = {
-                        "error": repr(error),
-                        "time": now(),
-                        "attempts": len(history),
-                        "history": history,
-                    }
-                checkpoint["completed"] = completed
-                workflow_evolution.write_json(checkpoint_path, checkpoint)
+            while in_flight:
+                done, _ = futures_wait(list(in_flight), return_when=FIRST_COMPLETED)
+                for future in done:
+                    problem_id, repetition = in_flight.pop(future)
+                    key = (problem_id, repetition)
+                    failure_key = f"{problem_id}::repeat_{repetition}"
+                    try:
+                        completed.setdefault(problem_id, {})[
+                            str(repetition)
+                        ] = future.result()
+                        checkpoint.get("failed", {}).pop(failure_key, None)
+                        attempts_used.pop(key, None)
+                    except Exception as error:
+                        used = attempts_used.get(key, 0) + 1
+                        attempts_used[key] = used
+                        record_validation_failure(
+                            checkpoint, failure_key, used, error
+                        )
+                        if used < validation_attempts:
+                            print(
+                                f"Round {round_number}: {failure_key} failed on "
+                                f"attempt {used}/{validation_attempts}; "
+                                "resubmitting without waiting for the batch",
+                                flush=True,
+                            )
+                            in_flight[
+                                submit_retry(
+                                    executor, run_fresh, problem_id, repetition
+                                )
+                            ] = key
+                    checkpoint["completed"] = completed
+                    workflow_evolution.write_json(checkpoint_path, checkpoint)
         pending = [
             (problem_id, repetition)
             for repetition in range(1, target_repetitions + 1)

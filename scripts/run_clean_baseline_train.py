@@ -4,6 +4,7 @@ Usage:
     python scripts/run_clean_baseline_train.py
     python scripts/run_clean_baseline_train.py --num-problems 40
     python scripts/run_clean_baseline_train.py --all-problems --initial-draft
+    python scripts/run_clean_baseline_train.py --benchmark mmbench --problem-id 2003_C
     python scripts/run_clean_baseline_train.py --initialize-only
 
 Relative experiment paths are resolved from the repository root.
@@ -33,6 +34,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_NUM_PROBLEMS = 5
 BATCH_SIZE = 5
 EXPERIMENT_PREFIX = "interaction_strategy_clean_baseline_train_"
+MMBENCH_EXPERIMENT_PREFIX = "interaction_strategy_clean_baseline_mmbench_"
+DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
+SUPPORTED_MMBENCH_PROBLEMS = ("2003_C", "2003_B")
 STANDARD_RUNNER = "src.OpenClaw.run_substantive_interaction_strategy_clean_baseline"
 INITIAL_DRAFT_RUNNER = (
     "src.OpenClaw.run_substantive_interaction_strategy_clean_baseline_initial_draft"
@@ -45,6 +49,27 @@ INITIAL_DRAFT_EXPERIMENT_TYPE = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--benchmark",
+        choices=("modelingbench", "mmbench"),
+        default="modelingbench",
+        help="Problem/data/evaluation source (default: modelingbench).",
+    )
+    parser.add_argument(
+        "--mmbench-root",
+        type=Path,
+        default=DEFAULT_MMBENCH_ROOT,
+        help=f"MM-Bench root (default: {DEFAULT_MMBENCH_ROOT}).",
+    )
+    parser.add_argument(
+        "--problem-id",
+        nargs="+",
+        help=(
+            "MM-Bench problem IDs; the enabled set is "
+            + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
+            + " (default: all of them)."
+        ),
+    )
     parser.add_argument("--model", default="deepseek/deepseek-v4-flash")
     parser.add_argument("--thinking", default="high")
     parser.add_argument("--timeout", type=int, default=7200)
@@ -63,6 +88,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--concurrency", type=int)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--openclaw-command")
+    parser.add_argument("--mmbench-judge-model", default="deepseek-v4-flash")
+    parser.add_argument("--mmbench-judge-api-key")
+    parser.add_argument("--mmbench-judge-base-url")
+    parser.add_argument("--mmbench-judge-timeout", type=float, default=600.0)
     parser.add_argument(
         "--initial-draft",
         action="store_true",
@@ -78,10 +107,41 @@ def parse_args() -> argparse.Namespace:
         parser.error("--concurrency must be positive")
     if args.batch_size < 1:
         parser.error("--batch-size must be positive")
+    if args.mmbench_judge_timeout <= 0:
+        parser.error("--mmbench-judge-timeout must be positive")
+    if args.benchmark == "modelingbench" and args.problem_id:
+        parser.error("--problem-id is currently available only with --benchmark mmbench")
+    if args.benchmark == "mmbench" and args.initial_draft:
+        parser.error("--initial-draft is not supported by this MMBench report runner")
+    if args.benchmark == "mmbench" and args.all_problems:
+        parser.error(
+            "--all-problems is unavailable while the MMBench integration is "
+            "pinned to " + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
+        )
     return args
 
 
-def selected_task_ids(num_problems: int, all_problems: bool = False) -> list[str]:
+def selected_task_ids(
+    num_problems: int,
+    all_problems: bool = False,
+    benchmark: str = "modelingbench",
+    requested: list[str] | None = None,
+) -> list[str]:
+    if benchmark == "mmbench":
+        problem_ids = list(requested or SUPPORTED_MMBENCH_PROBLEMS)
+        unsupported = [
+            problem_id
+            for problem_id in problem_ids
+            if problem_id not in SUPPORTED_MMBENCH_PROBLEMS
+        ]
+        if unsupported:
+            raise ValueError(
+                "MM-Bench support is currently pinned to "
+                + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
+                + "; got: "
+                + ", ".join(unsupported)
+            )
+        return problem_ids
     path = REPO_ROOT / "data" / "modeling_data_train.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not payload:
@@ -178,7 +238,12 @@ def cumulative_batch_ends(
 
 def main() -> int:
     args = parse_args()
-    problem_ids = selected_task_ids(args.num_problems, args.all_problems)
+    problem_ids = selected_task_ids(
+        args.num_problems,
+        args.all_problems,
+        args.benchmark,
+        args.problem_id,
+    )
     if len(problem_ids) != len(set(problem_ids)):
         raise ValueError("Selected datasets contain duplicate task IDs")
 
@@ -188,6 +253,8 @@ def main() -> int:
         prefix = (
             "interaction_strategy_clean_baseline_initial_draft_train_"
             if args.initial_draft
+            else MMBENCH_EXPERIMENT_PREFIX
+            if args.benchmark == "mmbench"
             else EXPERIMENT_PREFIX
         )
         experiment = (
@@ -231,6 +298,27 @@ def main() -> int:
             "--judge-repeats", "1",
             "--problem-id", *cumulative_problem_ids,
         ]
+        if not initial_draft:
+            command.extend(["--benchmark", args.benchmark])
+        if args.benchmark == "mmbench":
+            command.extend(
+                [
+                    "--mmbench-root",
+                    str(args.mmbench_root.resolve()),
+                    "--mmbench-judge-model",
+                    args.mmbench_judge_model,
+                    "--mmbench-judge-timeout",
+                    str(args.mmbench_judge_timeout),
+                ]
+            )
+            if args.mmbench_judge_api_key:
+                command.extend(
+                    ["--mmbench-judge-api-key", args.mmbench_judge_api_key]
+                )
+            if args.mmbench_judge_base_url:
+                command.extend(
+                    ["--mmbench-judge-base-url", args.mmbench_judge_base_url]
+                )
         if args.openclaw_command:
             command.extend(["--openclaw-command", args.openclaw_command])
         if args.initialize_only:

@@ -228,9 +228,18 @@ def prepare_mmbench_validation_problem(
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
     elif declared_paths:
-        raise FileNotFoundError(
-            "MM-Bench problem declares dataset files but no dataset directory "
-            f"exists: {source_root}"
+        # The native definition names dataset files that this MMBench checkout
+        # does not ship (2018_B is the only such task, and its data is a COMAP
+        # contest file the upstream bundle omits).  The definition is still
+        # rendered verbatim into the prompt, so the agent sees what the
+        # benchmark declares and copes with the absence exactly as it does for a
+        # task that ships no data.  Failing here would drop the task from an
+        # otherwise fixed split and invalidate comparisons across rounds.
+        print(
+            f"MM-Bench problem {problem_id} declares dataset files "
+            f"({', '.join(map(str, declared_paths))}) but {source_root} does not "
+            "exist; staging nothing.",
+            flush=True,
         )
     else:
         print(

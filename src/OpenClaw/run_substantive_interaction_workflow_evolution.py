@@ -560,6 +560,108 @@ def workflow_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
     return difflib.SequenceMatcher(None, left_text, right_text).ratio()
 
 
+# The initial policy marks exactly one section as open to revision.  Everything
+# around it — trigger conditions, interaction budget, stop conditions, and the
+# closing prohibition on delegating computation — is what the experiment holds
+# fixed, so a round that rewrites it changes the starting point instead of
+# improving a policy and makes the rounds incomparable.
+INTERACTION_WORKFLOW_HEADING = "### Interaction Workflow"
+
+
+def _fixed_policy_parts(text: str) -> tuple[str, str] | None:
+    """Split a policy into (text before the workflow section, text after it)."""
+    start = text.find(INTERACTION_WORKFLOW_HEADING)
+    if start < 0:
+        return None
+    rest = text[start + len(INTERACTION_WORKFLOW_HEADING) :]
+    # The section runs to the next level-three heading; the workflow's own steps
+    # are level four, so they stay inside it.
+    match = re.search(r"\n### ", rest)
+    if match is None:
+        return None
+    after_start = start + len(INTERACTION_WORKFLOW_HEADING) + match.start() + 1
+    return text[:start], text[after_start:]
+
+
+def _normalise_policy_fragment(text: str) -> str:
+    return "\n".join(line.rstrip() for line in text.strip().splitlines())
+
+
+def assert_fixed_policy_sections_unchanged(
+    candidate: dict[str, Any],
+    parents: list[dict[str, Any]],
+) -> None:
+    """Reject a candidate that rewrote policy text outside the workflow section."""
+    reference = None
+    for parent in parents or []:
+        workflow_value = parent.get("workflow") if isinstance(parent, dict) else None
+        if not isinstance(workflow_value, dict):
+            continue
+        text = str(workflow_value.get("policy_text") or "")
+        if _fixed_policy_parts(text) is not None:
+            reference = text
+            break
+    if reference is None:
+        # The parent predates the marker, so there is no boundary to enforce.
+        return
+
+    candidate_parts = _fixed_policy_parts(str(candidate.get("policy_text") or ""))
+    if candidate_parts is None:
+        raise ValueError(
+            "candidate policy_text dropped the "
+            f"`{INTERACTION_WORKFLOW_HEADING}` section"
+        )
+    reference_parts = _fixed_policy_parts(reference)
+    for label, candidate_part, reference_part in zip(
+        ("before", "after"), candidate_parts, reference_parts
+    ):
+        if _normalise_policy_fragment(candidate_part) != _normalise_policy_fragment(
+            reference_part
+        ):
+            raise ValueError(
+                f"candidate rewrote policy text {label} the "
+                f"`{INTERACTION_WORKFLOW_HEADING}` section; only that section may change"
+            )
+
+
+def assert_solver_policy_changed(
+    candidate: dict[str, Any],
+    parents: list[dict[str, Any]],
+    prior_policies: list[str] | None = None,
+) -> None:
+    """Reject a candidate whose solver-visible policy text has been seen before.
+
+    ``workflow_behavior`` feeds the similarity guard but omits ``policy_text``,
+    so a candidate can rewrite the action graph and the stop condition while
+    returning an already-seen policy verbatim.  Only ``policy_text`` reaches the
+    solver, so such a round changes nothing the solver can act on while still
+    costing a full evaluation.  A policy an earlier round already proposed is
+    rejected for the same reason: re-submitting it re-tests a settled direction.
+    """
+    candidate_text = _normalise_policy_fragment(str(candidate.get("policy_text") or ""))
+    if not candidate_text:
+        return
+    seen: list[tuple[str, str]] = []
+    for parent in parents or []:
+        workflow_value = parent.get("workflow") if isinstance(parent, dict) else None
+        if not isinstance(workflow_value, dict):
+            continue
+        text = str(workflow_value.get("policy_text") or "")
+        if text:
+            seen.append((f"parent {workflow_value.get('workflow_id')!r}", text))
+    for entry in prior_policies or []:
+        if isinstance(entry, str) and entry:
+            seen.append(("a policy an earlier round already proposed", entry))
+    for label, text in seen:
+        if _normalise_policy_fragment(text) == candidate_text:
+            raise ValueError(
+                f"candidate policy_text reproduces {label}, so the solver would "
+                "see no change; rewrite the "
+                f"`{INTERACTION_WORKFLOW_HEADING}` section instead of only the "
+                "action graph"
+            )
+
+
 def validate_workflow(workflow: dict[str, Any]) -> None:
     for field in ("name", "purpose", "stop_condition"):
         if len(str(workflow.get(field, "")).strip()) < 12:
@@ -1482,7 +1584,11 @@ def propose_cpe_workflow(
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": min(0.2 + 0.15 * (attempt - 1), 0.8),
+                    # The parent policy is a strong attractor: at 0.2 the optimizer
+                    # returns it verbatim and spends the response describing changes
+                    # to the action graph instead.  Start high enough that the first
+                    # proposal already departs from the parent.
+                    "temperature": min(0.5 + 0.15 * (attempt - 1), 0.9),
                     "max_tokens": 3000,
                     "response_format": {"type": "json_object"},
                 },
@@ -1506,6 +1612,16 @@ def propose_cpe_workflow(
                 )
             candidate["evolution_mode"] = evolution_mode
             validate_workflow(candidate)
+            assert_fixed_policy_sections_unchanged(candidate, training_parents)
+            assert_solver_policy_changed(
+                candidate,
+                training_parents,
+                [
+                    str(event.get("candidate_policy_text") or "")
+                    for event in patch_history
+                    if isinstance(event, dict)
+                ],
+            )
             candidate["workflow_id"] = workflow_id(candidate)
             similarities = [
                 (node["round"], workflow_similarity(candidate, node["workflow"]))
@@ -2969,6 +3085,12 @@ def run_cpe_evolved_rounds(
                 result["workflow_id"] for result in parent_results
             ],
             "changed_components": candidate.get("changed_components", []),
+            # The optimizer's own description of what it changed has proved to be
+            # boilerplate that repeats across rounds regardless of the actual
+            # edit, so the policy text itself is carried into the history.  It is
+            # the only thing the solver agent receives, so it is the only
+            # faithful record of what a round actually proposed.
+            "candidate_policy_text": str(candidate.get("policy_text") or ""),
             "evolution_rationale": candidate.get("evolution_rationale", ""),
             # Carried into the next round's evidence so the operator can compare
             # what it predicted against what the round actually produced.

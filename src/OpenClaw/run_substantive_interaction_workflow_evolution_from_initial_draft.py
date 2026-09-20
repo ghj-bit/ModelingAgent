@@ -558,19 +558,29 @@ def policy_text_for_evolution(workflow_value: dict) -> str:
 
 
 def evolution_history_entries(patch_history: list[dict]) -> list[dict]:
-    """Compact prior rounds into what changed, what was predicted, what happened.
+    """Compact prior rounds into what was tried, what was predicted, what happened.
 
     Each round is otherwise independent, so without this the optimizer
     re-derives the same plausible change every round and cannot learn that a
     direction already failed validation.
+
+    The round's own ``interaction_policy`` is included verbatim.  The optimizer's
+    ``changed_components`` cannot stand in for it: across rounds those strings
+    repeat word for word while the policy text they claim to describe differs
+    substantially, so reading them alone tells the optimizer it already tried
+    something it in fact never tried.
     """
     entries = []
     for event in patch_history or []:
         if not isinstance(event, dict):
             continue
+        policy_text = str(event.get("candidate_policy_text") or "").strip()
         entry = {
             "round": event.get("round"),
             "evolution_mode": event.get("evolution_mode"),
+            "interaction_policy": (
+                policy_text if policy_text else "(policy text not recorded for this round)"
+            ),
             "changed_components": event.get("changed_components", []),
             "parent_train_net_utilities": event.get("parent_train_net_utilities"),
             "candidate_train_net_utility": event.get("candidate_train_net_utility"),
@@ -609,10 +619,25 @@ task-specific solution: never copy task-specific facts, entities, parameters,
 methods, or conclusions out of the rollouts, and do not name a task inside the
 policy.
 
+Every earlier round is listed in `evolution_history` with the `interaction_policy`
+it actually proposed and its `train_accepted` verdict. A round whose
+`train_accepted` is false was measured against the training gate and lost; do not
+resubmit that direction in the same shape. Either abandon it, or change it enough
+that the failure it produced no longer applies — and name the earlier round you
+are departing from in `evolution_rationale`.
+
 The solver agent keeps all calculation, implementation, external-data validation,
 simulation, debugging, and report writing; the expert supplies high-impact
 strategic judgment only. Every exchange after the first must build on an earlier
 reply and serve a distinct decision-relevant purpose. Keep the policy compact.
+
+`interaction_policy` is the whole deliverable. It is the only artifact the solver
+agent ever reads and the only one the round is scored on, so every change you
+intend must appear in it. The `actions` graph is internal bookkeeping that never
+reaches the solver: restructuring it, renaming its steps, or adding nodes to it
+changes nothing on its own. Before you answer, re-read the `### Interaction
+Workflow` section of your `interaction_policy` against the parent's and confirm it
+differs. If it does not, the round is discarded and the attempt is wasted.
 
 A candidate whose behavioural similarity to a round already evaluated reaches
 {similarity_threshold} is rejected before it runs.
@@ -620,12 +645,33 @@ A candidate whose behavioural similarity to a round already evaluated reaches
 §2 Modification requirements.
 
 - Mutate the parent policy. Only one policy is live; crossover is unavailable.
-- Return the policy in the shape the parent uses: `name`, `purpose`, `policy_text`,
-  `maximum_expert_interactions`, `termination_condition`, and `actions`.
+- Change only the `### Interaction Workflow` section of `interaction_policy` —
+  its consultation-content and feedback-handling steps. Everything outside that
+  section is fixed: the trigger conditions, the interaction budget, the stop
+  conditions, the computational-efficiency rule, and the closing prohibition on
+  delegating computation must be carried over exactly as the parent states them.
+- Keep those two steps concise: one or two sentences each. A short workflow the
+  solver follows exactly is worth more than a longer one it follows only in part.
+  Do not restate the fixed sections inside the workflow.
+- Make the smallest edit that carries the patch. Add or rewrite only the lines
+  your change needs and leave every other line of `interaction_policy` exactly as
+  the parent wrote it. Rewording, reordering, and cosmetic deletion are not
+  behavioural changes and are rejected as noise.
+- Return the policy in the shape the parent uses: `name`, `purpose`,
+  `interaction_policy`, `maximum_expert_interactions`, `termination_condition`,
+  and `actions`.
 - Design the process as an ordered `actions` list, then render that same graph
-  into `policy_text`. `policy_text` is the deliverable and the only thing the
-  solver agent receives; it never sees the graph. It must stand alone and match
-  the graph's stage order, budget, and termination rule.
+  into `interaction_policy`. That string is the deliverable and the only thing
+  the solver agent receives; it never sees the graph. It must stand alone and
+  match the graph's stage order, budget, and termination rule.
+- `interaction_policy` must differ from the parent's and from every policy already
+  listed in `evolution_history`. Reproducing either is rejected before the round
+  runs, however much its `actions` graph, `name`, `purpose`, or housekeeping
+  fields differ. Do not spend a retry re-submitting the parent in new wording.
+- `changed_components` must name only differences the returned
+  `interaction_policy` actually carries against the parent's. Guidance the
+  parent already states is not a change; describing it as one misreports the
+  round and is recorded as such in `evolution_history`.
 - Each action is an object with `action_id` (lowercase, unique inside the
   workflow, matching `[a-z][a-z0-9_]*`), `action_type` (`agent_audit`,
   `expert_exchange`, `agent_analysis`, or `close`), and `rule` (at least 20
@@ -637,10 +683,13 @@ A candidate whose behavioural similarity to a round already evaluated reaches
 
 EVOLUTION_OUTPUT_SCHEMA = """§3 Output JSON schema.
 
+`interaction_policy` comes first because it is the deliverable. Write it before
+the bookkeeping fields, and make it differ from the parent's text.
+
 {
+  "interaction_policy": "<the complete evolved policy, one Markdown string. It must NOT reproduce the parent's text: a verbatim copy is rejected before the round runs, whatever else differs.>",
   "name": "<concise policy name>",
   "purpose": "<the strategic role of human interaction>",
-  "interaction_policy": "<the complete evolved policy, one Markdown string>",
   "actions": [
     {
       "action_id": "<lowercase, [a-z][a-z0-9_]*>",
@@ -667,8 +716,11 @@ quantity §1 asks you to raise.
 """
 
 
-EVOLUTION_PROMPT_FOOT = """§5 Final instruction. Emit one JSON object as in §3.
-No markdown outside that JSON."""
+EVOLUTION_PROMPT_FOOT = """§5 Final instruction. Emit one JSON object as in §3, with
+`interaction_policy` written first. Compare that policy's `### Interaction
+Workflow` section against the parent's before you emit: if it still reads the
+same, the proposal is discarded and the attempt is wasted. No markdown outside
+that JSON."""
 
 
 def build_initial_draft_cpe_workflow_evolution_prompt(
@@ -981,6 +1033,15 @@ Create directories when needed.
 
 Record the expert question, expert reply, and how the reply affected the work in
 `interaction_evidence.md`. Keep this evidence separate from the final report.
+
+# Python Environment
+
+Run all Python work with the `math_modeling` conda environment:
+`C:\\Users\\98263\\.conda\\envs\\math_modeling\\python.exe`. The plain `python` on
+PATH is a different interpreter; always use that path.
+
+Installed: numpy, scipy, pandas, matplotlib, networkx, sympy, statsmodels,
+scikit-learn, numba, pulp, highspy, ortools.
 
 Start by reading draft.md and reviewing the proposed modeling plan.
 """

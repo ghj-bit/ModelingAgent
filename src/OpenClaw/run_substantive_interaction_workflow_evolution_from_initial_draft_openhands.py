@@ -1,5 +1,13 @@
 """Evolve expert-interaction workflows that solve from planning ``draft.md`` files.
 
+OpenHands backend variant of
+``run_substantive_interaction_workflow_evolution_from_initial_draft``.  The
+pipeline, prompts, concurrency and gates are byte-identical to that launcher;
+the only difference is which executable solves each task.  Instead of the
+OpenClaw CLI, every Solver runs as an OpenHands conversation driven by
+``openhands_backend``, and OpenClaw's agent-registry calls are answered by a
+stub so the surrounding control flow is untouched.
+
 This is intentionally separate from the clean-baseline refinement launcher. It
 starts each Solver from a planning blueprint, not from an inherited completed
 solution report, and supplies a single planning-derived initial workflow.
@@ -24,16 +32,81 @@ from functools import partial
 from pathlib import Path
 
 try:
+    from . import openhands_backend
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from .interaction_policy import MODELING_STRATEGY_ESCALATION
 except ImportError:
+    import openhands_backend
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from src.OpenClaw.interaction_policy import MODELING_STRATEGY_ESCALATION
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# The locally served model backs every role in this launcher.  The values live in
+# the backend module so the solver, optimizer, expert and judge cannot drift
+# apart; override them per run with the OPENHANDS_MODEL / OPENHANDS_BASE_URL /
+# OPENHANDS_API_KEY environment variables.
+LOCAL_MODEL = openhands_backend.DEFAULT_MODEL
+LOCAL_BASE_URL = openhands_backend.DEFAULT_BASE_URL
+LOCAL_API_KEY = openhands_backend.DEFAULT_API_KEY
+
+# The shared engine's --fixed-rubric default points at a rubric evolved on the
+# original Windows machine (round 4 of interaction_rubric_substantive_...),
+# which this repository does not ship.  What it does ship is the rubric that
+# experiment started from, so that is the fixed rubric here.
+LOCAL_FIXED_RUBRIC = REPO_ROOT / "src" / "OpenClaw" / "interaction_initial_substantive_v1.json"
+
+
+def skip_round_dimension_plot(results, output_path):
+    """Stand in for the engine's end-of-run dimension chart.
+
+    matplotlib is deliberately not installed (these runs produce no figures),
+    and the engine calls the real plot unguarded on its last line, so without
+    this stand-in a fully completed experiment would still exit non-zero and be
+    reported as a failure.
+    """
+    print(
+        f"Round dimension plot skipped (matplotlib not installed): {output_path}",
+        flush=True,
+    )
+    return output_path
+
+
+def disable_thinking_for_direct_api_calls() -> None:
+    """Make the launcher's direct provider calls usable with the local model.
+
+    The shared code turns provider thinking off only when the base URL contains
+    "deepseek.com" -- the provider the original experiments ran against.  The
+    locally served model also defaults to thinking, and all three direct callers
+    here (the human expert, the optimizer, and the MM-Bench judge) want short,
+    immediately usable output.  With thinking on, the reasoning consumes the
+    small max_tokens budget and the response body comes back empty, which the
+    callers report as a failed API call rather than as an empty answer: the
+    expert bridge dies with "expert API response contains no text" and the task
+    fails its interaction gate.
+
+    The three call sites each construct their own openai.OpenAI client, so the
+    injection goes on the SDK's shared completions resource.  Calls that already
+    pass extra_body -- the DeepSeek branch -- are left untouched.
+    """
+    from openai.resources.chat.completions import Completions
+
+    if getattr(Completions.create, "_disables_provider_thinking", False):
+        return
+    original_create = Completions.create
+
+    def create(self, *args, **kwargs):
+        if not kwargs.get("extra_body"):
+            kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False}
+            }
+        return original_create(self, *args, **kwargs)
+
+    create._disables_provider_thinking = True
+    Completions.create = create
 # These are default source experiments. Their task IDs are discovered from
 # completed draft artifacts at runtime rather than duplicated here.
 PLANNING_DRAFT_TRAIN_ROOT = (
@@ -72,6 +145,8 @@ DEFAULT_TRAIN_REPETITIONS = 2
 # measured on the validation set, not a claim that the candidate is better.
 # The real comparison is the champion gate below, which uses five-task
 # validation means and therefore needs a far smaller margin to be meaningful.
+# Kept identical to the OpenClaw launcher's margin: the two backends are run as
+# comparison arms, and different gates would make their acceptances incomparable.
 DEFAULT_TRAIN_ACCEPTANCE_MARGIN = 0.005
 DEFAULT_VALIDATION_ACCEPTANCE_MARGIN = 0.005
 # Thinking level for the solving agent.  The DeepSeek provider collapses
@@ -82,7 +157,11 @@ DEFAULT_THINKING_LEVEL = "off"
 INTERACTION_WORKFLOW_PLACEHOLDER = "{{INTERACTION_WORKFLOW}}"
 DRAFT_PATH_PLACEHOLDER = "{{DRAFT_PATH}}"
 
-DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
+# The MM-Bench mirror that ships with this repository.  The upstream default is
+# a Windows path; every native problem definition the train and validation pools
+# name is present here, and the dataset attachment directories that exist are
+# staged per task.
+DEFAULT_MMBENCH_ROOT = REPO_ROOT / "data" / "MMBench"
 # Fixed MM-Bench split, selected by publication year over MMBench/problem/*.json
 # (111 tasks, 2000-2025):
 #   test       = every task from 2021 onward                              (32)
@@ -97,11 +176,8 @@ MMBENCH_TEST_PROBLEMS = (
     "2024_A", "2024_B", "2024_C", "2024_D", "2024_E", "2024_F",
     "2025_A", "2025_B", "2025_C", "2025_D", "2025_E", "2025_F",
 )
-# 2020_C was retired from the split on 2026-09-25: its rating/review task makes
-# agents write unbounded parallel text-sentiment jobs -- measured at 127 threads
-# and 59 cores from a single run -- which saturated the shared login node and
-# starved every other run in the same phase.  The pool is four problems now, so
-# --validation-size must match it (see launch_claude_evolution_from_scratch.sh).
+# 2020_C retired 2026-09-25 (see the claude arm's copy): its review-text task
+# makes agents launch unbounded parallel sentiment jobs that starve the phase.
 MMBENCH_VALIDATION_PROBLEMS = (
     "2020_B", "2020_D", "2020_E", "2020_F",
 )
@@ -148,6 +224,7 @@ _original_initial_population = workflow.initial_strategy_population
 _original_validate_workflow = workflow.validate_workflow
 _original_ensure_original_scores = workflow.ensure_cpe_original_report_scores
 _original_execute_cpe_evaluation = workflow.execute_cpe_evaluation
+_original_plot_round_dimension = workflow.plot_round_average_dimension_scores
 _original_utility_basis = workflow.CPE_UTILITY_BASIS
 _original_cost_weight = workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT
 _original_latency_cost_weight = workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT
@@ -179,8 +256,8 @@ def parse_planning_draft_sources() -> argparse.Namespace:
     parser.add_argument(
         "--benchmark",
         choices=("modelingbench", "mmbench"),
-        default="modelingbench",
-        help="Problem/data/evaluation source (default: modelingbench).",
+        default="mmbench",
+        help="Problem/data/evaluation source (default: mmbench).",
     )
     parser.add_argument(
         "--mmbench-root",
@@ -197,9 +274,12 @@ def parse_planning_draft_sources() -> argparse.Namespace:
             "interaction_strategy_clean_baseline_initial_draft_mmbench_* run."
         ),
     )
-    parser.add_argument("--mmbench-judge-model", default="deepseek-v4-flash")
-    parser.add_argument("--mmbench-judge-api-key")
-    parser.add_argument("--mmbench-judge-base-url")
+    # Every role -- solver, optimizer, expert and MM-Bench judge -- runs against
+    # the locally served model; the DeepSeek defaults in the shared parser are
+    # overridden in parse_args_with_pool_defaults below.
+    parser.add_argument("--mmbench-judge-model", default=LOCAL_MODEL)
+    parser.add_argument("--mmbench-judge-api-key", default=LOCAL_API_KEY)
+    parser.add_argument("--mmbench-judge-base-url", default=LOCAL_BASE_URL)
     parser.add_argument("--mmbench-judge-timeout", type=float, default=600.0)
     values, remainder = parser.parse_known_args(sys.argv[1:])
     sys.argv = [sys.argv[0], *remainder]
@@ -511,6 +591,13 @@ def interaction_workflow_block(workflow_value: dict) -> str:
             f"Maximum expert exchanges: **{max_exchanges}**.",
             "",
             f"Stop condition: {stop_condition}",
+            "",
+            "Minimum expert exchanges: **1**. This overrides the stop condition's",
+            "no-consultation outcome: a run that consults the expert zero times is",
+            "invalid and is discarded, however good its submission is. So when your",
+            "analysis finds no uncertainty that satisfies every trigger condition,",
+            "consult once anyway on the single most consequential open modeling",
+            "decision, and keep the question inside the scope the policy allows.",
             "",
             "### How to request expert feedback",
             "",
@@ -855,9 +942,7 @@ def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
 MMBENCH_SOLUTION_FILE_SECTION = """\
 ## MM-Bench Solution File
 
-When the task is an MM-Bench problem, the Markdown report is not the complete
-submission. Also write the machine-readable solution container that MM-Bench
-Judge reads:
+This machine-readable container is the submission that MM-Bench Judge reads:
 
 `{{RESULTS_DIR}}/solution.json`
 
@@ -906,8 +991,8 @@ subtask that asks for it, not to an element of its own.
 Every field is a plain string, and LaTeX is allowed inside strings. Escape
 newlines, quotes, and backslashes so the file parses as strict JSON. Do not wrap
 the file in a Markdown code fence, and do not embed images, charts, base64
-payloads, or data URLs. The solution file must state the same models, numbers,
-and conclusions as the report.
+payloads, or data URLs. Every model, number, and conclusion you report has to
+live in these fields, because nothing else is read.
 
 ### Writing this file ends the task
 
@@ -920,10 +1005,51 @@ this file, not after it.
 """
 
 
-def build_interactive_solver_prompt(workflow_value: dict) -> str:
-    """Build the Planner-to-Solver prompt with a workflow insertion point."""
+def build_interactive_solver_prompt(
+    workflow_value: dict, include_interaction: bool = True
+) -> str:
+    """Build the Planner-to-Solver prompt with a workflow insertion point.
+
+    ``include_interaction=False`` returns the same prompt with the
+    ``# Human Expert Interaction`` section removed, which is what the
+    no-interaction baseline runs on: everything else, including the submission
+    contract and the pre-gathered data step, stays identical so the two arms
+    differ by that one section.
+    """
     mmbench_section = (
         MMBENCH_SOLUTION_FILE_SECTION if _benchmark == "mmbench" else ""
+    )
+    # How much latitude the solver has over the draft it was handed.  Without a
+    # consultation there is nothing that could justify a deviation, so the
+    # baseline is told to carry the plan out as written; the interactive arm may
+    # depart from it only on the strength of the expert's reply or of knowledge
+    # it has established itself.
+    draft_stance = (
+        "Follow it as written unless the expert's reply, or knowledge you have "
+        "established from the problem statement and the supplied evidence, "
+        "justifies changing it. Modify assumptions, model choices, "
+        "implementation strategy, and validation methods only then, and record "
+        "what justified each change."
+        if include_interaction
+        else
+        "Follow it as written. Carry out that plan without changing its "
+        "assumptions, model choices, implementation strategy, or validation "
+        "methods."
+    )
+    # The evidence file only has content to hold when there is a consultation.
+    # Leaving its two mentions in place made the no-interaction arm plan a task
+    # ("Record expert interaction") that can never happen.
+    interaction_evidence_entry = (
+        "\nInteraction evidence: `{{RESULTS_DIR}}/interaction_evidence.md`\n"
+        if include_interaction
+        else ""
+    )
+    interaction_evidence_note = (
+        "\nRecord the expert question, expert reply, and how the reply affected "
+        "the work in\n`{{RESULTS_DIR}}/interaction_evidence.md`. Keep this "
+        "evidence separate from the submission.\n"
+        if include_interaction
+        else ""
     )
     template = f"""# ModelingBench Task — Interactive Modeling Solver Agent
 
@@ -941,7 +1067,7 @@ Your role is to:
 1. Review the draft.
 2. Refine the modeling strategy with human expert feedback.
 3. Execute the modeling workflow.
-4. Produce the final solution report.
+4. Produce the machine-readable solution container.
 
 ---
 
@@ -968,9 +1094,7 @@ A preliminary modeling blueprint is available at:
 `{DRAFT_PATH_PLACEHOLDER}`
 
 Read and analyze this file before starting. It provides planned assumptions,
-candidate models, a data strategy, and validation ideas. Treat it as a starting
-hypothesis. You may modify assumptions, model choices, implementation strategy,
-and validation methods when improvements are justified.
+candidate models, a data strategy, and validation ideas. {draft_stance}
 
 ---
 
@@ -1014,6 +1138,15 @@ begin another verification, revision, or recomputation pass afterwards.
 
 ---
 
+# Sub-Agents
+
+When the problem divides into subproblems that do not depend on one another,
+delegate them to sub-agents — one call each, issued together so they run at the
+same time — and combine what they return. Keep dependent subproblems in your own
+sequence.
+
+---
+
 # Submission Requirements
 
 The submission for this task is the machine-readable solution container
@@ -1024,8 +1157,7 @@ conclusions -- belongs in its fields.
 
 Do not also write a separate Markdown report. It would restate the same work,
 is never scored, and costs a substantial amount of time on a long problem; put
-that effort into the container instead. A report file is rendered from the
-container after the run, so nothing has to be written twice.
+that effort into the container instead.
 
 Do not generate or include images.
 
@@ -1038,9 +1170,7 @@ Do not generate or include images.
 Workspace: `{{{{OUTPUT_DIR}}}}`
 
 Submission: `{{{{RESULTS_DIR}}}}/solution.json`
-
-Interaction evidence: `{{{{RESULTS_DIR}}}}/interaction_evidence.md`
-
+{interaction_evidence_entry}
 Code: `{{{{CODE_DIR}}}}`
 
 Results: `{{{{RESULTS_DIR}}}}`
@@ -1049,10 +1179,11 @@ Data: `{{{{DATA_DIR}}}}`
 
 Logs: `{{{{LOGS_DIR}}}}`
 
-Create directories when needed.
-
-Record the expert question, expert reply, and how the reply affected the work in
-`interaction_evidence.md`. Keep this evidence separate from the submission.
+Create directories when needed. Those four directories already exist and are the
+only entries allowed in the workspace root: put everything you produce inside
+them. Do not create any other file or directory at the workspace root — a stray
+entry there fails the run outright, whatever the rest of the work looks like.
+{interaction_evidence_note}
 
 # Python Environment
 
@@ -1062,6 +1193,21 @@ Run all Python work with the `math_modeling` conda environment:
 
 Start by reading draft.md and reviewing the proposed modeling plan.
 """
+    if not include_interaction:
+        # Drop the section along with the separator pair that framed it, so the
+        # no-interaction prompt differs from the interactive one by exactly this
+        # block and nothing else.
+        framed = f"---\n\n{INTERACTION_WORKFLOW_PLACEHOLDER}\n\n---\n"
+        if template.count(framed) != 1:
+            raise RuntimeError(
+                "Interactive Solver prompt has an unexpected interaction frame"
+            )
+        template = template.replace(framed, "---\n", 1)
+        if INTERACTION_WORKFLOW_PLACEHOLDER in template:
+            raise RuntimeError(
+                "Interactive Solver prompt still references the workflow placeholder"
+            )
+        return template
     if template.count(INTERACTION_WORKFLOW_PLACEHOLDER) != 1:
         raise RuntimeError("Interactive Solver prompt has an invalid workflow placeholder")
     return template.replace(
@@ -1121,12 +1267,6 @@ def prepare_from_planning_draft(
         args,
     )
     output_dir = Path(prepared["output_dir"])
-    # The machine-readable container is the deliverable, as it is for the
-    # OpenHands backend.  ``final_report`` is what the phase waits on, so
-    # pointing it at solution.json makes that file -- not the Markdown report --
-    # the artifact whose presence ends the solver run.  The report is rendered
-    # from the container afterwards, before the engine's own checks read it.
-    prepared["final_report"] = output_dir / "results" / "solution.json"
     # The shared evaluator resolves this source into args.baseline_reports before
     # calling this preparation hook; the legacy field name is retained for API
     # compatibility only.
@@ -1278,82 +1418,11 @@ def ensure_planning_interaction_evidence(output_dir: Path) -> Path:
     return evidence_path
 
 
-def render_report_from_submission(prepared: dict) -> Path | None:
-    """Render the Markdown report the harness insists on, from the container.
-
-    The solver is told the machine-readable container is the submission and that
-    a Markdown report would only restate it.  The engine's own gates still treat
-    ``results/solution_report.md`` as the run's report, so it is rendered here
-    from the container's fields: the two cannot disagree, and the agent is never
-    asked to produce the same content twice.
-
-    The target is written out in full rather than taken from ``final_report``,
-    which this launcher points at the container so the phase waits on it.
-    """
-    output_dir = Path(prepared["output_dir"])
-    submission = output_dir / "results" / "solution.json"
-    report = output_dir / "results" / "solution_report.md"
-    if not submission.is_file():
-        return None
-    try:
-        container = workflow.workflow_evolution.read_json(submission, {})
-    except (OSError, ValueError):
-        return None
-    tasks = container.get("tasks")
-    if not isinstance(tasks, list) or not tasks:
-        return None
-    # Field order mirrors the container's own schema, so the rendered report
-    # reads in the order the subtasks were answered.
-    sections = (
-        ("task_description", "Problem"),
-        ("task_analysis", "Analysis"),
-        ("preliminary_formulas", "Preliminary Formulas"),
-        ("mathematical_modeling_process", "Modeling Process"),
-        ("task_code", "Code"),
-        ("execution_result", "Execution Result"),
-        ("solution_interpretation", "Interpretation"),
-        ("subtask_outcome_analysis", "Outcome Analysis"),
-    )
-    lines = ["# Solution", ""]
-    for index, task in enumerate(tasks, start=1):
-        if not isinstance(task, dict):
-            continue
-        title = str(task.get("task_description", "")).strip().splitlines()
-        heading = title[0][:120] if title else f"Subtask {index}"
-        lines.extend([f"## Subtask {index}: {heading}", ""])
-        for key, label in sections:
-            value = str(task.get(key, "")).strip()
-            if not value:
-                continue
-            lines.extend([f"### {label}", "", value, ""])
-    lines.extend(
-        [
-            "---",
-            "",
-            f"_Rendered by the launcher from `{submission.name}`; the JSON "
-            "container is the submission of record._",
-            "",
-        ]
-    )
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text("\n".join(lines), encoding="utf-8")
-    print(
-        f"Rendered {report.name} from {submission.name} "
-        f"({len(tasks)} subtask(s)); the solver wrote no report.",
-        flush=True,
-    )
-    return report
-
-
 def run_planning_draft_solution_check(prepared: dict) -> Path:
     """Validate the planning draft and final Solver artifacts directly."""
     output_dir = Path(prepared["output_dir"])
     results_dir = output_dir / "results"
     checks = []
-    # The container is the submission; the report the checks below read is
-    # derived from it here, so a run whose container is missing or unusable
-    # fails on the missing report rather than silently reporting success.
-    render_report_from_submission(prepared)
 
     def require_text(relative: str) -> str:
         path = output_dir / relative
@@ -1508,6 +1577,35 @@ def parse_args_with_pool_defaults():
         args.retry_concurrency = phase_concurrency
     if not supplied("--judge-concurrency"):
         args.judge_concurrency = phase_concurrency
+    # Every role runs against the locally served model.  The shared parser's
+    # defaults name DeepSeek models and carry no credentials, so leaving them
+    # alone would send the optimizer, the expert and the MM-Bench judge to
+    # api.deepseek.com.  The judge reads the optimizer's credentials when it has
+    # none of its own, so --opt-base-url/--opt-api-key cover both.
+    for option, attribute, value in (
+        ("--model", "model", LOCAL_MODEL),
+        ("--opt-model", "opt_model", LOCAL_MODEL),
+        ("--opt-base-url", "opt_base_url", LOCAL_BASE_URL),
+        ("--opt-api-key", "opt_api_key", LOCAL_API_KEY),
+        ("--expert-model", "expert_model", LOCAL_MODEL),
+        ("--expert-base-url", "expert_base_url", LOCAL_BASE_URL),
+        ("--expert-api-key", "expert_api_key", LOCAL_API_KEY),
+        ("--judge-feedback-model", "judge_feedback_model", LOCAL_MODEL),
+    ):
+        if not supplied(option):
+            setattr(args, attribute, value)
+    # Surfaced in the run's config.json so the recorded configuration names the
+    # endpoint that actually served each solver run.
+    for attribute, value in openhands_backend.default_settings().items():
+        setattr(args, attribute, value)
+    # OpenHands keeps no agent registry, so the framework's registration and
+    # cleanup calls are answered by the stub rather than a real OpenClaw install.
+    if not supplied("--openclaw-command"):
+        args.openclaw_command = str(openhands_backend.REGISTRY_STUB)
+    # See LOCAL_FIXED_RUBRIC: the engine's default names a rubric this
+    # repository does not contain.
+    if not supplied("--fixed-rubric"):
+        args.fixed_rubric = str(LOCAL_FIXED_RUBRIC)
     return args
 
 
@@ -1665,40 +1763,6 @@ def configure_problem_pools(sources: argparse.Namespace) -> None:
     )
 
 
-def disable_thinking_for_direct_api_calls() -> None:
-    """Make the launcher's direct provider calls usable with the local model.
-
-    The shared code turns provider thinking off only when the base URL contains
-    "deepseek.com" -- the provider the original experiments ran against.  The
-    locally served model also defaults to thinking, and all three direct callers
-    here (the human expert, the optimizer, and the MM-Bench judge) want short,
-    immediately usable output.  With thinking on, the reasoning consumes the
-    small max_tokens budget and the response body comes back empty, which the
-    callers report as a failed API call rather than as an empty answer: the
-    expert bridge dies with "expert API response contains no text" and the task
-    fails its interaction gate.
-
-    The three call sites each construct their own openai.OpenAI client, so the
-    injection goes on the SDK's shared completions resource.  Calls that already
-    pass extra_body -- the DeepSeek branch -- are left untouched.
-    """
-    from openai.resources.chat.completions import Completions
-
-    if getattr(Completions.create, "_disables_provider_thinking", False):
-        return
-    original_create = Completions.create
-
-    def create(self, *args, **kwargs):
-        if not kwargs.get("extra_body"):
-            kwargs["extra_body"] = {
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
-        return original_create(self, *args, **kwargs)
-
-    create._disables_provider_thinking = True
-    Completions.create = create
-
-
 def main() -> None:
     global _initialize_only
     sources = parse_planning_draft_sources()
@@ -1754,6 +1818,18 @@ def main() -> None:
     workflow.substantive.run_consolidated_refinement_check = (
         run_planning_draft_solution_check
     )
+    # OpenHands backend.  The engine binds interaction.run_local_modeling_phase
+    # from this name while workflow.main() starts up (workflow_evolution.py:3704),
+    # so the patch has to land on the source name -- patching interaction.* here
+    # would be overwritten before any agent runs.
+    workflow.substantive.run_substantive_modeling_phase = (
+        openhands_backend.run_openhands_modeling_phase
+    )
+    # The engine calls this by bare name on its last line, so patching the module
+    # attribute is enough to keep a matplotlib-free run from failing at the end.
+    workflow.plot_round_average_dimension_scores = skip_round_dimension_plot
+    # Without this the expert, optimizer and judge calls all come back empty.
+    disable_thinking_for_direct_api_calls()
     workflow.substantive.runtime_args = runtime_args_with_immediate_agent_start
     workflow.build_workflow_refinement_prompt = build_interactive_solver_prompt
     workflow.build_cpe_workflow_evolution_prompt = (
@@ -1773,15 +1849,13 @@ def main() -> None:
         run_initial_draft_parent_evaluations
     )
     workflow.experiment_path = experiment_path
-    # The expert bridge, the optimizer and the MM-Bench judge call the provider
-    # directly rather than through OpenClaw, so they need the same treatment the
-    # OpenHands launcher applies: without it every expert exchange comes back
-    # empty and the run fails its interaction gate.
-    disable_thinking_for_direct_api_calls()
     isolated_config = previous_config = None
     try:
-        if not _initialize_only:
-            isolated_config, previous_config = clean.activate_subagent_enabled_openclaw_config()
+        # The OpenClaw launcher rewrites a private copy of ~/.openclaw/openclaw.json
+        # here to enable sub-agent tools.  OpenHands reads no such config and the
+        # file does not exist on this cluster, so the step is skipped entirely.
+        # Teardown is guarded by `isolated_config is not None`, so leaving both
+        # names as None above keeps it a no-op.
         workflow.main(cpe_mode=True, compact_experiment_inputs=True, dialogue_operator_evolution=False)
     finally:
         workflow.load_cpe_split = _original_load_cpe_split
@@ -1812,6 +1886,7 @@ def main() -> None:
         workflow.initial_strategy_population = _original_initial_population
         workflow.validate_workflow = _original_validate_workflow
         workflow.execute_cpe_evaluation = _original_execute_cpe_evaluation
+        workflow.plot_round_average_dimension_scores = _original_plot_round_dimension
         workflow.CPE_UTILITY_BASIS = _original_utility_basis
         workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = _original_cost_weight
         workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT = _original_latency_cost_weight

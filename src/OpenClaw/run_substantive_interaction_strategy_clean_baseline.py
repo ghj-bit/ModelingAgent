@@ -23,9 +23,13 @@ from functools import partial
 from pathlib import Path
 
 try:
+    from . import claude_backend
+    from . import openhands_backend
     from . import run_substantive_interaction_strategy_evolution as strategy
     from . import run_substantive_interaction_workflow_test_from_initial_draft as mmbench_support
 except ImportError:
+    import claude_backend
+    import openhands_backend
     import run_substantive_interaction_strategy_evolution as strategy
     import run_substantive_interaction_workflow_test_from_initial_draft as mmbench_support
 
@@ -35,6 +39,33 @@ EXPERIMENT_PREFIX = "interaction_strategy_clean_baseline"
 TRAIN_DATASET = Path(__file__).resolve().parents[2] / "data" / "modeling_data_train.json"
 DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
 SUPPORTED_MMBENCH_PROBLEMS = ("2003_C", "2003_B")
+
+# ``openhands`` and ``claude`` modes run the same task the interactive arm does --
+# same planning draft, same pre-gathered empirical data -- and differ only in the
+# prompt: the expert-interaction section is removed and nothing replaces it.
+# They differ from each other only in which executable solves the task, so every
+# step that keys off "is this a draft-based backend" keys off this tuple rather
+# than one name.  OpenClaw mode keeps the historic behaviour, which starts from
+# the problem statement alone.
+DRAFT_BACKENDS = ("openhands", "claude")
+# The solver prompt carries the draft's location under this name.  Kept as a
+# literal, matching the launchers, because this module imports them lazily.
+DRAFT_PATH_PLACEHOLDER = "{{DRAFT_PATH}}"
+_AGENT_BACKEND = "openclaw"
+# Resolved once in main(): one planning draft per problem, by problem_id.  The
+# values are strings, as resolve_planning_drafts returns them.
+_DRAFT_REPORTS: dict[str, str] = {}
+# Whether this run actually stages a planning draft.  DRAFT_BACKENDS names the
+# backends that *can* use one; handed no --planning-draft-root they run the
+# problem statement alone instead, which is the behaviour the openclaw backend
+# has always had.  Set in main() from the parsed args, so a backend string alone
+# never decides it.
+_DRAFT_MODE = False
+# Whether to take only each draft's evidence and not its proposed solution.  The
+# solver then runs the problem statement plus data/external_data.md, which is the
+# one thing the draft pool is uniquely good for and the one thing the solver
+# cannot gather itself.  Set in main().
+_REUSE_DRAFT_DATA = False
 
 _ORIGINAL_PARSE_ARGS = strategy.parse_args
 _ORIGINAL_VALIDATE_ARGS = strategy.validate_args
@@ -178,6 +209,98 @@ def build_clean_baseline_prompt(
     return prompt
 
 
+def build_solution_only_prompt(benchmark: str = "mmbench") -> str:
+    """The draft-free prompt whose only deliverable is solution.json.
+
+    Three deliberate differences from build_clean_baseline_prompt:
+
+    1. No report contract.  The Claude backend already renders solution_report.md
+       from solution.json (claude_backend.synthesize_report_from_submission), so a
+       solver-written report is a file nothing reads -- asking for it only spends
+       turns on prose the scored container has to repeat anyway.
+    2. No data-search step.  The evidence is staged into the workspace from the
+       draft pool, so searching would duplicate what is already on disk; the
+       citation duty transfers to the supplied sources instead.
+    3. An explicit stop.  The run is over once solution.json is complete.
+
+    Unlike the draft arm this needs no substitute for {{DRAFT_PATH}}: the planning
+    draft section is absent rather than pointed elsewhere.
+    """
+    prompt = build_clean_baseline_prompt({}, benchmark)
+
+    final_report_line = "- Final report: `{{FINAL_REPORT}}`\n"
+    search_step = (
+        "4. Search for at most 1-2 verifiable empirical data items that materially "
+        "affect the model or validation, and record their sources and intended use."
+    )
+    report_step = "7. Produce the final report at the required path.\n"
+    staged_data_step = (
+        "4. Use the empirical evidence already staged in the Data directory: read "
+        "`data/external_data.md` first and treat it as the factual basis for the "
+        "model, its validation, and its conclusions. It records the sources and "
+        "the intended use of each. Do not search for other data -- everything "
+        "this task is scored against is already provided."
+    )
+    for label, needle in (
+        ("workspace report line", final_report_line),
+        ("bounded data-search step", search_step),
+        ("final-report workflow step", report_step),
+    ):
+        if prompt.count(needle) != 1:
+            raise RuntimeError(f"Shared prompt has an unexpected {label}")
+    prompt = prompt.replace(final_report_line, "", 1)
+    prompt = prompt.replace(search_step, staged_data_step, 1)
+    prompt = prompt.replace(report_step, "", 1)
+
+    report_header = "## Final Report Contract\n"
+    solution_header = "## MM-Bench Solution File\n"
+    if prompt.count(report_header) != 1 or prompt.count(solution_header) != 1:
+        raise RuntimeError("Shared prompt has an unexpected report/solution layout")
+    before_report, remainder = prompt.split(report_header, 1)
+    _, solution_section = remainder.split(solution_header, 1)
+    prompt = before_report.rstrip() + "\n\n" + solution_header + solution_section
+
+    report_intro = (
+        "When the task is an MM-Bench problem, the Markdown report is not the "
+        "complete\nsubmission. Also write the machine-readable solution container "
+        "that MM-Bench\nJudge reads:"
+    )
+    solution_intro = (
+        "Write the machine-readable solution container that MM-Bench Judge reads:"
+    )
+    report_consistency = (
+        "The solution file must state the same models, numbers,\n"
+        "and conclusions as the report."
+    )
+    solution_consistency = (
+        "State the models, the numbers, and the conclusions in full here: this "
+        "file is\nthe only thing that is submitted."
+    )
+    for label, needle in (
+        ("solution-file introduction", report_intro),
+        ("solution/report consistency sentence", report_consistency),
+    ):
+        if prompt.count(needle) != 1:
+            raise RuntimeError(f"Shared prompt has an unexpected {label}")
+    prompt = prompt.replace(report_intro, solution_intro, 1)
+    prompt = prompt.replace(report_consistency, solution_consistency, 1)
+
+    closing = "Start immediately and do not ask the user follow-up questions."
+    stop_instruction = (
+        "Start immediately and do not ask the user follow-up questions.\n\n"
+        "Finish as soon as `{{RESULTS_DIR}}/solution.json` is complete: valid JSON, "
+        "one `tasks` element per subproblem in the original order, every field "
+        "filled in, and the same models and numbers throughout. That file is the "
+        "whole submission -- once it is written and verified, stop. Do not write a "
+        "separate report, do not keep exploring after the answers are in hand, and "
+        "do not start work beyond the subproblems the problem asks about."
+    )
+    if prompt.count(closing) != 1:
+        raise RuntimeError("Shared prompt has an unexpected closing instruction")
+    prompt = prompt.replace(closing, stop_instruction, 1)
+    return prompt
+
+
 def runtime_args(args):
     """Prepare clean workspaces and start each Agent as soon as it registers."""
     run_args = _ORIGINAL_RUNTIME_ARGS(args)
@@ -191,6 +314,113 @@ def runtime_args(args):
     run_args.mmbench_judge_base_url = args.mmbench_judge_base_url
     run_args.mmbench_judge_timeout = args.mmbench_judge_timeout
     return run_args
+
+
+def stage_planning_draft(problem_id: str, output_dir: Path) -> dict:
+    """Copy the planning draft and its pre-gathered evidence into the run.
+
+    The solver prompt is the interactive arm's with the interaction section
+    removed: it tells the agent to refine ``draft.md`` and to read the empirical
+    facts from ``data/external_data.md`` instead of searching.  Both have to be
+    present here or the run has nothing to refine and no sanctioned way to obtain
+    external facts.
+    """
+    resolved = _DRAFT_REPORTS.get(problem_id)
+    if resolved is None:
+        raise FileNotFoundError(
+            f"No planning draft resolved for MM-Bench problem {problem_id}"
+        )
+    # resolve_planning_drafts hands back strings, not Paths.
+    source = Path(resolved)
+    draft_target = output_dir / "results" / "draft.md"
+    shutil.copy2(source, draft_target)
+    if not draft_target.read_text(encoding="utf-8", errors="replace").strip():
+        raise RuntimeError(f"Planning draft is empty: {draft_target}")
+    empirical_source = source.parents[1] / "data" / "external_data.md"
+    empirical_target = output_dir / "data" / "external_data.md"
+    if empirical_source.is_file() and empirical_source.read_text(
+        encoding="utf-8", errors="replace"
+    ).strip():
+        empirical_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(empirical_source, empirical_target)
+    else:
+        # Warn rather than fail, matching the interactive arm: a pool that is
+        # only partly regenerated still runs, but the gap stays visible.
+        print(
+            f"Planning draft for {problem_id} has no data/external_data.md at "
+            f"{empirical_source}; the solver will have no pre-gathered evidence.",
+            flush=True,
+        )
+    # Point the solver prompt at the draft it was staged for.  The interactive
+    # launchers substitute this placeholder while preparing their own runs, but
+    # this path stages the draft itself, so without this the prompt hands the
+    # solver a literal "{{DRAFT_PATH}}" and it has to infer the location from
+    # the surrounding prose.  Mirrors DRAFT_PATH_PLACEHOLDER in the launchers.
+    prompt_path = Path(output_dir).parent / "prompt.md"
+    if prompt_path.is_file():
+        prompt = prompt_path.read_text(encoding="utf-8", errors="replace")
+        if DRAFT_PATH_PLACEHOLDER in prompt:
+            prompt_path.write_text(
+                prompt.replace(DRAFT_PATH_PLACEHOLDER, str(draft_target.resolve())),
+                encoding="utf-8",
+            )
+        elif str(draft_target.resolve()) not in prompt:
+            print(
+                "Warning: solver prompt names neither {{DRAFT_PATH}} nor the "
+                f"staged draft at {draft_target}",
+                flush=True,
+            )
+    return {
+        "initial_draft_used": True,
+        "initial_draft_source": str(source),
+        "initial_draft_path": str(draft_target),
+        "empirical_data_source": (
+            str(empirical_source) if empirical_target.is_file() else ""
+        ),
+        "empirical_data_path": (
+            str(empirical_target) if empirical_target.is_file() else ""
+        ),
+    }
+
+
+def stage_draft_data(problem_id: str, output_dir: Path) -> dict:
+    """Stage a draft's pre-gathered evidence, but not the draft itself.
+
+    The draft arm is handed the pool's proposed solution and refines it; this arm
+    is handed the same evidence and the problem statement alone, so what it builds
+    is comparable to that arm without inheriting its plan.
+
+    Raises rather than warning when the evidence is absent: the prompt tells the
+    solver to read data/external_data.md and forbids searching, so a run without
+    it would be scored on a factual basis it was never given.
+    """
+    resolved = _DRAFT_REPORTS.get(problem_id)
+    if resolved is None:
+        raise FileNotFoundError(
+            f"No planning draft resolved for MM-Bench problem {problem_id}"
+        )
+    # resolve_planning_drafts hands back strings, not Paths.
+    source = Path(resolved)
+    empirical_source = source.parents[1] / "data" / "external_data.md"
+    if not (
+        empirical_source.is_file()
+        and empirical_source.read_text(encoding="utf-8", errors="replace").strip()
+    ):
+        raise RuntimeError(
+            f"Planning draft for {problem_id} has no data/external_data.md at "
+            f"{empirical_source}; this arm reuses exactly that evidence and has no "
+            "way to obtain it otherwise."
+        )
+    empirical_target = output_dir / "data" / "external_data.md"
+    empirical_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(empirical_source, empirical_target)
+    return {
+        # No planning draft reached the solver, so the report and config must not
+        # claim one did.
+        "initial_draft_used": False,
+        "empirical_data_source": str(empirical_source),
+        "empirical_data_path": str(empirical_target),
+    }
 
 
 def prepare_mmbench_validation_problem(
@@ -261,6 +491,14 @@ def prepare_mmbench_validation_problem(
             "mmbench_declared_dataset_paths": declared_paths,
         }
     )
+    if _DRAFT_MODE:
+        metadata.update(
+            stage_planning_draft(problem_id, Path(prepared["output_dir"]))
+        )
+    elif _REUSE_DRAFT_DATA:
+        metadata.update(
+            stage_draft_data(problem_id, Path(prepared["output_dir"]))
+        )
     strategy.workflow_evolution.write_json(metadata_path, metadata)
     return prepared
 
@@ -284,8 +522,23 @@ def run_baseline_validation_problem(
             f"{problem_id}-clean-baseline-r{round_number}-"
             f"x{prepared['repetition']}-{uuid.uuid4().hex[:8]}"
         )
+        # The three backends take the same arguments; the draft-based ones are
+        # told there is no dialogue to account for, so they stop after the
+        # submission instead of running the interaction bookkeeping and gate.
+        if _AGENT_BACKEND == "openhands":
+            phase = partial(
+                openhands_backend.run_openhands_modeling_phase,
+                check_interaction=False,
+            )
+        elif _AGENT_BACKEND == "claude":
+            phase = partial(
+                claude_backend.run_claude_modeling_phase,
+                check_interaction=False,
+            )
+        else:
+            phase = strategy.run_end_to_end_modeling_phase
         try:
-            strategy.run_end_to_end_modeling_phase(
+            phase(
                 prepared,
                 session_id,
                 prepared["prompt"],
@@ -341,6 +594,35 @@ def parse_args():
     extension_parser.add_argument(
         "--mmbench-judge-timeout", type=float, default=600.0
     )
+    extension_parser.add_argument(
+        "--agent-backend",
+        choices=("openclaw", "openhands", "claude"),
+        default="openclaw",
+        help=(
+            "Which agent runtime solves the task. openhands and claude "
+            "additionally need --planning-draft-root and run the same prompt as "
+            "the interactive arm minus its expert-interaction section."
+        ),
+    )
+    extension_parser.add_argument(
+        "--planning-draft-root",
+        type=Path,
+        nargs="+",
+        help=(
+            "Roots holding planning drafts (with their data/external_data.md). "
+            "Only used with --agent-backend openhands or claude."
+        ),
+    )
+    extension_parser.add_argument(
+        "--reuse-draft-data",
+        action="store_true",
+        help=(
+            "Take only each planning draft's data/external_data.md -- the "
+            "evidence it gathered -- and not the draft's proposed solution. The "
+            "solver is given the problem statement plus that evidence, is told "
+            "not to search, and stops once solution.json is complete."
+        ),
+    )
     raw_argv = sys.argv[1:]
     extension, remaining = extension_parser.parse_known_args(raw_argv)
     original_argv = sys.argv
@@ -355,6 +637,13 @@ def parse_args():
     args.mmbench_judge_api_key = extension.mmbench_judge_api_key
     args.mmbench_judge_base_url = extension.mmbench_judge_base_url
     args.mmbench_judge_timeout = extension.mmbench_judge_timeout
+    args.agent_backend = extension.agent_backend
+    args.planning_draft_root = (
+        [path.resolve() for path in extension.planning_draft_root]
+        if extension.planning_draft_root
+        else None
+    )
+    args.reuse_draft_data = extension.reuse_draft_data
 
     def supplied(option: str) -> bool:
         return any(
@@ -363,19 +652,32 @@ def parse_args():
         )
 
     if args.benchmark == "mmbench":
-        if not supplied("--problem-id"):
-            args.problem_id = list(SUPPORTED_MMBENCH_PROBLEMS)
-        unsupported = [
-            problem_id
-            for problem_id in args.problem_id
-            if problem_id not in SUPPORTED_MMBENCH_PROBLEMS
-        ]
-        if unsupported:
+        if args.agent_backend == "openclaw":
+            # The OpenClaw integration was only ever wired for these two tasks.
+            # The OpenHands mode takes any task that has a planning draft, which
+            # resolve_planning_drafts verifies, so it is not held to this list.
+            if not supplied("--problem-id"):
+                args.problem_id = list(SUPPORTED_MMBENCH_PROBLEMS)
+            unsupported = [
+                problem_id
+                for problem_id in args.problem_id
+                if problem_id not in SUPPORTED_MMBENCH_PROBLEMS
+            ]
+            if unsupported:
+                raise ValueError(
+                    "This clean-baseline MM-Bench integration currently supports only "
+                    + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
+                    + "; got: "
+                    + ", ".join(unsupported)
+                )
+        elif not args.planning_draft_root and not supplied("--problem-id"):
+            # A draft backend pins its task list through the draft root.  Without
+            # one it runs the problem statement alone, so the task list has to be
+            # named explicitly -- nothing else pins which tasks can run.
             raise ValueError(
-                "This clean-baseline MM-Bench integration currently supports only "
-                + ", ".join(SUPPORTED_MMBENCH_PROBLEMS)
-                + "; got: "
-                + ", ".join(unsupported)
+                f"--benchmark mmbench with --agent-backend {args.agent_backend} "
+                "needs --planning-draft-root or --problem-id; nothing else pins "
+                "which tasks can run."
             )
     elif not supplied("--problem-id"):
         problems = json.loads(TRAIN_DATASET.read_text(encoding="utf-8"))
@@ -437,6 +739,27 @@ def validate_args(args) -> None:
             "--enforce-substantive-interaction-gate is incompatible with the "
             "clean no-interaction baseline."
         )
+    if args.agent_backend in DRAFT_BACKENDS:
+        if args.benchmark != "mmbench":
+            raise ValueError(
+                f"--agent-backend {args.agent_backend} needs --benchmark mmbench: "
+                "the prompt it reuses is the MM-Bench solver prompt."
+            )
+        # No --planning-draft-root check here any more.  parse_args has already
+        # accepted the run only when a draft root or an explicit --problem-id
+        # pins the task list, and without a draft root the solver is handed the
+        # problem statement alone, so there is no draft to insist on.
+    if getattr(args, "reuse_draft_data", False):
+        if args.benchmark != "mmbench":
+            raise ValueError(
+                "--reuse-draft-data needs --benchmark mmbench: the evidence it "
+                "stages comes from the MM-Bench draft pool."
+            )
+        if not args.planning_draft_root:
+            raise ValueError(
+                "--reuse-draft-data needs --planning-draft-root: that is where "
+                "each problem's data/external_data.md is read from."
+            )
 
 
 def install_runtime_hooks(args, problems: dict) -> None:
@@ -456,7 +779,19 @@ def install_runtime_hooks(args, problems: dict) -> None:
 
 def main() -> None:
     """Run one clean baseline without creating strategy-evolution artifacts."""
+    global _AGENT_BACKEND, _DRAFT_MODE, _DRAFT_REPORTS, _REUSE_DRAFT_DATA
     args = parse_args()
+    _AGENT_BACKEND = args.agent_backend
+    # A draft-capable backend stages one only when handed a draft root; without
+    # it the solver gets the problem statement alone, as openclaw always has.
+    # --reuse-draft-data borrows that root for its evidence instead, so the draft
+    # itself stays out of the run.
+    _REUSE_DRAFT_DATA = bool(getattr(args, "reuse_draft_data", False))
+    _DRAFT_MODE = (
+        _AGENT_BACKEND in DRAFT_BACKENDS
+        and bool(args.planning_draft_root)
+        and not _REUSE_DRAFT_DATA
+    )
     validate_args(args)
     if args.benchmark == "mmbench":
         problems, selected_problem_ids = mmbench_support.load_mmbench_problems(
@@ -490,18 +825,67 @@ def main() -> None:
     round_dir = experiment / "runs" / "round_1"
     round_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = round_dir / "prompt.md"
-    prompt = (
-        build_clean_baseline_prompt({}, "mmbench")
-        if args.benchmark == "mmbench"
-        else build_clean_baseline_prompt({})
-    )
+    if _DRAFT_MODE:
+        # Same prompt as the interactive arm with the expert-interaction section
+        # removed and nothing put in its place: that section is the only
+        # difference between the two arms, so the rest has to stay identical.
+        # Each backend launcher carries its own copy of that prompt rather than
+        # importing a shared one, so the matching module is the one whose text
+        # this arm runs -- editing a copy has to move only that arm.
+        import importlib
+
+        module_name = (
+            "run_substantive_interaction_workflow_evolution_from_initial_draft_"
+            + _AGENT_BACKEND
+        )
+        try:
+            launcher = importlib.import_module(f".{module_name}", __package__ or "src.OpenClaw")
+        except ImportError:
+            launcher = importlib.import_module(module_name)
+        _DRAFT_REPORTS = mmbench_support.resolve_planning_drafts(
+            args.planning_draft_root, list(args.problem_id)
+        )
+        launcher._benchmark = "mmbench"
+        prompt = launcher.build_interactive_solver_prompt(
+            launcher.fixed_initial_workflow(), include_interaction=False
+        )
+        print(
+            f"Resolved {len(_DRAFT_REPORTS)} planning draft(s) from "
+            + ", ".join(str(root) for root in args.planning_draft_root),
+            flush=True,
+        )
+    elif _REUSE_DRAFT_DATA:
+        # The draft root is still read, but only to locate each problem's
+        # data/external_data.md -- the draft's own plan never reaches the solver.
+        _DRAFT_REPORTS = mmbench_support.resolve_planning_drafts(
+            args.planning_draft_root, list(args.problem_id)
+        )
+        prompt = build_solution_only_prompt("mmbench")
+        print(
+            f"Resolved {len(_DRAFT_REPORTS)} planning draft(s) for their evidence "
+            "only, from "
+            + ", ".join(str(root) for root in args.planning_draft_root),
+            flush=True,
+        )
+    else:
+        prompt = (
+            build_clean_baseline_prompt({}, "mmbench")
+            if args.benchmark == "mmbench"
+            else build_clean_baseline_prompt({})
+        )
     prompt_path.write_text(
         prompt, encoding="utf-8"
     )
     config = {
         "experiment_type": EXPERIMENT_TYPE,
         "execution_mode": "clean_baseline_no_interaction",
-        "initial_draft_used": False,
+        "agent_backend": _AGENT_BACKEND,
+        "initial_draft_used": _DRAFT_MODE,
+        "planning_draft_roots": (
+            [str(root) for root in args.planning_draft_root]
+            if _DRAFT_MODE
+            else []
+        ),
         "benchmark": args.benchmark,
         "split": (
             "mmbench_dataset_tasks"
@@ -542,6 +926,11 @@ def main() -> None:
     strategy.workflow_evolution.configure_completion_grace(
         strategy.baseline.run_problem, args.completion_grace
     )
+    # Required for both backends: the preparation path still registers the task
+    # through the OpenClaw CLI, and that CLI initialises the workspace with
+    # AGENTS.md, SOUL.md and a git repo unless this config suppresses it.  Those
+    # entries fail the clean-workspace assertion, so skipping this call breaks
+    # the OpenHands mode just as surely as it would break the OpenClaw one.
     isolated_config, previous_config = activate_clean_openclaw_config()
     atexit.register(
         remove_clean_openclaw_config, isolated_config, previous_config

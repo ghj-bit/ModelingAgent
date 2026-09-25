@@ -177,21 +177,22 @@ reply. Follow the stop condition and never exceed 1 expert interaction(s).
 
 Run all Python work with this conda environment:
 
-    C:\Users\98263\.conda\envs\math_modeling\python.exe
+    /public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python
 
 Invoke it by absolute path, for example:
 
-    C:\Users\98263\.conda\envs\math_modeling\python.exe your_script.py
+    /public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python your_script.py
 
 The plain `python` on PATH is a different interpreter. Always use the path above
 instead of assuming that `python` is the correct one.
 
-Installed: numpy, scipy, pandas, matplotlib, networkx, sympy, statsmodels,
-scikit-learn, pymc, pmdarima, hmmlearn, numba, pulp, highspy, ortools.
+Installed: numpy, networkx, openai, PyPDF2, pymupdf, pymupdf4llm,
+google-generativeai. Other scientific packages (scipy, pandas, matplotlib, sympy,
+statsmodels, scikit-learn, numba, pulp, ortools) are not installed.
 
 Install anything else you need into the same environment:
 
-    C:\Users\98263\.conda\envs\math_modeling\python.exe -m pip install <package>
+    /public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python -m pip install <package>
 
 ---
 

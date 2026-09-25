@@ -3,6 +3,7 @@ import json
 import re
 import sys
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 from functools import partial
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,6 +15,21 @@ load_dotenv()
 
 EXPECTED_ANALYSES_PER_DIMENSION = 2
 DIMENSION_MAX_ATTEMPTS = 3
+
+
+def parallel_dimensions_enabled() -> bool:
+    """Whether the four dimensions may be scored on concurrent calls.
+
+    Off unless MMBENCH_JUDGE_PARALLEL_DIMENSIONS is set to a true-ish value.
+    The judge endpoint is shared with the solver agents, so switching this on
+    changes how hard a run leans on that endpoint, and two runs judged under
+    different regimes are not directly comparable -- hence opt-in rather than
+    a default that would silently re-score every arm.
+    """
+    return os.getenv("MMBENCH_JUDGE_PARALLEL_DIMENSIONS", "").strip().lower() not in (
+        "", "0", "false", "no", "off",
+    )
+
 STRICT_OUTPUT_REMINDER = """
 IMPORTANT OUTPUT REQUIREMENT:
 Return exactly two evaluation items. Each item must contain one
@@ -172,21 +188,52 @@ def evaluate_math_modeling(llm, solution_path):
     # retry this function, so completed dimensions must not be charged again.
     all_evaluation_data = _load_existing_results(evaluation_results_json_path)
     raw_sections = []
+    pending = []
     for result_key, display_name, prompt_factory in evaluation_specs:
         if _is_complete_dimension(all_evaluation_data.get(result_key)):
             print(f"Reusing completed {display_name} evaluation.", flush=True)
-            continue
+        else:
+            pending.append((result_key, display_name, prompt_factory))
 
-        raw_text, parsed = _evaluate_dimension(
-            llm,
-            prompt_factory(solution_data),
-            display_name,
-        )
-        all_evaluation_data[result_key] = parsed
-        raw_sections.append(raw_text)
-        # Persist each completed/failed dimension immediately so an outer retry
-        # can continue from this checkpoint after interruption or API failure.
-        _save_json(evaluation_results_json_path, all_evaluation_data)
+    # The four dimensions are independent: each reads the same solution data and
+    # writes only its own key, so nothing orders them.  Scoring them on
+    # concurrent calls therefore costs no fidelity and cuts the judge's wall
+    # clock to that of its slowest dimension.  Both paths persist each dimension
+    # as it finishes, so an outer retry resumes from whatever completed.
+    if pending and parallel_dimensions_enabled():
+        scored: dict[str, tuple[str, dict]] = {}
+        with ThreadPoolExecutor(max_workers=len(pending)) as executor:
+            futures = {
+                executor.submit(
+                    _evaluate_dimension,
+                    llm,
+                    prompt_factory(solution_data),
+                    display_name,
+                ): result_key
+                for result_key, display_name, prompt_factory in pending
+            }
+            for future in as_completed(futures):
+                result_key = futures[future]
+                scored[result_key] = future.result()
+                all_evaluation_data[result_key] = scored[result_key][1]
+                _save_json(evaluation_results_json_path, all_evaluation_data)
+        # The raw transcript keeps declaration order, exactly as the serial loop
+        # appended it, so the saved .txt does not depend on completion order.
+        for result_key, _, _ in evaluation_specs:
+            if result_key in scored:
+                raw_sections.append(scored[result_key][0])
+    else:
+        for result_key, display_name, prompt_factory in pending:
+            raw_text, parsed = _evaluate_dimension(
+                llm,
+                prompt_factory(solution_data),
+                display_name,
+            )
+            all_evaluation_data[result_key] = parsed
+            raw_sections.append(raw_text)
+            # Persist each completed/failed dimension immediately so an outer retry
+            # can continue from this checkpoint after interruption or API failure.
+            _save_json(evaluation_results_json_path, all_evaluation_data)
 
     # Keep all four keys in the native result schema, including any dimension
     # that exhausted its own retries and remains incomplete.

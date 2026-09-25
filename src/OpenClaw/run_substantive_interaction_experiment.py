@@ -58,17 +58,14 @@ an API. You are a non-computational decision adviser, not a calculator or model
 implementer.
 
 Read the complete authoritative problem statement appended below before
-answering. The parent must consult you before implementation about one live
-qualitative uncertainty that could change a model assumption, decision
-criterion, validation scenario, deliverable, confidence boundary, or scope.
+answering.
 
-Do not merely endorse the parent's framing. First check whether its alternatives
-omit a consequential stakeholder objective, real-world failure mode, or task
-interpretation. You may choose an alternative, reject the offered alternatives,
-or reframe the decision. State one recommendation, up to three concise reasons
-tagged Fact/Judgment/Assumption, and one caveat. Do not calculate results, invent
-parameters, prescribe code, use tools, or provide a literature review. Keep the
-answer under 180 words.
+Answer only the question you are asked. Do not go beyond it: no extra advice, no
+caveats, alternatives, or analysis the question did not ask for, and no
+restatement or widening of the question.
+
+Do not calculate results, invent parameters, prescribe code, use tools, or
+provide a literature review. Keep the answer under 180 words.
 """
 
 def now() -> str:
@@ -1253,23 +1250,24 @@ def run_substantive_modeling_phase(
         if not artifact_ready():
             recovery_prompt = meta_dir / "final_report_recovery_prompt.md"
             recovery_prompt.write_text(
-                "# Final-report recovery\n\n"
-                "The previous turn completed without creating the required final "
-                "report. Resume the existing work in this same workspace and "
-                "session. Do not restart completed analysis, repeat web research, "
-                "or request another expert interaction. Inspect the existing draft, "
-                "code, data, computed results, and expert feedback, then write the "
-                "complete final report to this exact path:\n\n"
+                "# Submission recovery\n\n"
+                "The previous turn completed without creating the required "
+                "submission for this task. Resume the existing work in this same "
+                "workspace and session. Do not restart completed analysis, repeat "
+                "web research, or request another expert interaction. Inspect the "
+                "existing draft, code, data, computed results, and expert "
+                "feedback, then write the complete submission in the exact format "
+                "the task prompt specifies, at this exact path:\n\n"
                 f"`{completion_artifact}`\n\n"
                 "Answer every original task, include the necessary assumptions, "
                 "model, results, validation, and limitations, and do not generate "
-                "images. Verify that the report exists and is non-empty before "
-                "ending.\n",
+                "images. Verify that the file exists, is non-empty, and is in the "
+                "required format before ending.\n",
                 encoding="utf-8",
             )
             print(
-                "OpenClaw exited before writing the final report; resuming the "
-                "same session once to complete the artifact.",
+                "OpenClaw exited before writing the required submission; resuming "
+                "the same session once to complete the artifact.",
                 flush=True,
             )
             run_agent(recovery_prompt)

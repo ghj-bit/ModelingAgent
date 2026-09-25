@@ -564,17 +564,24 @@ def mmbench_judge_llm(
         timeout=timeout,
         max_retries=0,
     )
+    options = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        # Greedy decoding: repeated Judge trials on the same solution should
+        # differ only by provider-side nondeterminism, not sampling.
+        "temperature": 0,
+        "max_tokens": max_tokens,
+        "n": 1,
+        "top_p": 0.9,
+    }
+    # DeepSeek reasons by default and its reasoning would consume the judge's
+    # token budget, leaving the answer empty.  It has no chat_template_kwargs,
+    # so it needs its own switch -- and passing extra_body here also keeps the
+    # launcher's vLLM-only chat_template_kwargs injection off this request.
+    if "deepseek.com" in str(base_url).lower():
+        options["extra_body"] = {"thinking": {"type": "disabled"}}
     try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            # Greedy decoding: repeated Judge trials on the same solution should
-            # differ only by provider-side nondeterminism, not sampling.
-            temperature=0,
-            max_tokens=max_tokens,
-            n=1,
-            top_p=0.9,
-        )
+        response = client.chat.completions.create(**options)
     except AuthenticationError as error:
         raise RuntimeError(
             "MM-Bench Judge authentication failed. Update the credential "
@@ -768,11 +775,18 @@ def judge_report_with_mmbench(
         problems[problem_id], Path(result["run_dir"])
     )
     if agent_solution is None:
+        # Read the report at its own path rather than through result
+        # ["final_report"]: launchers that make the container the completion
+        # artifact point that field at solution.json, and the fallback exists
+        # precisely for the case where the container could not be used.
+        fallback_report = (
+            Path(result["run_dir"]) / "output" / "results" / "solution_report.md"
+        )
         container = native_mmbench_solution(
             problems[problem_id],
-            judge_filesystem_path(
-                Path(result["final_report"])
-            ).read_text(encoding="utf-8", errors="replace"),
+            judge_filesystem_path(fallback_report).read_text(
+                encoding="utf-8", errors="replace"
+            ),
         )
         solution_source = "final_report"
     else:

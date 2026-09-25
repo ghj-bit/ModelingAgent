@@ -1,0 +1,91 @@
+{
+  "rubric_id": "interaction_strategy_v1",
+  "name": "Consultation value and budget discipline",
+  "purpose": "Score one round's interaction strategy together with the consultation it actually produced, so the evolver learns which policy rules earn their cost. Every rule is decidable from artifacts the run already writes; nothing here judges the modeling result itself (that is the task score).",
+  "inputs": {
+    "policy": "the '# Human Expert Interaction' block of the run's prompt.md",
+    "receipt": "output/results/interaction_receipt.json (questions_asked, expert_answers, exchange_count, workflow_max_exchanges)",
+    "evidence": "output/results/interaction_evidence.md",
+    "raw": "output/logs/operator_feedback/expert_question_N.md and expert_reply_N.json",
+    "cost": "interaction_cost recorded by the launcher (exchanges, tokens, latency) — reported, not scored here"
+  },
+  "scoring_protocol": {
+    "per_rule": "-1 = the rule is violated, 0 = not exercised or undecidable, +1 = the rule is clearly satisfied",
+    "aggregate": "0.5 + 0.5 * mean(rule scores) so the scale stays 0..1 and 0.5 is neutral",
+    "repeat": "score three times, keep the median per rule; report the spread",
+    "must_cite": "every non-zero score needs a quote or file pointer, otherwise it becomes 0",
+    "output_schema": {
+      "rule_scores": [
+        {
+          "id": "R1",
+          "score": -1,
+          "evidence": "interaction_evidence.md: 'the consultation was held after the pipeline had already run'",
+          "why": "one sentence tying the evidence to the plus/minus clause",
+          "fix": "one concrete edit to the interaction policy text, addressed to the rule that failed"
+        }
+      ],
+      "aggregate": 0.5,
+      "top_fix": "the single policy edit with the largest expected score gain",
+      "unjudgeable": ["rule ids whose evidence is missing from this run"],
+      "notes": "at most 60 words, no restating of the scores"
+    }
+  },
+  "criteria": [
+    {
+      "id": "R1",
+      "name": "Timing and independence",
+      "rule": "The consultation happens before the work it governs, and the question is a genuine open decision rather than a request for approval.",
+      "plus": "The affected modeling work starts only after the reply; the question states the decision point without revealing which option the agent prefers.",
+      "minus": "The consultation comes after the affected work is finished; the question discloses a preferred answer and asks the expert to endorse it; a settled decision is re-opened.",
+      "evidence": "timestamps of the question file versus the artifacts it governs; the wording of the question"
+    },
+    {
+      "id": "R2",
+      "name": "Decision weight",
+      "rule": "The question targets a choice that can change the framework, a core assumption, or a headline conclusion.",
+      "plus": "The question names what differs between the options in modeling terms (assumptions, criteria, deliverable, quantitative outcome), and the answer could flip the main claim.",
+      "minus": "The consultation is spent on implementation, code, parameters, data handling, or validation mechanics; or on a choice whose outcome cannot change any reported number.",
+      "evidence": "the 'Strategic Decision Point' section of the question and its stated impact"
+    },
+    {
+      "id": "R3",
+      "name": "Consultation package",
+      "rule": "The question is answerable in one pass: brief problem framing, one explicit decision point, at most three options with tradeoffs.",
+      "plus": "All three blocks present; at most three options, each with advantage, limitation, and expected impact in a few lines.",
+      "minus": "No explicit decision point; more than three options; options without tradeoffs; an open-ended 'what do you think' that the expert cannot answer without doing the modeling.",
+      "evidence": "structure and length of expert_question_1.md"
+    },
+    {
+      "id": "R4",
+      "name": "Traceable adoption",
+      "rule": "The reply produces at least one explicit, recorded modeling change, or a recorded reason why no change follows.",
+      "plus": "At least one decision traced to the reply, naming the artifact it changed (assumption, criterion, scenario, scope); 'no change' is recorded with the reason.",
+      "minus": "The reply is only restated or praised; the recorded decision cannot be traced to the reply text; a change is claimed that the artifacts do not show.",
+      "evidence": "interaction_evidence.md decision section versus the raw reply and the affected artifact"
+    },
+    {
+      "id": "R5",
+      "name": "Budget discipline",
+      "rule": "One exchange is the default; a further exchange is spent only on a decision distinct from every earlier one, and never exceeded the cap.",
+      "plus": "Exactly one exchange when one suffices; a second only for a different stage or uncertainty, with the distinction stated; stops once the decision is settled.",
+      "minus": "The cap is exceeded; a second exchange repeats the first uncertainty or asks for elaboration, confirmation, or review of an earlier reply.",
+      "evidence": "exchange_count versus workflow_max_exchanges; the topics of the questions in order"
+    },
+    {
+      "id": "R6",
+      "name": "Fidelity of the record",
+      "rule": "What the run records about the exchange matches the raw question and reply files.",
+      "plus": "The reply is quoted or faithfully summarized, its caveats and limits are kept, and the raw files are left untouched.",
+      "minus": "The reply is paraphrased into something stronger or weaker than it was; a caveat is dropped; a decision is attributed to the expert that the reply does not support.",
+      "evidence": "interaction_evidence.md and interaction_added_content.md versus expert_reply_N.json"
+    }
+  ],
+  "attention_budget": "One mandatory early exchange; a second only for a distinct unresolved decision; the cap is the policy's own max_exchanges. The launcher scores exchange count, tokens, and latency outside this rubric, so do not double-count cost here.",
+  "success_test": "Removing the reply from a run that scores +1 on R1, R2 and R4 must remove at least one traceable modeling decision; a rubric version that cannot separate such a run from an approval-seeking run is not doing any work.",
+  "evolution_hooks": {
+    "stable_ids": "R1..R6 keep their ids across versions so per-rule scores stay comparable over rounds",
+    "allowed_edits": "reword a rule's plus/minus, split a rule into two, retire a rule that is never decisive, or add one new rule with its own id, plus and minus",
+    "forbidden": "rewriting the whole rubric in one step, editing rule ids, or adding a rule whose evidence no run writes",
+    "each_edit_must_state": "predicted_effect = which rule scores move, in which direction, on which of last round's runs"
+  }
+}

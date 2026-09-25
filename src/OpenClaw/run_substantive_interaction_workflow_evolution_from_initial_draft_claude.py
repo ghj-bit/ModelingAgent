@@ -1,5 +1,18 @@
 """Evolve expert-interaction workflows that solve from planning ``draft.md`` files.
 
+Claude Code backend variant of
+``run_substantive_interaction_workflow_evolution_from_initial_draft``.  The
+pipeline, prompts, concurrency and gates are byte-identical to that launcher;
+the only difference is which executable solves each task.  Instead of the
+OpenClaw CLI, every Solver runs as a headless Claude Code session driven by
+``claude_backend``, and OpenClaw's agent-registry calls are answered by a
+stub so the surrounding control flow is untouched.
+
+Unlike the OpenClaw and OpenHands backends, this one cannot reach the local
+model directly: Claude Code speaks the Anthropic Messages API and the served
+endpoint cannot run this workload in that shape, so each task carries its own
+translation shim (see ``claude_backend/proxy.py``).
+
 This is intentionally separate from the clean-baseline refinement launcher. It
 starts each Solver from a planning blueprint, not from an inherited completed
 solution report, and supplies a single planning-derived initial workflow.
@@ -16,6 +29,8 @@ import argparse
 import copy
 import difflib
 import json
+import os
+import re
 import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,16 +39,87 @@ from functools import partial
 from pathlib import Path
 
 try:
+    from . import claude_backend
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
-    from .interaction_policy import MODELING_STRATEGY_ESCALATION
+    from .interaction_policy import STRATEGIC_DECISION_CONSULTATION
 except ImportError:
+    import claude_backend
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
-    from src.OpenClaw.interaction_policy import MODELING_STRATEGY_ESCALATION
+    from src.OpenClaw.interaction_policy import STRATEGIC_DECISION_CONSULTATION
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# The locally served model backs every role in this launcher.  The values live in
+# the backend module so the solver, optimizer, expert and judge cannot drift
+# apart; override them per run with the CLAUDE_MODEL / CLAUDE_BASE_URL /
+# CLAUDE_API_KEY environment variables.
+LOCAL_MODEL = claude_backend.DEFAULT_MODEL
+LOCAL_BASE_URL = claude_backend.DEFAULT_BASE_URL
+LOCAL_API_KEY = claude_backend.DEFAULT_API_KEY
+
+# The shared engine's --fixed-rubric default points at a rubric evolved on the
+# original Windows machine (round 4 of interaction_rubric_substantive_...),
+# which this repository does not ship.  What it does ship is the rubric that
+# experiment started from, so that is the fixed rubric here.
+LOCAL_FIXED_RUBRIC = REPO_ROOT / "src" / "OpenClaw" / "interaction_initial_substantive_v1.json"
+
+# How the solver starts, as the evolution prompt describes it to the optimizer.
+# The draft-based arm leaves it as is; a draft-free arm sets it before main() so
+# the optimizer is not told about a planning draft that arm never has.
+SOLVER_SOURCE_CONTEXT = "from a planning draft"
+SOLVER_START_CONTEXT = "starts from a planning draft"
+
+
+def skip_round_dimension_plot(results, output_path):
+    """Stand in for the engine's end-of-run dimension chart.
+
+    matplotlib is deliberately not installed (these runs produce no figures),
+    and the engine calls the real plot unguarded on its last line, so without
+    this stand-in a fully completed experiment would still exit non-zero and be
+    reported as a failure.
+    """
+    print(
+        f"Round dimension plot skipped (matplotlib not installed): {output_path}",
+        flush=True,
+    )
+    return output_path
+
+
+def disable_thinking_for_direct_api_calls() -> None:
+    """Make the launcher's direct provider calls usable with the local model.
+
+    The shared code turns provider thinking off only when the base URL contains
+    "deepseek.com" -- the provider the original experiments ran against.  The
+    locally served model also defaults to thinking, and all three direct callers
+    here (the human expert, the optimizer, and the MM-Bench judge) want short,
+    immediately usable output.  With thinking on, the reasoning consumes the
+    small max_tokens budget and the response body comes back empty, which the
+    callers report as a failed API call rather than as an empty answer: the
+    expert bridge dies with "expert API response contains no text" and the task
+    fails its interaction gate.
+
+    The three call sites each construct their own openai.OpenAI client, so the
+    injection goes on the SDK's shared completions resource.  Calls that already
+    pass extra_body -- the DeepSeek branch -- are left untouched.
+    """
+    from openai.resources.chat.completions import Completions
+
+    if getattr(Completions.create, "_disables_provider_thinking", False):
+        return
+    original_create = Completions.create
+
+    def create(self, *args, **kwargs):
+        if not kwargs.get("extra_body"):
+            kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False}
+            }
+        return original_create(self, *args, **kwargs)
+
+    create._disables_provider_thinking = True
+    Completions.create = create
 # These are default source experiments. Their task IDs are discovered from
 # completed draft artifacts at runtime rather than duplicated here.
 PLANNING_DRAFT_TRAIN_ROOT = (
@@ -72,6 +158,8 @@ DEFAULT_TRAIN_REPETITIONS = 2
 # measured on the validation set, not a claim that the candidate is better.
 # The real comparison is the champion gate below, which uses five-task
 # validation means and therefore needs a far smaller margin to be meaningful.
+# Kept identical to the OpenClaw launcher's margin: the two backends are run as
+# comparison arms, and different gates would make their acceptances incomparable.
 DEFAULT_TRAIN_ACCEPTANCE_MARGIN = 0.005
 DEFAULT_VALIDATION_ACCEPTANCE_MARGIN = 0.005
 # Thinking level for the solving agent.  The DeepSeek provider collapses
@@ -82,7 +170,11 @@ DEFAULT_THINKING_LEVEL = "off"
 INTERACTION_WORKFLOW_PLACEHOLDER = "{{INTERACTION_WORKFLOW}}"
 DRAFT_PATH_PLACEHOLDER = "{{DRAFT_PATH}}"
 
-DEFAULT_MMBENCH_ROOT = Path(r"D:\vscode_project\LLM-MM-Agent\MMBench")
+# The MM-Bench mirror that ships with this repository.  The upstream default is
+# a Windows path; every native problem definition the train and validation pools
+# name is present here, and the dataset attachment directories that exist are
+# staged per task.
+DEFAULT_MMBENCH_ROOT = REPO_ROOT / "data" / "MMBench"
 # Fixed MM-Bench split, selected by publication year over MMBench/problem/*.json
 # (111 tasks, 2000-2025):
 #   test       = every task from 2021 onward                              (32)
@@ -97,11 +189,10 @@ MMBENCH_TEST_PROBLEMS = (
     "2024_A", "2024_B", "2024_C", "2024_D", "2024_E", "2024_F",
     "2025_A", "2025_B", "2025_C", "2025_D", "2025_E", "2025_F",
 )
-# 2020_C was retired from the split on 2026-09-25: its rating/review task makes
-# agents write unbounded parallel text-sentiment jobs -- measured at 127 threads
-# and 59 cores from a single run -- which saturated the shared login node and
-# starved every other run in the same phase.  The pool is four problems now, so
-# --validation-size must match it (see launch_claude_evolution_from_scratch.sh).
+# 2020_C retired 2026-09-25: its review-text task makes agents launch unbounded
+# parallel sentiment jobs (one run measured at 127 threads / 59 of 104 cores),
+# which starved every other run in the phase.  Four problems now, so
+# --validation-size must be 4 -- see launch_claude_evolution_from_scratch.sh.
 MMBENCH_VALIDATION_PROBLEMS = (
     "2020_B", "2020_D", "2020_E", "2020_F",
 )
@@ -119,6 +210,7 @@ _active_experiment: Path | None = None
 _draft_train_root: Path | None = None
 _draft_validation_root: Path | None = None
 _initialize_only = False
+_round0_only = False
 _benchmark = "modelingbench"
 _mmbench_root: Path = DEFAULT_MMBENCH_ROOT
 # Resolved once in main(); injected into run_args so the shared preparation hook
@@ -148,6 +240,7 @@ _original_initial_population = workflow.initial_strategy_population
 _original_validate_workflow = workflow.validate_workflow
 _original_ensure_original_scores = workflow.ensure_cpe_original_report_scores
 _original_execute_cpe_evaluation = workflow.execute_cpe_evaluation
+_original_plot_round_dimension = workflow.plot_round_average_dimension_scores
 _original_utility_basis = workflow.CPE_UTILITY_BASIS
 _original_cost_weight = workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT
 _original_latency_cost_weight = workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT
@@ -179,8 +272,8 @@ def parse_planning_draft_sources() -> argparse.Namespace:
     parser.add_argument(
         "--benchmark",
         choices=("modelingbench", "mmbench"),
-        default="modelingbench",
-        help="Problem/data/evaluation source (default: modelingbench).",
+        default="mmbench",
+        help="Problem/data/evaluation source (default: mmbench).",
     )
     parser.add_argument(
         "--mmbench-root",
@@ -197,10 +290,27 @@ def parse_planning_draft_sources() -> argparse.Namespace:
             "interaction_strategy_clean_baseline_initial_draft_mmbench_* run."
         ),
     )
-    parser.add_argument("--mmbench-judge-model", default="deepseek-v4-flash")
-    parser.add_argument("--mmbench-judge-api-key")
-    parser.add_argument("--mmbench-judge-base-url")
+    # Every role -- solver, optimizer, expert and MM-Bench judge -- runs against
+    # the locally served model; the DeepSeek defaults in the shared parser are
+    # overridden in parse_args_with_pool_defaults below.
+    parser.add_argument("--mmbench-judge-model", default=LOCAL_MODEL)
+    parser.add_argument("--mmbench-judge-api-key", default=LOCAL_API_KEY)
+    parser.add_argument("--mmbench-judge-base-url", default=LOCAL_BASE_URL)
     parser.add_argument("--mmbench-judge-timeout", type=float, default=600.0)
+    # Launcher-private, and consumed here rather than by the shared parser.  The
+    # engine's own validation requires --max-rounds to be at least 1, so "stop
+    # after round 0" cannot be expressed through that flag without editing the
+    # engine every other experiment also uses.
+    parser.add_argument(
+        "--round0-only",
+        action="store_true",
+        help=(
+            "Run the round-0 initial-parent validation on the validation pool "
+            "and stop before the initial training parents and every evolved "
+            "round.  Use --max-rounds 1 alongside it: that value is only there "
+            "to satisfy the shared parser."
+        ),
+    )
     values, remainder = parser.parse_known_args(sys.argv[1:])
     sys.argv = [sys.argv[0], *remainder]
     return values
@@ -310,6 +420,22 @@ def run_initial_draft_parent_evaluations(
     }
     state["updated_at"] = workflow.now()
     workflow.workflow_evolution.write_json(workflow.cpe_state_path(experiment), state)
+
+    if _round0_only:
+        # Validation-only run.  The initial training parents exist to seed the
+        # first evolved round -- the first candidate is selected against their
+        # utilities -- so with no evolved round scheduled nothing would ever
+        # read their results, and running them anyway means solving the reserved
+        # training batch for a consumer that never arrives.  Stop before them,
+        # and before every evolved round: the round-0 validation results and the
+        # policy chosen from them were saved above, so the experiment is left
+        # consistent and resumable.  Resume without --round0-only to continue.
+        print(
+            "Round-0-only run: stopping before the initial training parents and "
+            "all evolved rounds.  Round-0 validation results are complete.",
+            flush=True,
+        )
+        raise SystemExit(0)
 
     parent_train_results: list[dict | None] = [
         None
@@ -475,13 +601,18 @@ def planning_draft_matches_problem(problem_id: str, draft: Path) -> bool:
     return metadata.get("problem_id") == problem_id
 
 
-def interaction_workflow_block(workflow_value: dict) -> str:
-    """Render every seed or evolved workflow as ordinary Markdown prose."""
+def interaction_workflow_block(workflow_value: dict, note: str = "") -> str:
+    """Render every seed or evolved workflow as ordinary Markdown prose.
+
+    ``note`` is one arm-specific paragraph appended to the section, so a run can
+    state a constraint that is not part of the policy the optimizer may rewrite.
+    """
     name = str(workflow_value.get("name", "Interaction workflow"))
     purpose = str(workflow_value.get("purpose", "")).strip()
     actions = list(workflow_value.get("actions", []))
     max_exchanges = int(workflow_value.get("max_exchanges", 1))
-    stop_condition = str(workflow_value.get("stop_condition", "")).strip()
+    rounds = "round" if max_exchanges == 1 else "rounds"
+    interactions = "expert interaction" if max_exchanges == 1 else "expert interactions"
     policy_text = str(workflow_value.get("policy_text", "")).strip()
     if policy_text:
         lines = policy_text.splitlines()
@@ -508,9 +639,10 @@ def interaction_workflow_block(workflow_value: dict) -> str:
             )
     lines.extend(
         [
-            f"Maximum expert exchanges: **{max_exchanges}**.",
-            "",
-            f"Stop condition: {stop_condition}",
+            f"Expert exchanges: **{max_exchanges}**, fixed. The consultation runs "
+            f"exactly {max_exchanges} {rounds}: ask the first question before the work "
+            "it governs, and make each later question build on the previous reply. "
+            "Do not stop early, and do not exceed it.",
             "",
             "### How to request expert feedback",
             "",
@@ -531,11 +663,13 @@ def interaction_workflow_block(workflow_value: dict) -> str:
             "",
             "The controller owns the request and reply files. Do not edit them, poll "
             "for them, or retry the command. Every later question must build on an "
-            f"earlier reply. Follow the stop condition and never exceed {max_exchanges} "
-            "expert interaction(s).",
+            f"earlier reply. Complete exactly {max_exchanges} {interactions}, "
+            "one per round.",
             "",
         ]
     )
+    if note.strip():
+        lines.extend(["", str(note).strip(), ""])
     return "\n".join(lines)
 
 
@@ -596,28 +730,34 @@ def evolution_history_entries(patch_history: list[dict]) -> list[dict]:
             "validation_accepted": event.get("validation_accepted"),
         }
         predicted = event.get("predicted_effect")
-        if isinstance(predicted, dict):
+        # The optimizer is no longer asked to predict its effect, so a round
+        # normally carries an empty mapping here; keep it out of the evidence.
+        if isinstance(predicted, dict) and predicted:
             entry["predicted_effect"] = predicted
         entries.append(entry)
     return entries
 
 
 EVOLUTION_PROMPT_HEAD = """System prompt. You are a senior interaction-policy engineer.
-The downstream solver agent solves MM-Bench modeling tasks from a planning draft
+The downstream solver agent solves MM-Bench modeling tasks {solver_source}
 and may consult a human expert while it works. You must respond with one JSON
 object only (no markdown fences), matching the schema in §3.
 
 §1 Optimization goals. Evolve one executable human-expert interaction policy for
-a modeling agent that starts from a planning draft and otherwise solves
-autonomously. Treat the policy as the communication contract: it governs only how
-the agent audits the modeling state, asks the human expert, translates the reply
-into a decision, follows up, and stops.
+a modeling agent that {solver_start} and otherwise solves autonomously. Treat the policy as the communication contract: it governs only the
+consultation itself — when the agent asks, what it asks, how many exchanges it
+uses, and what it does with each reply. It governs no other part of the solver's
+work, and a policy that asks the agent to account for, log, or document the
+consultation is not a behavioural improvement.
 
 The evidence JSON holds the single training parent and its rollouts on the current
 training batch, the historical validation champion, and every round already run.
-Each sampled task carries its problem statement, the complete expert dialogue, the
-interaction-attributable report change, and its scores. Judge prose is withheld;
-work from the dialogues, the report changes, and the scores.
+Each sampled task carries its problem statement, the complete expert dialogue, a
+short summary of what the reply changed in the work, and its scores. Judge prose is
+withheld; judge the consultation by the questions the agent asked and the replies
+it received — what was asked, when, how often, and what the agent did with each
+reply — and read the change summaries and scores as the coarse consequences of
+that, not as the thing to optimize.
 
 Use the parent's rollouts to identify communication failures and transferable
 successes, and treat the aggregate net utilities and the decision history as
@@ -635,16 +775,13 @@ are departing from in `evolution_rationale`.
 
 The solver agent keeps all calculation, implementation, external-data validation,
 simulation, debugging, and report writing; the expert supplies high-impact
-strategic judgment only. Every exchange after the first must build on an earlier
-reply and serve a distinct decision-relevant purpose. Keep the policy compact.
+strategic judgment only. Keep the policy compact.
 
 `interaction_policy` is the whole deliverable. It is the only artifact the solver
 agent ever reads and the only one the round is scored on, so every change you
-intend must appear in it. The `actions` graph is internal bookkeeping that never
-reaches the solver: restructuring it, renaming its steps, or adding nodes to it
-changes nothing on its own. Before you answer, re-read the `### Interaction
-Workflow` section of your `interaction_policy` against the parent's and confirm it
-differs. If it does not, the round is discarded and the attempt is wasted.
+intend must appear in it. Before you answer, re-read the steps of your
+`interaction_policy` that govern the consultation against the parent's and confirm
+they differ. If they do not, the round is discarded and the attempt is wasted.
 
 A candidate whose behavioural similarity to a round already evaluated reaches
 {similarity_threshold} is rejected before it runs.
@@ -652,39 +789,33 @@ A candidate whose behavioural similarity to a round already evaluated reaches
 §2 Modification requirements.
 
 - Mutate the parent policy. Only one policy is live; crossover is unavailable.
-- Change only the `### Interaction Workflow` section of `interaction_policy` —
-  its consultation-content and feedback-handling steps. Everything outside that
-  section is fixed: the trigger conditions, the interaction budget, the stop
-  conditions, the computational-efficiency rule, and the closing prohibition on
-  delegating computation must be carried over exactly as the parent states them.
-- Keep those two steps concise: one or two sentences each. A short workflow the
-  solver follows exactly is worth more than a longer one it follows only in part.
-  Do not restate the fixed sections inside the workflow.
+- Change only the consultation's own behaviour: what the agent does before it
+  asks (the question's content and form), how it treats the reply, and whether and
+  how a further exchange is used. Everything else in `interaction_policy` is fixed
+  and must be carried over exactly as the parent states it: the trigger conditions
+  for consulting, the exchange budget, the stop conditions, any efficiency or
+  scope rule, and any prohibition on asking the expert to compute, implement, or
+  execute. Where the parent marks the mutable part with a heading, that heading is
+  the boundary; the policy text itself is the only thing the solver reads.
+- Keep each step the policy states concise: one or two sentences each. A short
+  workflow the solver follows exactly is worth more than a longer one it follows
+  only in part. Do not restate the fixed parts inside the workflow.
 - Make the smallest edit that carries the patch. Add or rewrite only the lines
   your change needs and leave every other line of `interaction_policy` exactly as
   the parent wrote it. Rewording, reordering, and cosmetic deletion are not
   behavioural changes and are rejected as noise.
 - Return the policy in the shape the parent uses: `name`, `purpose`,
-  `interaction_policy`, `maximum_expert_interactions`, `termination_condition`,
-  and `actions`.
-- Design the process as an ordered `actions` list, then render that same graph
-  into `interaction_policy`. That string is the deliverable and the only thing
-  the solver agent receives; it never sees the graph. It must stand alone and
-  match the graph's stage order, budget, and termination rule.
+  `interaction_policy`, `maximum_expert_interactions`, and
+  `termination_condition`. `interaction_policy` is the deliverable and must stand
+  alone: it is the only thing the solver agent ever receives.
 - `interaction_policy` must differ from the parent's and from every policy already
   listed in `evolution_history`. Reproducing either is rejected before the round
-  runs, however much its `actions` graph, `name`, `purpose`, or housekeeping
-  fields differ. Do not spend a retry re-submitting the parent in new wording.
+  runs, whatever else differs. Do not spend a retry re-submitting the parent in
+  new wording.
 - `changed_components` must name only differences the returned
   `interaction_policy` actually carries against the parent's. Guidance the
   parent already states is not a change; describing it as one misreports the
   round and is recorded as such in `evolution_history`.
-- Each action is an object with `action_id` (lowercase, unique inside the
-  workflow, matching `[a-z][a-z0-9_]*`), `action_type` (`agent_audit`,
-  `expert_exchange`, `agent_analysis`, or `close`), and `rule` (at least 20
-  characters). The list holds two to eight actions in execution order and at
-  least one `expert_exchange`.
-- Do not use the fields `transitions`, `completion_output`, or `success_test`.
 """
 
 
@@ -697,21 +828,11 @@ the bookkeeping fields, and make it differ from the parent's text.
   "interaction_policy": "<the complete evolved policy, one Markdown string. It must NOT reproduce the parent's text: a verbatim copy is rejected before the round runs, whatever else differs.>",
   "name": "<concise policy name>",
   "purpose": "<the strategic role of human interaction>",
-  "actions": [
-    {
-      "action_id": "<lowercase, [a-z][a-z0-9_]*>",
-      "action_type": "<agent_audit|expert_exchange|agent_analysis|close>",
-      "rule": "<at least 20 characters>"
-    }
-  ],
   "maximum_expert_interactions": <positive integer>,
   "termination_condition": "<concise textual stopping rule>",
   "evolution_mode": "mutation",
   "changed_components": ["<non-empty list of behavioural changes>"],
-  "evolution_rationale": "<why the changes fit the parent policy's evidence>",
-  "predicted_effect_metric": "<the metric this mutation should move>",
-  "predicted_effect_direction": "<increase|decrease>",
-  "predicted_effect_magnitude": <number on that metric's own scale>
+  "evolution_rationale": "<why the changes fit the parent policy's evidence>"
 }
 """
 
@@ -724,8 +845,8 @@ quantity §1 asks you to raise.
 
 
 EVOLUTION_PROMPT_FOOT = """§5 Final instruction. Emit one JSON object as in §3, with
-`interaction_policy` written first. Compare that policy's `### Interaction
-Workflow` section against the parent's before you emit: if it still reads the
+`interaction_policy` written first. Compare the steps of that policy that govern
+the consultation against the parent's before you emit: if they still read the
 same, the proposal is discarded and the attempt is wasted. No markdown outside
 that JSON."""
 
@@ -780,7 +901,8 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
             EVOLUTION_PROMPT_HEAD.replace(
                 "{similarity_threshold}",
                 f"{workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD:.2f}",
-            ),
+            ).replace("{solver_source}", SOLVER_SOURCE_CONTEXT)
+            .replace("{solver_start}", SOLVER_START_CONTEXT),
             EVOLUTION_OUTPUT_SCHEMA,
             EVOLUTION_EVIDENCE_GUIDE,
             "",
@@ -792,6 +914,112 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
             "",
         ]
     )
+
+
+def _synthesise_actions(interaction_policy: str) -> list[dict]:
+    """Derive the internal action graph from the policy's interaction workflow.
+
+    The workflow this pipeline evolves is the interaction workflow: the steps the
+    solver follows while consulting.  The optimizer authors only the text, so the
+    graph is projected from it here rather than being asked for separately -- one
+    action per step the policy states, which keeps the graph a faithful
+    single-sourced view of the text.
+
+    It also has to be derived this way for the evolution to work at all: the
+    similarity guard compares candidates through this graph, so if every
+    candidate carried one generic action holding the whole policy, two distinct
+    policies would look almost identical and every round after the first would be
+    rejected as a duplicate.
+
+    Falls back to the generic four-stage graph when the policy states no steps of
+    its own; the fixed-section check already rejects a candidate that drops the
+    workflow section, so that path is the seeds' alone.
+    """
+    steps = _interaction_workflow_steps(interaction_policy)
+    if not steps:
+        return [
+            {
+                "action_id": "apply_policy_trigger",
+                "action_type": "agent_step",
+                "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n"
+                + interaction_policy,
+            },
+            {
+                "action_id": "request_strategic_feedback",
+                "action_type": "expert_exchange",
+                "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy.",
+            },
+            {
+                "action_id": "integrate_strategic_feedback",
+                "action_type": "agent_analysis",
+                "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously.",
+            },
+            {
+                "action_id": "close_policy_interaction",
+                "action_type": "close",
+                "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously.",
+            },
+        ]
+    actions = []
+    exchange_assigned = False
+    for index, (title, body) in enumerate(steps, start=1):
+        text = re.sub(
+            r"\s+", " ", (title.rstrip(":").strip() + ". " + body).strip()
+        ).strip(" .")
+        label = re.sub(r"(?i)^step\s*\d+\s*:?\s*", "", title).strip()
+        consults = bool(re.search(r"(?i)\b(ask|query|request|consult|expert|reply)\b", text))
+        if index == 1:
+            action_type = "agent_step"
+        elif consults and not exchange_assigned:
+            action_type = "expert_exchange"
+            exchange_assigned = True
+        elif index == len(steps) and re.search(
+            r"(?i)\b(stop|terminat|close|end|limit)\b", label
+        ):
+            action_type = "close"
+        else:
+            action_type = "agent_analysis"
+        actions.append(
+            {
+                "action_id": f"step_{index}_{_slug(label) or action_type}",
+                "action_type": action_type,
+                "rule": text[:2000],
+            }
+        )
+    if not exchange_assigned:
+        # The graph is bookkeeping, but one exchange has to be represented.
+        actions[min(1, len(actions) - 1)]["action_type"] = "expert_exchange"
+    return actions
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")[:40]
+
+
+def _interaction_workflow_steps(interaction_policy: str) -> list[tuple[str, str]]:
+    """Split the policy's interaction-workflow section into (title, body) steps.
+
+    The split itself lives in the shared engine, which also uses it to compare
+    two policies by the steps they state; this wrapper keeps the titles here,
+    because an action's id is built from its step's title.
+    """
+    section = workflow._workflow_section(interaction_policy)
+    if section is None:
+        return []
+    body, _, level = section
+    levels = [len(match) for match in re.findall(rf"(?m)^(#{{{level + 1},}}) ", body)]
+    blocks: list[tuple[str, str]] = []
+    if levels:
+        step_level = min(levels)
+        parts = re.split(rf"(?m)^#{{{step_level}}} (.+)$", body)
+        for title, chunk in zip(parts[1::2], parts[2::2]):
+            blocks.append((title.strip(), chunk.strip()))
+    else:
+        for item in re.split(r"(?m)^\s*(?=\d+\.\s)", body)[1:]:
+            text = re.sub(r"^\s*\d+\.\s*", "", item).strip()
+            title = text.splitlines()[0].strip(" *").rstrip(":") if text else ""
+            blocks.append((title, text))
+    return [(title, body) for title, body in blocks if body]
 
 
 def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
@@ -816,29 +1044,7 @@ def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
         workflow_value["stop_condition"] = str(termination).strip()
     actions = workflow_value.get("actions")
     if not actions and interaction_policy:
-        workflow_value["actions"] = [
-            {
-                "action_id": "apply_policy_trigger",
-                "action_type": "agent_audit",
-                "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n"
-                + interaction_policy,
-            },
-            {
-                "action_id": "request_strategic_feedback",
-                "action_type": "expert_exchange",
-                "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy.",
-            },
-            {
-                "action_id": "integrate_strategic_feedback",
-                "action_type": "agent_analysis",
-                "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously.",
-            },
-            {
-                "action_id": "close_policy_interaction",
-                "action_type": "close",
-                "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously.",
-            },
-        ]
+        workflow_value["actions"] = _synthesise_actions(interaction_policy)
         actions = workflow_value["actions"]
     actions = workflow_value.get("actions")
     if not workflow_value.get("entry_action") and isinstance(actions, list) and actions:
@@ -855,9 +1061,7 @@ def validate_workflow_with_inferred_start(workflow_value: dict) -> None:
 MMBENCH_SOLUTION_FILE_SECTION = """\
 ## MM-Bench Solution File
 
-When the task is an MM-Bench problem, the Markdown report is not the complete
-submission. Also write the machine-readable solution container that MM-Bench
-Judge reads:
+This machine-readable container is the submission that MM-Bench Judge reads:
 
 `{{RESULTS_DIR}}/solution.json`
 
@@ -867,65 +1071,97 @@ It must be valid UTF-8 JSON with exactly this shape:
 {
   "tasks": [
     {
-      "task_description": "...",
-      "task_analysis": "...",
-      "preliminary_formulas": "...",
-      "mathematical_modeling_process": "...",
-      "task_code": "...",
-      "is_pass": true,
-      "execution_result": "...",
-      "solution_interpretation": "...",
-      "subtask_outcome_analysis": "..."
+      "task_description": "该子任务要解决的问题、目标和范围",
+      "task_analysis": "该子任务的假设、建模思路、方法选择及合理性",
+      "mathematical_modeling_process": "具体数学模型、公式、变量、约束和求解过程",
+      "subtask_outcome_analysis": "计算结果、结果解释、模型局限和偏差分析"
     }
   ]
 }
 ```
-
-### Subtask Granularity
-
-Write one element in `tasks` for each subproblem the problem statement asks
-about, in the original order. Do not merge several subproblems into one element,
-and do not split one subproblem across elements. A special deliverable the
-problem requires (memo, position paper, schedule, recommendation) belongs to the
-subtask that asks for it, not to an element of its own.
-
-### Field Content
-
-| Field | Content |
-| --- | --- |
-| `task_description` | What this subtask must deliver and how it fits the overall problem decomposition. |
-| `task_analysis` | Modeling analysis of this subtask: objective, assumptions and their justification, chosen method, alternatives considered, technical risks. |
-| `preliminary_formulas` | Notation, variables and parameters with units, and the core mathematical relations, written in LaTeX. |
-| `mathematical_modeling_process` | The complete modeling and solution process for this subtask: model construction, parameter estimation, algorithm and implementation steps. |
-| `task_code` | The code actually executed for this subtask, or an empty string when the subtask needs no computation. |
-| `is_pass` | `true` only when that computation ran successfully and its outputs passed basic checks; otherwise `false`. |
-| `execution_result` | The key numerical outputs produced by the executed computation. |
-| `solution_interpretation` | How the results are read and the direct answer to this subtask. |
-| `subtask_outcome_analysis` | Conclusions, interpretation limits, and the data, model, and computational bias analysis for this subtask. |
-
-Every field is a plain string, and LaTeX is allowed inside strings. Escape
-newlines, quotes, and backslashes so the file parses as strict JSON. Do not wrap
-the file in a Markdown code fence, and do not embed images, charts, base64
-payloads, or data URLs. The solution file must state the same models, numbers,
-and conclusions as the report.
-
-### Writing this file ends the task
-
-As soon as this file exists and parses, stop: issue no further tool calls and end
-the turn. The MM-Bench evaluation reads it automatically once the run ends, so
-nothing done after this point can change the score, and any further command only
-delays the result. If you still have verification to do, do it before writing
-this file, not after it.
-
 """
 
 
-def build_interactive_solver_prompt(workflow_value: dict) -> str:
-    """Build the Planner-to-Solver prompt with a workflow insertion point."""
+def build_interactive_solver_prompt(
+    workflow_value: dict,
+    include_interaction: bool = True,
+    include_draft: bool = True,
+    interaction_note: str = "",
+) -> str:
+    """Build the Planner-to-Solver prompt with a workflow insertion point.
+
+    ``include_interaction=False`` returns the same prompt with the
+    ``# Human Expert Interaction`` section removed, which is what the
+    no-interaction baseline runs on: everything else, including the submission
+    contract and the pre-gathered data step, stays identical so the two arms
+    differ by that one section.
+
+    ``include_draft=False`` is the draft-free arm's prompt: the same task, the
+    same submission contract and the same pre-gathered evidence, but the solver
+    is told it starts from the problem statement alone and owns the modeling
+    plan.  Every ``draft.md`` reference in the head and the closing step is
+    replaced rather than left dangling.
+
+    ``interaction_note`` appends one extra paragraph to the interaction section.
+    """
     mmbench_section = (
         MMBENCH_SOLUTION_FILE_SECTION if _benchmark == "mmbench" else ""
     )
-    template = f"""# ModelingBench Task — Interactive Modeling Solver Agent
+    # How much latitude the solver has over the draft it was handed.  Without a
+    # consultation there is nothing that could justify a deviation, so the
+    # baseline is told to carry the plan out as written; the interactive arm may
+    # depart from it only on the strength of the expert's reply or of knowledge
+    # it has established itself.
+    draft_stance = (
+        "Follow it as written unless the expert's reply, or knowledge you have "
+        "established from the problem statement and the supplied evidence, "
+        "justifies changing it. Modify assumptions, model choices, "
+        "implementation strategy, and validation methods only then, and record "
+        "what justified each change."
+        if include_interaction
+        else
+        "Follow it as written. Carry out that plan without changing its "
+        "assumptions, model choices, implementation strategy, or validation "
+        "methods."
+    )
+    # The evidence file only has content to hold when there is a consultation.
+    # Leaving its two mentions in place made the no-interaction arm plan a task
+    # ("Record expert interaction") that can never happen.
+    interaction_evidence_entry = (
+        "\nInteraction evidence: `{{RESULTS_DIR}}/interaction_evidence.md`\n"
+        if include_interaction
+        else ""
+    )
+    interaction_evidence_note = (
+        "\nRecord the expert question, expert reply, and how the reply affected "
+        "the work in\n`{{RESULTS_DIR}}/interaction_evidence.md`. Keep this "
+        "evidence separate from the submission.\n"
+        if include_interaction
+        else ""
+    )
+    # Test-only: guard rules against the runaway tool calls observed in this
+    # experiment (a whole-filesystem `find` that burned 30 minutes, and a
+    # nested resampling loop in the solver's own analysis script that ran into
+    # the 30-minute Bash ceiling).  Appended only when the flag is set, so
+    # production prompts are byte-identical.
+    runaway_guard = (
+        """
+# Search Scope and Long Commands
+
+Search and read only inside the four workspace directories above. Never scan
+from `/`, `/tmp`, or the repository root: a whole-disk `find` has cost half an
+hour here and found nothing.
+
+Do not nest computation loops. If a calculation needs two levels of repetition,
+restructure it so the inner level is a vectorized array operation, or flatten it
+into a single loop.
+
+"""
+        if os.environ.get("INTERACTION_RUNAWAY_GUARD") == "1"
+        else ""
+    )
+    if include_draft:
+        intro = """# ModelingBench Task — Interactive Modeling Solver Agent
 
 You are an advanced mathematical modeling solver agent.
 
@@ -941,8 +1177,33 @@ Your role is to:
 1. Review the draft.
 2. Refine the modeling strategy with human expert feedback.
 3. Execute the modeling workflow.
-4. Produce the final solution report.
+4. Produce the machine-readable solution container.
+"""
+        planning_draft_section = f"""## Planning Draft
 
+A preliminary modeling blueprint is available at:
+
+`{DRAFT_PATH_PLACEHOLDER}`
+
+Read and analyze this file before starting. It provides planned assumptions,
+candidate models, a data strategy, and validation ideas. {draft_stance}
+
+---
+
+"""
+        first_step = ""
+    else:
+        intro = """# ModelingBench Task — Interactive Modeling Solver Agent
+
+You are an advanced mathematical modeling solver agent.
+
+Your task is to solve the given modeling problem, consulting a human expert only
+where the interaction policy below requires it.
+
+"""
+        planning_draft_section = ""
+        first_step = ""
+    template = f"""{intro}
 ---
 
 # Inputs
@@ -961,33 +1222,7 @@ Problem Statement:
 
 ---
 
-## Planning Draft
-
-A preliminary modeling blueprint is available at:
-
-`{DRAFT_PATH_PLACEHOLDER}`
-
-Read and analyze this file before starting. It provides planned assumptions,
-candidate models, a data strategy, and validation ideas. Treat it as a starting
-hypothesis. You may modify assumptions, model choices, implementation strategy,
-and validation methods when improvements are justified.
-
----
-
-# Source Restrictions
-
-Do not search for, retrieve, consult, quote, imitate, or use an existing answer,
-worked solution, contest paper, answer key, or prior report for this exact
-problem. Do not search by the problem ID, title, distinctive problem wording, or
-competition/year metadata to locate such material. If exact-problem solution
-material is encountered incidentally, ignore it and do not use it.
-
-Do not perform external searches. The independent, authoritative empirical facts
-needed for model parameters or validation were gathered while the plan draft was
-written, and are provided in `{{{{DATA_DIR}}}}/external_data.md` together with
-their sources. Use those. They are general domain references, not solutions to
-this task. Derive the model, calculations, code, results, and conclusions
-independently from the problem statement and draft.md.
+{planning_draft_section}
 
 ---
 
@@ -1005,7 +1240,7 @@ independently from the problem statement and draft.md.
    affects the model or validation, and record its sources and intended use. Do
    not search the web for further data.
 5. Write and execute reproducible code when needed.
-6. Validate and analyze the results, then answer every subproblem.
+6. Analyze the results, then answer every subproblem.
 7. Produce the machine-readable submission at the required path.
 
 These seven steps are the whole task. Do every check you intend to do as part of
@@ -1019,13 +1254,12 @@ begin another verification, revision, or recomputation pass afterwards.
 The submission for this task is the machine-readable solution container
 described below. That container is what the judge reads and the only deliverable
 whose completeness is checked, so every part of the analysis it asks for --
-assumptions, model, formulation, code, results, validation, limitations and
-conclusions -- belongs in its fields.
+assumptions, modeling approach, formulas, results, interpretation, limitations
+and conclusions -- belongs in the four fields of each task.
 
 Do not also write a separate Markdown report. It would restate the same work,
 is never scored, and costs a substantial amount of time on a long problem; put
-that effort into the container instead. A report file is rendered from the
-container after the run, so nothing has to be written twice.
+that effort into the container instead.
 
 Do not generate or include images.
 
@@ -1038,9 +1272,7 @@ Do not generate or include images.
 Workspace: `{{{{OUTPUT_DIR}}}}`
 
 Submission: `{{{{RESULTS_DIR}}}}/solution.json`
-
-Interaction evidence: `{{{{RESULTS_DIR}}}}/interaction_evidence.md`
-
+{interaction_evidence_entry}
 Code: `{{{{CODE_DIR}}}}`
 
 Results: `{{{{RESULTS_DIR}}}}`
@@ -1049,10 +1281,11 @@ Data: `{{{{DATA_DIR}}}}`
 
 Logs: `{{{{LOGS_DIR}}}}`
 
-Create directories when needed.
-
-Record the expert question, expert reply, and how the reply affected the work in
-`interaction_evidence.md`. Keep this evidence separate from the submission.
+Create directories when needed. Those four directories already exist and are the
+only entries allowed in the workspace root: put everything you produce inside
+them. Do not create any other file or directory at the workspace root — a stray
+entry there fails the run outright, whatever the rest of the work looks like.
+{interaction_evidence_note}
 
 # Python Environment
 
@@ -1060,37 +1293,82 @@ Run all Python work with the `math_modeling` conda environment:
 `/public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python`. The plain
 `python` on PATH is a different interpreter; always use that path.
 
-Start by reading draft.md and reviewing the proposed modeling plan.
+{runaway_guard}{first_step}
 """
+    if not include_draft and DRAFT_PATH_PLACEHOLDER in template:
+        raise RuntimeError(
+            "Draft-free Solver prompt still references the planning-draft path"
+        )
+    if not include_interaction:
+        # Drop the section along with the separator pair that framed it, so the
+        # no-interaction prompt differs from the interactive one by exactly this
+        # block and nothing else.
+        framed = f"---\n\n{INTERACTION_WORKFLOW_PLACEHOLDER}\n\n---\n"
+        if template.count(framed) != 1:
+            raise RuntimeError(
+                "Interactive Solver prompt has an unexpected interaction frame"
+            )
+        template = template.replace(framed, "---\n", 1)
+        if INTERACTION_WORKFLOW_PLACEHOLDER in template:
+            raise RuntimeError(
+                "Interactive Solver prompt still references the workflow placeholder"
+            )
+        return template
     if template.count(INTERACTION_WORKFLOW_PLACEHOLDER) != 1:
         raise RuntimeError("Interactive Solver prompt has an invalid workflow placeholder")
     return template.replace(
-        INTERACTION_WORKFLOW_PLACEHOLDER, interaction_workflow_block(workflow_value), 1
+        INTERACTION_WORKFLOW_PLACEHOLDER,
+        interaction_workflow_block(workflow_value, note=interaction_note),
+        1,
     )
 
 
 def fixed_initial_workflow() -> dict:
     """Return the one frozen interaction policy used by the whole run.
 
-    The policy text is shared with the workflow-test runner, so the initial
-    strategy here is byte-identical to the one that runner pins per task.
+    This is the Claude Code arm's own seed (``STRATEGIC_DECISION_CONSULTATION``),
+    not the text the OpenHands arm and the workflow-test runner pin: the two
+    arms therefore start from different strengths of the same rule.  Everything
+    downstream -- the gates, the utility, the evolution prompt -- is unchanged.
     """
     selected = {
-        "name": "Modeling strategy escalation policy",
+        "name": "Strategic decision consultation policy",
         "purpose": (
-            "Put one high-impact modeling-strategy uncertainty to the expert on "
-            "every task, and resolve further ones with the expert only when "
-            "autonomous analysis cannot produce a clear decision."
+            "Solve the task autonomously by default and consult the expert only "
+            "for a high-impact strategic decision -- an ambiguous objective, "
+            "fundamentally different modeling approaches, a critical assumption, "
+            "or a framework choice with major downstream impact."
         ),
-        "policy_text": MODELING_STRATEGY_ESCALATION,
+        "policy_text": STRATEGIC_DECISION_CONSULTATION,
         "max_exchanges": 3,
         "stop_condition": (
-            "Never stop before one expert reply has been received; after that, "
-            "stop without further consultation unless every trigger condition "
-            "holds, otherwise stop after three expert replies and continue "
-            "autonomously."
+            "Never end the run with zero expert replies: if no uncertainty "
+            "qualifies, consult once on the most consequential open modeling "
+            "decision. After the first reply, stop consulting once the strategic "
+            "uncertainty is resolved, the modeling direction is determined, and "
+            "the remaining decisions can be handled autonomously; never exceed "
+            "three expert replies."
         ),
     }
+    # Test-only: replay an already-evolved policy in an isolated experiment, so
+    # one policy/problem combination can be re-run without replaying the whole
+    # evolution.  Unset in every production run.
+    override = os.environ.get("INTERACTION_INITIAL_WORKFLOW_JSON")
+    if override:
+        saved = json.loads(Path(override).read_text())
+        if isinstance(saved, list):
+            saved = saved[0]
+        selected = {
+            key: saved[key]
+            for key in (
+                "name",
+                "purpose",
+                "policy_text",
+                "max_exchanges",
+                "stop_condition",
+        )
+            if key in saved
+        }
     validate_workflow_with_inferred_start(selected)
     selected["workflow_id"] = workflow.workflow_id(selected)
     return selected
@@ -1121,12 +1399,6 @@ def prepare_from_planning_draft(
         args,
     )
     output_dir = Path(prepared["output_dir"])
-    # The machine-readable container is the deliverable, as it is for the
-    # OpenHands backend.  ``final_report`` is what the phase waits on, so
-    # pointing it at solution.json makes that file -- not the Markdown report --
-    # the artifact whose presence ends the solver run.  The report is rendered
-    # from the container afterwards, before the engine's own checks read it.
-    prepared["final_report"] = output_dir / "results" / "solution.json"
     # The shared evaluator resolves this source into args.baseline_reports before
     # calling this preparation hook; the legacy field name is retained for API
     # compatibility only.
@@ -1278,82 +1550,11 @@ def ensure_planning_interaction_evidence(output_dir: Path) -> Path:
     return evidence_path
 
 
-def render_report_from_submission(prepared: dict) -> Path | None:
-    """Render the Markdown report the harness insists on, from the container.
-
-    The solver is told the machine-readable container is the submission and that
-    a Markdown report would only restate it.  The engine's own gates still treat
-    ``results/solution_report.md`` as the run's report, so it is rendered here
-    from the container's fields: the two cannot disagree, and the agent is never
-    asked to produce the same content twice.
-
-    The target is written out in full rather than taken from ``final_report``,
-    which this launcher points at the container so the phase waits on it.
-    """
-    output_dir = Path(prepared["output_dir"])
-    submission = output_dir / "results" / "solution.json"
-    report = output_dir / "results" / "solution_report.md"
-    if not submission.is_file():
-        return None
-    try:
-        container = workflow.workflow_evolution.read_json(submission, {})
-    except (OSError, ValueError):
-        return None
-    tasks = container.get("tasks")
-    if not isinstance(tasks, list) or not tasks:
-        return None
-    # Field order mirrors the container's own schema, so the rendered report
-    # reads in the order the subtasks were answered.
-    sections = (
-        ("task_description", "Problem"),
-        ("task_analysis", "Analysis"),
-        ("preliminary_formulas", "Preliminary Formulas"),
-        ("mathematical_modeling_process", "Modeling Process"),
-        ("task_code", "Code"),
-        ("execution_result", "Execution Result"),
-        ("solution_interpretation", "Interpretation"),
-        ("subtask_outcome_analysis", "Outcome Analysis"),
-    )
-    lines = ["# Solution", ""]
-    for index, task in enumerate(tasks, start=1):
-        if not isinstance(task, dict):
-            continue
-        title = str(task.get("task_description", "")).strip().splitlines()
-        heading = title[0][:120] if title else f"Subtask {index}"
-        lines.extend([f"## Subtask {index}: {heading}", ""])
-        for key, label in sections:
-            value = str(task.get(key, "")).strip()
-            if not value:
-                continue
-            lines.extend([f"### {label}", "", value, ""])
-    lines.extend(
-        [
-            "---",
-            "",
-            f"_Rendered by the launcher from `{submission.name}`; the JSON "
-            "container is the submission of record._",
-            "",
-        ]
-    )
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text("\n".join(lines), encoding="utf-8")
-    print(
-        f"Rendered {report.name} from {submission.name} "
-        f"({len(tasks)} subtask(s)); the solver wrote no report.",
-        flush=True,
-    )
-    return report
-
-
 def run_planning_draft_solution_check(prepared: dict) -> Path:
     """Validate the planning draft and final Solver artifacts directly."""
     output_dir = Path(prepared["output_dir"])
     results_dir = output_dir / "results"
     checks = []
-    # The container is the submission; the report the checks below read is
-    # derived from it here, so a run whose container is missing or unusable
-    # fails on the missing report rather than silently reporting success.
-    render_report_from_submission(prepared)
 
     def require_text(relative: str) -> str:
         path = output_dir / relative
@@ -1479,6 +1680,7 @@ def execute_cpe_evaluation_with_phase_concurrency(
 def parse_args_with_pool_defaults():
     args = _original_parse_args()
 
+
     def supplied(option: str) -> bool:
         return any(value == option or value.startswith(option + "=") for value in sys.argv[1:])
 
@@ -1508,6 +1710,35 @@ def parse_args_with_pool_defaults():
         args.retry_concurrency = phase_concurrency
     if not supplied("--judge-concurrency"):
         args.judge_concurrency = phase_concurrency
+    # Every role runs against the locally served model.  The shared parser's
+    # defaults name DeepSeek models and carry no credentials, so leaving them
+    # alone would send the optimizer, the expert and the MM-Bench judge to
+    # api.deepseek.com.  The judge reads the optimizer's credentials when it has
+    # none of its own, so --opt-base-url/--opt-api-key cover both.
+    for option, attribute, value in (
+        ("--model", "model", LOCAL_MODEL),
+        ("--opt-model", "opt_model", LOCAL_MODEL),
+        ("--opt-base-url", "opt_base_url", LOCAL_BASE_URL),
+        ("--opt-api-key", "opt_api_key", LOCAL_API_KEY),
+        ("--expert-model", "expert_model", LOCAL_MODEL),
+        ("--expert-base-url", "expert_base_url", LOCAL_BASE_URL),
+        ("--expert-api-key", "expert_api_key", LOCAL_API_KEY),
+        ("--judge-feedback-model", "judge_feedback_model", LOCAL_MODEL),
+    ):
+        if not supplied(option):
+            setattr(args, attribute, value)
+    # Surfaced in the run's config.json so the recorded configuration names the
+    # endpoint that actually served each solver run.
+    for attribute, value in claude_backend.default_settings().items():
+        setattr(args, attribute, value)
+    # Claude Code keeps no agent registry, so the framework's registration and
+    # cleanup calls are answered by the stub rather than a real OpenClaw install.
+    if not supplied("--openclaw-command"):
+        args.openclaw_command = str(claude_backend.REGISTRY_STUB)
+    # See LOCAL_FIXED_RUBRIC: the engine's default names a rubric this
+    # repository does not contain.
+    if not supplied("--fixed-rubric"):
+        args.fixed_rubric = str(LOCAL_FIXED_RUBRIC)
     return args
 
 
@@ -1610,7 +1841,26 @@ def configure_problem_pools(sources: argparse.Namespace) -> None:
         # problems and resolving their drafts here fails fast, before any agent
         # starts, if a draft is missing.
         TRAIN_PROBLEMS = list(MMBENCH_TRAIN_PROBLEMS)
-        VALIDATION_PROBLEMS = list(MMBENCH_VALIDATION_PROBLEMS)
+        # Narrow the training pool to the named tasks (comma-separated).  Used to
+        # keep only the single-model tasks, whose plans carry no sub-model blocks
+        # and therefore cost far less per CPE round.  The split file is untouched;
+        # unset in every run that should use the full publication-year pool.
+        light = [
+            value.strip()
+            for value in os.environ.get("MMBENCH_TRAIN_POOL", "").split(",")
+            if value.strip()
+        ]
+        if light:
+            TRAIN_PROBLEMS = light
+        # Test-only: pin the validation pool to the named tasks so a single
+        # policy/problem combination can be replayed on its own.  Unset in every
+        # production run, where the pool is the fixed publication-year split.
+        pinned = [
+            value.strip()
+            for value in os.environ.get("MMBENCH_PIN_VALIDATION", "").split(",")
+            if value.strip()
+        ]
+        VALIDATION_PROBLEMS = pinned or list(MMBENCH_VALIDATION_PROBLEMS)
         _draft_train_root = _draft_validation_root = None
         roots = [
             path.resolve()
@@ -1665,44 +1915,13 @@ def configure_problem_pools(sources: argparse.Namespace) -> None:
     )
 
 
-def disable_thinking_for_direct_api_calls() -> None:
-    """Make the launcher's direct provider calls usable with the local model.
-
-    The shared code turns provider thinking off only when the base URL contains
-    "deepseek.com" -- the provider the original experiments ran against.  The
-    locally served model also defaults to thinking, and all three direct callers
-    here (the human expert, the optimizer, and the MM-Bench judge) want short,
-    immediately usable output.  With thinking on, the reasoning consumes the
-    small max_tokens budget and the response body comes back empty, which the
-    callers report as a failed API call rather than as an empty answer: the
-    expert bridge dies with "expert API response contains no text" and the task
-    fails its interaction gate.
-
-    The three call sites each construct their own openai.OpenAI client, so the
-    injection goes on the SDK's shared completions resource.  Calls that already
-    pass extra_body -- the DeepSeek branch -- are left untouched.
-    """
-    from openai.resources.chat.completions import Completions
-
-    if getattr(Completions.create, "_disables_provider_thinking", False):
-        return
-    original_create = Completions.create
-
-    def create(self, *args, **kwargs):
-        if not kwargs.get("extra_body"):
-            kwargs["extra_body"] = {
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
-        return original_create(self, *args, **kwargs)
-
-    create._disables_provider_thinking = True
-    Completions.create = create
-
-
 def main() -> None:
-    global _initialize_only
+    global _initialize_only, _round0_only
     sources = parse_planning_draft_sources()
     _initialize_only = "--initialize-only" in sys.argv[1:]
+    # Read from the extension namespace: parse_planning_draft_sources has
+    # already stripped --round0-only out of sys.argv by this point.
+    _round0_only = bool(sources.round0_only)
     _mmbench_judge.update(
         {
             "model": sources.mmbench_judge_model,
@@ -1754,6 +1973,18 @@ def main() -> None:
     workflow.substantive.run_consolidated_refinement_check = (
         run_planning_draft_solution_check
     )
+    # Claude Code backend.  The engine binds interaction.run_local_modeling_phase
+    # from this name while workflow.main() starts up (workflow_evolution.py:3704),
+    # so the patch has to land on the source name -- patching interaction.* here
+    # would be overwritten before any agent runs.
+    workflow.substantive.run_substantive_modeling_phase = (
+        claude_backend.run_claude_modeling_phase
+    )
+    # The engine calls this by bare name on its last line, so patching the module
+    # attribute is enough to keep a matplotlib-free run from failing at the end.
+    workflow.plot_round_average_dimension_scores = skip_round_dimension_plot
+    # Without this the expert, optimizer and judge calls all come back empty.
+    disable_thinking_for_direct_api_calls()
     workflow.substantive.runtime_args = runtime_args_with_immediate_agent_start
     workflow.build_workflow_refinement_prompt = build_interactive_solver_prompt
     workflow.build_cpe_workflow_evolution_prompt = (
@@ -1773,15 +2004,13 @@ def main() -> None:
         run_initial_draft_parent_evaluations
     )
     workflow.experiment_path = experiment_path
-    # The expert bridge, the optimizer and the MM-Bench judge call the provider
-    # directly rather than through OpenClaw, so they need the same treatment the
-    # OpenHands launcher applies: without it every expert exchange comes back
-    # empty and the run fails its interaction gate.
-    disable_thinking_for_direct_api_calls()
     isolated_config = previous_config = None
     try:
-        if not _initialize_only:
-            isolated_config, previous_config = clean.activate_subagent_enabled_openclaw_config()
+        # The OpenClaw launcher rewrites a private copy of ~/.openclaw/openclaw.json
+        # here to enable sub-agent tools.  Claude Code reads no such config and the
+        # file does not exist on this cluster, so the step is skipped entirely.
+        # Teardown is guarded by `isolated_config is not None`, so leaving both
+        # names as None above keeps it a no-op.
         workflow.main(cpe_mode=True, compact_experiment_inputs=True, dialogue_operator_evolution=False)
     finally:
         workflow.load_cpe_split = _original_load_cpe_split
@@ -1812,6 +2041,7 @@ def main() -> None:
         workflow.initial_strategy_population = _original_initial_population
         workflow.validate_workflow = _original_validate_workflow
         workflow.execute_cpe_evaluation = _original_execute_cpe_evaluation
+        workflow.plot_round_average_dimension_scores = _original_plot_round_dimension
         workflow.CPE_UTILITY_BASIS = _original_utility_basis
         workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = _original_cost_weight
         workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT = _original_latency_cost_weight

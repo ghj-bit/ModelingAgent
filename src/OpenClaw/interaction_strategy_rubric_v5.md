@@ -1,0 +1,13 @@
+Interaction Strategy: Single-Exchange Consultation
+
+[20] Decision-targeted opening, asked before the work: The consultation isolates exactly one open decision that governs the modeling framework — an assumption, a decision criterion, a scope boundary, or a headline claim — and is put to the expert before the work it governs is done. Deduct when it bundles several decisions, when it targets implementation, parameters, data handling, or validation mechanics, or when it arrives after the affected work is already complete.
+
+[20] Options, not steering: The question puts candidates to the expert offering at least two alternatives a competent expert could actually choose between, each with its own tradeoff, and neither states nor implies which one the agent prefers. Deduct when only one real option is offered and the rest are strawmen, when tradeoffs are missing, or when the wording signals a preferred answer and asks the expert to endorse it.
+
+[25] One exchange, answerable in one pass: The consultation is a single exchange, and that exchange carries everything a competent expert needs to answer it without asking for context or doing the modeling: the problem framing, the one decision point, and the candidate options with their tradeoffs. Deduct when the question leaves the decision under-specified, when it asks the expert to compute, fetch data, or write code, or when it would need a follow-up to be usable at all.
+
+[20] Every reply moves or sharpens the decision: The reply changes or sharpens something the work then depends on — rather than leaving the work it was asked about as it stood — and the run acts on what the reply established. Deduct when a reply only ratifies the existing default or the agent's own stated preference, however well argued, and when what it established is left unused.
+
+[15] What the reply opens is settled inside the run: The expert's part ends with the reply, so anything the reply introduces — a new constraint, a variant, a failure mode — must be resolved by the agent itself and carried into the modeling work, rather than left unaddressed or sent back as another question. Deduct when a question the reply plainly opened is never taken up, when the agent asks the expert to settle something it could have decided from the reply and the supplied evidence, and when what the reply opened is recorded but not acted on.
+
+Scores are summed and normalized by this rubric's theoretical maximum (100): normalized = total / 100. Score only the dialogue — the policy text, the question, the reply, and the work they produced. Do not score what the run wrote about the exchange; a record of good practice is not good practice.

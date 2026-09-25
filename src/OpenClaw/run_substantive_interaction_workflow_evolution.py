@@ -18,12 +18,14 @@ from typing import Any
 
 try:
     from . import baseline
+    from . import interaction_workflow_excel
     from . import run_evolution as workflow_evolution
     from . import run_interaction_rubric_evolution as interaction
     from . import run_judge_stability
     from . import run_substantive_interaction_experiment as substantive
 except ImportError:
     import baseline
+    import interaction_workflow_excel
     import run_evolution as workflow_evolution
     import run_interaction_rubric_evolution as interaction
     import run_judge_stability
@@ -493,13 +495,29 @@ def normalize_text(value: Any) -> str:
 
 
 def workflow_behavior(workflow: dict[str, Any]) -> dict[str, Any]:
-    """Return behavior only, excluding labels and evolution prose."""
+    """Return behavior only, excluding labels and evolution prose.
+
+    The behavior leads with the interaction workflow itself -- the steps the
+    policy states, read from its text -- because that is what the solver reads
+    and what this experiment evolves.  The action graph is carried along when a
+    workflow has one: some arms still render it into their prompt, and it is
+    internal bookkeeping everywhere else.  Similarity is judged on the steps, so
+    the graph cannot make two different interaction workflows look alike.
+    """
+    behavior: dict[str, Any] = {
+        "steps": interaction_workflow_steps(str(workflow.get("policy_text") or "")),
+        "max_exchanges": workflow.get("max_exchanges"),
+        "stop_condition": normalize_text(workflow.get("stop_condition")),
+    }
     actions = workflow.get("actions") or []
-    action_ids = [str(item.get("action_id", "")) for item in actions]
-    id_map = {value: f"action_{index}" for index, value in enumerate(action_ids, 1)}
-    normalized_actions = []
-    for action in actions:
-        normalized_actions.append(
+    if actions:
+        action_ids = [str(item.get("action_id", "")) for item in actions]
+        id_map = {value: f"action_{index}" for index, value in enumerate(action_ids, 1)}
+        behavior["entry_action"] = id_map.get(
+            str(workflow.get("entry_action", "")),
+            str(workflow.get("entry_action", "")),
+        )
+        behavior["actions"] = [
             {
                 "action_id": id_map.get(
                     str(action.get("action_id", "")),
@@ -512,16 +530,9 @@ def workflow_behavior(workflow: dict[str, Any]) -> dict[str, Any]:
                 "output_fields": action.get("output_fields"),
                 "budget": action.get("budget"),
             }
-        )
-    return {
-        "entry_action": id_map.get(
-            str(workflow.get("entry_action", "")),
-            str(workflow.get("entry_action", "")),
-        ),
-        "actions": normalized_actions,
-        "max_exchanges": workflow.get("max_exchanges"),
-        "stop_condition": normalize_text(workflow.get("stop_condition")),
-    }
+            for action in actions
+        ]
+    return behavior
 
 
 def without_removed_workflow_fields(workflow: dict[str, Any]) -> dict[str, Any]:
@@ -551,12 +562,23 @@ def workflow_id(workflow: dict[str, Any]) -> str:
 
 
 def workflow_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
-    left_text = json.dumps(
-        workflow_behavior(left), ensure_ascii=False, sort_keys=True
-    )
-    right_text = json.dumps(
-        workflow_behavior(right), ensure_ascii=False, sort_keys=True
-    )
+    """How much of one interaction workflow the other already contains.
+
+    Compared step by step rather than character by character: a mutation rewrites
+    one step of a long policy, which is a large change in behaviour but a tiny
+    change in characters, and a character ratio would report every such candidate
+    as a duplicate of its parent.  With steps, ``1.0`` means the same steps in the
+    same words and ``0.0`` means no step in common.
+    """
+    left_behavior = workflow_behavior(left)
+    right_behavior = workflow_behavior(right)
+    left_steps = left_behavior.get("steps") or []
+    right_steps = right_behavior.get("steps") or []
+    if left_steps and right_steps:
+        unchanged = sum(1 for step in left_steps if step in right_steps)
+        return unchanged / max(len(left_steps), len(right_steps))
+    left_text = json.dumps(left_behavior, ensure_ascii=False, sort_keys=True)
+    right_text = json.dumps(right_behavior, ensure_ascii=False, sort_keys=True)
     return difflib.SequenceMatcher(None, left_text, right_text).ratio()
 
 
@@ -565,22 +587,66 @@ def workflow_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
 # closing prohibition on delegating computation — is what the experiment holds
 # fixed, so a round that rewrites it changes the starting point instead of
 # improving a policy and makes the rounds incomparable.
-INTERACTION_WORKFLOW_HEADING = "### Interaction Workflow"
+#
+# Seeds differ in how they head that section (the escalation seed uses a level
+# three heading, the consultation seed a level one), so the level is read off the
+# policy instead of being assumed: the boundary is the next heading of the same or
+# a higher level, which keeps the workflow's own deeper steps inside it.
+INTERACTION_WORKFLOW_HEADING = "Interaction Workflow"
+_WORKFLOW_HEADING_PATTERN = re.compile(
+    rf"(?m)^(#{{1,3}}) {re.escape(INTERACTION_WORKFLOW_HEADING)}\s*$"
+)
+
+
+def _workflow_section(text: str) -> tuple[str, int, int] | None:
+    """Return (section text, its start, its heading level) for the workflow part."""
+    heading = _WORKFLOW_HEADING_PATTERN.search(text)
+    if heading is None:
+        return None
+    level = len(heading.group(1))
+    body_start = heading.end()
+    closing = re.search(rf"\n#{{1,{level}}} ", text[body_start:])
+    if closing is None:
+        return None
+    return text[body_start : body_start + closing.start()], body_start, level
+
+
+def interaction_workflow_steps(policy_text: str) -> list[str]:
+    """The steps the policy states for the consultation, normalized, in order.
+
+    The workflow this experiment evolves is the interaction workflow — how the
+    agent consults, and how a later exchange follows from an earlier one — and the
+    policy text is where it is written down.  The steps are read off that section
+    at its own shallowest deeper heading (or its numbered items when it has no
+    sub-headings), so a policy's structure is whatever the policy itself states.
+    """
+    section = _workflow_section(policy_text)
+    if section is None:
+        return []
+    body, _, level = section
+    levels = [len(match) for match in re.findall(rf"(?m)^(#{{{level + 1},}}) ", body)]
+    blocks: list[str] = []
+    if levels:
+        step_level = min(levels)
+        parts = re.split(rf"(?m)^#{{{step_level}}} (.+)$", body)
+        for title, chunk in zip(parts[1::2], parts[2::2]):
+            blocks.append(f"{title.strip()} {chunk.strip()}")
+    else:
+        for item in re.split(r"(?m)^\s*(?=\d+\.\s)", body)[1:]:
+            blocks.append(re.sub(r"^\s*\d+\.\s*", "", item).strip())
+    return [normalize_text(block) for block in blocks if block.strip()]
 
 
 def _fixed_policy_parts(text: str) -> tuple[str, str] | None:
     """Split a policy into (text before the workflow section, text after it)."""
-    start = text.find(INTERACTION_WORKFLOW_HEADING)
-    if start < 0:
+    section = _workflow_section(text)
+    if section is None:
         return None
-    rest = text[start + len(INTERACTION_WORKFLOW_HEADING) :]
-    # The section runs to the next level-three heading; the workflow's own steps
-    # are level four, so they stay inside it.
-    match = re.search(r"\n### ", rest)
-    if match is None:
-        return None
-    after_start = start + len(INTERACTION_WORKFLOW_HEADING) + match.start() + 1
-    return text[:start], text[after_start:]
+    _, body_start, level = section
+    closing = re.search(rf"\n#{{1,{level}}} ", text[body_start:])
+    after_start = body_start + closing.start() + 1
+    heading_start = text[:body_start].rfind("#")
+    return text[:heading_start], text[after_start:]
 
 
 def _normalise_policy_fragment(text: str) -> str:
@@ -2240,6 +2306,18 @@ def persist_cpe_round_result(results_path: Path, result: dict[str, Any]) -> list
     )
     workflow_evolution.write_json(results_path, results)
     write_execution_time_excel(results_path.parent / "round_execution_times.xlsx", results)
+    # The strategy workbook is a read-and-rewrite of artifacts this round has
+    # just finished writing, so it is refreshed here, at the one point every
+    # round -- resumed or live -- passes through.  A round costs hours: a failed
+    # export has to cost a line of output, never the round.
+    try:
+        interaction_workflow_excel.write_interaction_evolution_workbook(
+            results_path.parent / interaction_workflow_excel.WORKBOOK_NAME,
+            results_path.parent.parent,
+            results,
+        )
+    except Exception as error:
+        print(f"Interaction strategy workbook export failed: {error!r}", flush=True)
     print(
         f"Round {result['round']} CPE train net utility: "
         f"{result['train_post_utility']:.6f}; "
@@ -3226,22 +3304,54 @@ def parse_iso_datetime(value: Any) -> datetime | None:
         return None
 
 
+def newest_artifact_time(directory: Path) -> datetime | None:
+    """Newest mtime under a run directory, for runs no artifact stamps a finish."""
+    latest: datetime | None = None
+    for path in Path(directory).rglob("*"):
+        try:
+            stamp = datetime.fromtimestamp(path.stat().st_mtime)
+        except OSError:
+            continue
+        if latest is None or stamp > latest:
+            latest = stamp
+    return latest
+
+
 def run_artifact_timing(run: dict[str, Any]) -> dict[str, Any] | None:
-    """Recover one completed problem run's wall interval from its artifacts."""
+    """Recover one completed problem run's wall interval from its artifacts.
+
+    Only the start is ever recorded.  The judge checkpoint that would stamp the
+    finish lands in ``meta/mmbench_judge/`` under the MM-Bench judge and carries
+    no ``completed_at`` even there, so the newest artifact the run wrote answers
+    for the end instead -- and a run abandoned by the timeout never produces a
+    stamped finish at all.  ``source`` records which signal was used, because an
+    mtime can be moved by anything that later touches the directory.
+    """
     run_dir = Path(str(run.get("run_dir", "")))
     metadata = workflow_evolution.read_json(run_dir / "meta" / "run.json", {})
-    judge = workflow_evolution.read_json(
-        run_dir / "meta" / "judge_stability.json", {}
-    )
     started = parse_iso_datetime(metadata.get("created_at"))
-    completed = parse_iso_datetime(judge.get("completed_at"))
-    if started is None or completed is None or completed < started:
+    if started is None:
+        return None
+    completed = parse_iso_datetime(
+        workflow_evolution.read_json(
+            run_dir / "meta" / "mmbench_judge" / "judge_stability.json", {}
+        ).get("completed_at")
+    ) or parse_iso_datetime(
+        workflow_evolution.read_json(
+            run_dir / "meta" / "judge_stability.json", {}
+        ).get("completed_at")
+    )
+    source = "run_and_judge_artifact_timestamps"
+    if completed is None:
+        completed = newest_artifact_time(run_dir)
+        source = "run_metadata_and_directory_mtime"
+    if completed is None or completed < started:
         return None
     return {
         "started_at": started.isoformat(),
         "completed_at": completed.isoformat(),
         "elapsed_seconds": (completed - started).total_seconds(),
-        "source": "run_and_judge_artifact_timestamps",
+        "source": source,
     }
 
 

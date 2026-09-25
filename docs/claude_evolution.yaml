@@ -201,3 +201,43 @@ verification:
     - config.json under the experiment directory does NOT record any of this. It has model /
       opt_model / expert_model and thinking-free fields only, so it cannot be used to audit the
       compaction or thinking settings.
+  how_to_publish_this_repository:
+    note: This cluster holds no standing write credential of its own — every commit on the remote
+      up to 2026-09-21 was authored and committed by ghj-bit on his own machine. The procedure
+      below is the one that first worked from here, on 2026-09-25.
+    precondition: A fine-grained PAT belonging to a repo writer, with Contents -> Read and write
+      and this repository selected. Export it as GH_PAT. The token must never be written into this
+      file, into .git-credentials, or onto a command line.
+    command: |
+      ASKPASS=$(mktemp /tmp/.gp_askpass.XXXXXX)
+      printf '#!/bin/sh\ncase "$1" in\n  *[Uu]sername*) echo "x-access-token" ;;\n  *[Pp]assword*) echo "$GH_PAT" ;;\nesac\n' > "$ASKPASS"
+      chmod 700 "$ASKPASS"
+      GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+        git -c credential.helper= -c http.version=HTTP/1.1 -c http.postBuffer=524288000 \
+            -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+            push https://github.com/ghj-bit/ModelingAgent.git main
+      rm -f "$ASKPASS"
+    why_each_flag:
+      direct_url_instead_of_origin: origin points at the ghfast.top proxy, which rewrites an
+        authorization failure into "Invalid username or token. Password authentication is not
+        supported for Git operations" and so misreports the cause.
+      credential_helper_empty: clears the github.com entry in ~/.git-credentials, which belongs to
+        an account without write access and would otherwise be tried first.
+      http_version_HTTP_1_1: >-
+        avoids "GnuTLS recv error (-110): The TLS connection was non-properly terminated". That
+        error is intermittent and unrelated to authorization — do not read it as a permissions
+        problem. The permission fix and this flag are two separate obstacles.
+      http_postBuffer_and_speed: headroom for the pack and a lower stall threshold.
+    verify: git ls-remote https://github.com/ghj-bit/ModelingAgent.git refs/heads/main
+    verify_note: Compare the SHA against local HEAD. Prefer ls-remote over git fetch, which still
+      hangs intermittently on this network.
+    probe_write_permission: |
+      curl -s -X DELETE -H "Authorization: Bearer $GH_PAT" \
+        https://api.github.com/repos/ghj-bit/ModelingAgent/git/refs/heads/__nonexistent_probe__
+    probe_note: Deleting a reference that does not exist is non-destructive on both outcomes, so
+      this is a safe way to test a token. 403 "Resource not accessible by personal access token"
+      means the fine-grained PAT lacks Contents write; 422 "Reference does not exist" means the
+      permission check passed. Editing a fine-grained PAT's permissions does not change the token
+      string, so the same value keeps working. Note that the permissions object returned by
+      GET /repos/... describes the account's role, not the token's scope, and cannot be used to
+      predict whether a push will be accepted.

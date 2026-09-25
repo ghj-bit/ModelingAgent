@@ -746,9 +746,10 @@ object only (no markdown fences), matching the schema in §3.
 §1 Optimization goals. Evolve one executable human-expert interaction policy for
 a modeling agent that {solver_start} and otherwise solves autonomously. Treat the policy as the communication contract: it governs only the
 consultation itself — when the agent asks, what it asks, how many exchanges it
-uses, and what it does with each reply. It governs no other part of the solver's
-work, and a policy that asks the agent to account for, log, or document the
-consultation is not a behavioural improvement.
+uses, how those exchanges relate to one another, and what it does with each
+reply. It governs no other part of the solver's work, and a policy that asks
+the agent to account for, log, or document the consultation is not a
+behavioural improvement.
 
 The evidence JSON holds the single training parent and its rollouts on the current
 training batch, the historical validation champion, and every round already run.

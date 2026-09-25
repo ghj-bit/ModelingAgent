@@ -261,6 +261,18 @@ def to_openai(body: dict, model: str) -> dict:
             payload["tool_choice"] = choice
     if body.get("stream"):
         payload["stream"] = True
+        # Without this the upstream omits usage from the SSE stream -- that is
+        # the OpenAI contract, and vLLM follows it -- so StreamTranslator keeps
+        # its initial zeros and every turn tells Claude Code the context is
+        # empty.  Claude Code sizes its auto-compaction against that number, so
+        # compaction never fired: a solver run was measured reaching 261175
+        # tokens against a 262144 window, having shrunk the output budget from
+        # 20000 to 345 across 47 retries, and only stopped when the window was
+        # full and the turn was refused.  With the flag set, the translator
+        # reports real counts in message_delta and auto-compaction fires:
+        # measured on a 174266-token context, trigger=auto, 174266 -> 6067
+        # tokens in 83s.
+        payload["stream_options"] = {"include_usage": True}
     return payload
 
 

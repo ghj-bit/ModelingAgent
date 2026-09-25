@@ -33,8 +33,8 @@ set -euo pipefail
 
 REPO=/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent
 PY=/public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python
-BASE_URL=http://gpu6:18763/v1
-MODEL=qwen3.8-27b
+BASE_URL="${BASE_URL:-http://gpu6:18763/v1}"
+MODEL="${MODEL:-qwen3.8-27b}"
 
 # The human expert runs on DeepSeek; the MM-Bench judge stays on the locally
 # served model (a DeepSeek judge was reverted: its reply format broke MM-Bench's
@@ -49,6 +49,15 @@ EXPERT_API_KEY="${EXPERT_API_KEY:-$DEEPSEEK_API_KEY}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 JUDGE_BASE_URL="${JUDGE_BASE_URL:-$BASE_URL}"
 JUDGE_API_KEY="${JUDGE_API_KEY:-EMPTY}"
+
+# claude_backend takes its endpoint from the environment, not from --model or
+# --base-url, so without these the arm would fall back to the backend's own
+# defaults rather than to what is configured here.  Same values as the flags
+# above, so the solver and the optimizer share one endpoint.
+export CLAUDE_MODEL="$MODEL"
+export CLAUDE_BASE_URL="$BASE_URL"
+export CLAUDE_API_KEY="$JUDGE_API_KEY"
+
 export CRITIC_MODEL="${CRITIC_MODEL:-deepseek-flash}"
 export CRITIC_BASE_URL="${CRITIC_BASE_URL:-$DEEPSEEK_BASE_URL}"
 export CRITIC_API_KEY="${CRITIC_API_KEY:-$DEEPSEEK_API_KEY}"
@@ -60,6 +69,32 @@ export CRITIC_API_KEY="${CRITIC_API_KEY:-$DEEPSEEK_API_KEY}"
 export RUBRIC_MODEL="${RUBRIC_MODEL:-$MODEL}"
 export RUBRIC_BASE_URL="${RUBRIC_BASE_URL:-$BASE_URL}"
 export RUBRIC_API_KEY="${RUBRIC_API_KEY:-EMPTY}"
+
+# CPU budget per solving agent.  Agents write numpy/sklearn/pandas pipelines,
+# and those default to every core on the box: measured 2026-09-25, one run's
+# text-sentiment script opened 127 threads and held 59 of 104 cores, which
+# starved the other 19 runs of the same phase and every other user of the shared
+# login node.  Two independent limits, because neither is sufficient alone:
+#
+#   * CLAUDE_AGENT_CPUS makes run_claude_task.py pin the session -- and every
+#     process it spawns, since children inherit the affinity mask -- to that many
+#     CPUs.  This is the hard cap: it holds even for multiprocessing pools, which
+#     thread-count variables cannot touch.
+#   * The thread-count variables size the libraries' pools to the pinned CPUs, so
+#     work inside the lane runs at full speed instead of thrashing; BLAS and
+#     joblib both read them, and joblib is what sklearn's n_jobs=-1 ends up in.
+#
+# Raise AGENT_CPUS for faster single runs, lower it to fit more runs side by side;
+# 0 disables the pin entirely.
+AGENT_CPUS="${AGENT_CPUS:-4}"
+export CLAUDE_AGENT_CPUS="$AGENT_CPUS"
+if [ "$AGENT_CPUS" -gt 0 ]; then
+  export OMP_NUM_THREADS="$AGENT_CPUS"
+  export OPENBLAS_NUM_THREADS="$AGENT_CPUS"
+  export MKL_NUM_THREADS="$AGENT_CPUS"
+  export NUMEXPR_NUM_THREADS="$AGENT_CPUS"
+  export LOKY_MAX_CPU_COUNT="$AGENT_CPUS"
+fi
 
 # This arm's policy no longer carries the "keep every run bounded" clause (the
 # seed text is the plain one), so the solver-side guard against whole-disk
@@ -145,6 +180,7 @@ setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolutio
   --judge-repeats "$JUDGE_REPEATS" \
   --train-batch-size 2 \
   --validation-size "${VALIDATION_SIZE:-4}" \
+  --validation-repetitions "${VALIDATION_REPETITIONS:-1}" \
   --thinking off \
   >> "$LOG" 2>&1 &
 

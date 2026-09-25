@@ -1,0 +1,203 @@
+meta:
+  title: Claude evolution experiment configuration — launch_claude_evolution_from_scratch.sh
+  updated_at: '2026-09-25'
+  repository: /public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent
+  maintained: hand-written (not generated). The source files below are the single source of
+    truth; this document transcribes the values that were in force for the run of 2026-09-25.
+    Nothing reads this file at runtime, so it cannot drift the experiment — but it can go stale,
+    so re-check the file:line references after touching those sources.
+  hand_written_note: There is no generator script for this file. If you change one of the source
+    files below, update the matching section here in the same commit.
+  source_files:
+  - scripts/launch_claude_evolution_from_scratch.sh
+  - src/OpenClaw/run_substantive_interaction_workflow_evolution_from_scratch_claude.py
+  - src/OpenClaw/run_substantive_interaction_workflow_evolution_from_initial_draft_claude.py
+  - src/OpenClaw/claude_backend/__init__.py
+  - src/OpenClaw/claude_backend/run_claude_task.py
+  - src/OpenClaw/claude_backend/proxy.py
+  secrets_notice: No API keys, tokens or credentials are included. Credentials are read at runtime
+    from the environment (DEEPSEEK_API_KEY) or are the EMPTY sentinel for the keyless local endpoint.
+
+launcher:
+  script: scripts/launch_claude_evolution_from_scratch.sh
+  invocation: bash scripts/launch_claude_evolution_from_scratch.sh <experiment-name> [max-rounds]
+  driver: src/OpenClaw/run_substantive_interaction_workflow_evolution_from_scratch_claude.py
+  driver_note: This module carries no configuration of its own. It imports the sibling launcher as
+    `base`, rebinds the solver's source-context strings to "from the problem statement alone"
+    (run_substantive_interaction_workflow_evolution_from_scratch_claude.py:325-326) and calls main().
+    Everything below therefore lives in the shared `base` modules.
+  solver_starts_from: the problem statement and the task's pre-gathered data/external_data.md; no
+    prior plan is read, no prompt section refers to one
+  experiment_root: openclaw_experiments/evolve_exp/<experiment-name>
+  log: .env_setup_logs/<experiment-name>.log
+  last_verified_run: claude_r0_val4x3 (launched 2026-09-25T18:36, MM-Bench train=4 / validation=4)
+  related_arms:
+    - scripts/launch_claude_evolution.sh (solver starts from a planning draft)
+    - scripts/launch_claude_coevolution.sh (draft arm plus a critic in the loop)
+    - scripts/launch_claude_baseline.sh, scripts/launch_claude_baseline_nodraft.sh (clean baselines)
+
+model:
+  # The solving agent is a Claude Code CLI session driven by the local vLLM server
+  # through an Anthropic->OpenAI shim. The model therefore reaches the CLI as an
+  # environment variable, never as a --model flag.
+  solving_agent:
+    model_id: qwen3.8-27b
+    base_url: http://gpu6:18763/v1
+    api_key: EMPTY (sentinel; the shim sends no Authorization header)
+    served_by: local vLLM endpoint on gpu6
+    launcher_env:
+      CLAUDE_MODEL: $MODEL  # launch_claude_evolution_from_scratch.sh:58
+      CLAUDE_BASE_URL: $BASE_URL  # :59
+      CLAUDE_API_KEY: $JUDGE_API_KEY  # :60
+    launcher_defaults:
+      MODEL: qwen3.8-27b  # :46, overridable from the environment
+      BASE_URL: http://gpu6:18763/v1  # :45, overridable from the environment
+    backend_defaults:
+      DEFAULT_MODEL: qwen3.8-27b  # claude_backend/__init__.py:64
+      DEFAULT_BASE_URL: http://gpu6:18763/v1  # claude_backend/__init__.py:65
+      DEFAULT_API_KEY: EMPTY  # claude_backend/__init__.py:66
+    resolution: claude_backend/__init__.py:74-88 reads CLAUDE_<NAME> then falls back to DEFAULT_*.
+      This env-var route is the only one that works — claude_command() also probes getattr(args,
+      "claude_*"), but the args object reaching it is a whitelisted SimpleNamespace
+      (run_substantive_interaction_experiment.py:1159-1186) with no claude_* fields, so those
+      probes are always None.
+    how_it_reaches_the_cli: run_claude_task.py:241,244,245 set ANTHROPIC_MODEL,
+      ANTHROPIC_SMALL_FAST_MODEL and ANTHROPIC_DEFAULT_HAIKU_MODEL to the same model id.
+  other_roles:
+    optimizer: qwen3.8-27b @ http://gpu6:18763/v1 (--opt-model, launcher :164)
+    judge_feedback: qwen3.8-27b @ http://gpu6:18763/v1 (--judge-feedback-model, launcher :166)
+    mmbench_judge: qwen3.8-27b @ http://gpu6:18763/v1 (launcher :167, JUDGE_MODEL defaults to $MODEL)
+    human_expert: deepseek-flash @ https://api.deepseek.com (launcher :47-49) — the only role served
+      off-cluster
+  notes_on_recent_choices: Everything was pointed at DeepSeek for the night of 2026-09-25 and rolled
+    back within the hour; the per-token cost of 16-20 concurrent sessions is real and the judge's
+    reply format had already forced one earlier revert (launcher :35-42). Cost was not what caused
+    the saturation that started the experiment — the agent CPU budget was (launcher :41-42).
+
+context_compaction:
+  # Where the setting lives and why there is no override above it.
+  cli_flag: --autocompact 100k
+  defined_at: src/OpenClaw/claude_backend/run_claude_task.py:146 (argparse default)
+  passed_to_cli_at: src/OpenClaw/claude_backend/run_claude_task.py:352-353
+  override_surface: none. The launcher, the driver and claude_command() all decline to pass
+    --autocompact, so the argparse default is the only value in play. "auto" would hand the
+    decision back to the CLI's own default.
+  why_100k: the CLI rejects anything below 100k (80000 and 99k both abort the session at startup),
+    so this is the earliest compaction the flag can ask for. It is also not early enough to rely on;
+    see the shim-side mitigation below.
+  window_resolution_order: 'CLAUDE_CODE_AUTO_COMPACT_WINDOW -> --autocompact -> clientdata ->
+    experiment -> model default. The environment variable RETURNS on a hit, so an inherited value
+    silently voids the flag (run_claude_task.py:262-267).'
+  inherited_var_is_removed: run_claude_task.py:282 pops CLAUDE_CODE_AUTO_COMPACT_WINDOW from the
+    child environment. This is load-bearing — a parent Claude Code session injects it into its own
+    process and dict(os.environ) passes it straight through. Measured on claude_r0_val4x3, the
+    inherited value was 786432.
+  effective_window:
+    with_the_variable_removed: min(model 200000, --autocompact 100000) = 100000
+    with_the_variable_inherited: min(model 200000, 786432) = 200000
+  trigger_threshold: window - 33000. The 33000 is the output budget (20000) plus a further 13000 of
+    hardcoded slack, so compaction fires at 67000 with the variable removed and at 167000 without
+    (run_claude_task.py:279-281).
+  observed_effect: Of the 12 runs in claude_r0_val4x3 (2026-09-25), none compacted; their peak
+    contexts were 48806..125519. With the variable removed the threshold would have been 67000,
+    which 11 of the 12 would have crossed.
+  output_token_ceiling:
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS: 20000  # run_claude_task.py:258-260; inheritable from the environment
+    note: Claude Code asks for 32k output tokens per turn by default, which puts the prompt ceiling
+      at window - 32k = 99072 — below the 100k window, so a session that reaches the ceiling gets
+      every later turn refused before compaction ever fires (run_claude_task.py:139-144).
+  shim_side_adaptation:
+    MAX_OUTPUT_TOKENS: 32768  # proxy.py:47
+    CONTEXT_MARGIN: 1024  # proxy.py:57
+    MIN_OUTPUT_TOKENS: 256  # proxy.py:60
+    behaviour: shrink_to_fit() (proxy.py:73-107) recomputes the output budget from the measured
+      prompt on an upstream 400 and retries once. This retry, not the --autocompact flag, is the
+      effective mitigation for deep runs.
+  usage_reporting:
+    stream_options: '{"include_usage": true}'  # proxy.py:275
+    why_it_matters: Without usage on the SSE stream the CLI sees an empty context and compaction
+      never fires at all. This was a real defect in the shim and it is fixed.
+
+thinking:
+  # Three layers carry a thinking setting; only two of them do anything.
+  declared_setting:
+    cli_flag: --thinking off
+    launcher: scripts/launch_claude_evolution_from_scratch.sh:173
+    driver_constant: DEFAULT_THINKING_LEVEL = "off"
+      # run_substantive_interaction_workflow_evolution_from_initial_draft_claude.py:169
+    driver_forced_at: run_substantive_interaction_workflow_evolution_from_initial_draft_claude.py:1689-1690
+      (applied only when the caller supplied no --thinking)
+    rationale: The DeepSeek provider collapses minimal/low/medium/high onto one wire value
+      (reasoning_effort="high"), so "off" is the only distinct setting. It drops reasoning to 0% of
+      output tokens and cuts generated tokens per call by roughly 46%
+      (run_substantive_interaction_workflow_evolution_from_initial_draft_claude.py:165-169).
+  WARNING_declared_setting_is_inert:
+    finding: --thinking is a dead parameter on this path. run_claude_task.py defines it at :147 and
+      never reads it again — the whole file contains exactly one occurrence of the name, the
+      argparse line itself. claude_backend/__init__.py:129-130 dutifully forwards it; nothing
+      consumes it.
+    consequence: Do not read the "off" above as evidence that thinking is off. The two switches
+      below are what actually turn it off, and both are hardcoded.
+  effective_switch_solver:
+    where: src/OpenClaw/claude_backend/proxy.py:247
+    value: 'chat_template_kwargs: {"enable_thinking": false}'
+    why_hardcoded_here: The Anthropic request model has no field for thinking mode, so the shim
+      injects it into the OpenAI body it builds. The Anthropic endpoint offers no way to stop it —
+      thinking:{type:disabled} is not honoured by the local template, which keeps spending its
+      budget thinking (proxy.py:9-14).
+    applies_to: every upstream /chat/completions request made by the solving agent
+  effective_switch_direct_api_calls:
+    where: src/OpenClaw/run_substantive_interaction_workflow_evolution_from_initial_draft_claude.py:91-122
+    installed_at: :1987 (disable_thinking_for_direct_api_calls(), called from main())
+    value: 'extra_body={"chat_template_kwargs": {"enable_thinking": false}}'
+    mechanism: Monkey-patches openai.resources.chat.completions.Completions.create, so it reaches
+      all three direct callers — the human expert, the optimizer and the MM-Bench judge. Calls that
+      already pass extra_body (the DeepSeek branch) are left untouched.
+    why_it_is_needed: The shared code disables provider thinking only when the base URL contains
+      "deepseek.com". With thinking on, the reasoning consumes the small max_tokens budget and the
+      body returns empty, which the callers report as a failed API call rather than an empty answer —
+      the expert bridge dies with "expert API response contains no text" and the task fails its
+      interaction gate.
+
+resources_and_timeouts:
+  agent_cpus:
+    CLAUDE_AGENT_CPUS: 4  # launcher :78-79; 0 disables the pin
+    enforced_at: run_claude_task.py:80-112 (os.sched_setaffinity; children inherit the mask)
+    thread_env: OMP_NUM_THREADS, OPENBLAS_NUM_THREADS, MKL_NUM_THREADS, NUMEXPR_NUM_THREADS,
+      LOKY_MAX_CPU_COUNT — all set to AGENT_CPUS  # launcher :81-85
+    why: Solvers write numpy/sklearn/pandas pipelines that default to every core. Measured
+      2026-09-25, one run's text-sentiment script opened 127 threads and held 59 of 104 cores,
+      starving the other 19 runs of the phase and every other user of the shared login node
+      (launcher :62-66). CLAUDE_AGENT_CPUS is the hard cap; the thread variables size the libraries'
+      pools inside the lane.
+    note: Only this arm sets CLAUDE_AGENT_CPUS. The other four Claude launch scripts do not, so
+      their solvers run unpinned.
+  bash_timeouts:
+    BASH_DEFAULT_TIMEOUT_MS: 1800000  # run_claude_task.py:297-299
+    BASH_MAX_TIMEOUT_MS: 1800000  # :300
+    rationale: The CLI's stock 600s ceiling sat close enough to a real pipeline's runtime that the
+      agent wrapped each run in its own `timeout 570` and threw the work away. Default must equal
+      the maximum because the agent almost never sets a timeout explicitly — 49 of 50 Bash calls
+      left it unset and took the default (run_claude_task.py:283-296). Paired with the settings.json
+      deny rule for Bash(timeout *).
+  task_timeout_seconds: 7200  # shared parser, run_substantive_interaction_workflow_evolution.py:2045
+  shim_start_timeout_seconds: 30.0  # run_claude_task.py:55
+  permission_mode: acceptEdits  # claude_backend/__init__.py:122; no caller sets args.claude_permission_mode
+  isolated_config_dir: <run>/meta/claude/claude_config  # run_claude_task.py:250,321-323
+  telemetry_disabled: DISABLE_AUTOUPDATER, DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING,
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC — all 1  # run_claude_task.py:303-306
+
+verification:
+  how_to_check_this_document:
+    - grep -n "autocompact" src/OpenClaw/claude_backend/run_claude_task.py
+    - grep -n "thinking" src/OpenClaw/claude_backend/run_claude_task.py   # expect one line: :147
+    - grep -n "enable_thinking" src/OpenClaw/claude_backend/proxy.py
+    - sed -n '43,60p;78,92p;156,174p' scripts/launch_claude_evolution_from_scratch.sh
+  how_to_confirm_what_a_run_actually_used:
+    - The per-run shim log at <run>/meta/claude/shim.log records the first request's max_tokens and
+      the upstream model it rewrote to.
+    - The claude CLI command actually executed is echoed into the experiment log as a
+      "[claude] <command>" line; it shows --autocompact 100k and the absence of --model.
+    - config.json under the experiment directory does NOT record any of this. It has model /
+      opt_model / expert_model and thinking-free fields only, so it cannot be used to audit the
+      compaction or thinking settings.

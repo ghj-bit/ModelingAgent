@@ -23,6 +23,7 @@ import ast
 import datetime
 import hashlib
 import inspect
+import json
 import os
 import pathlib
 import re
@@ -154,6 +155,91 @@ def critic_prompts() -> tuple[str, str]:
         interaction_cost="«exchanges, tokens, latency»",
     )
     return critic.SYSTEM_PROMPT, user
+
+
+def rubric_evolution_prompt() -> str:
+    """The rubric proposer's prompts: one system message, two user variants.
+
+    Which evidence a revision is made from is decided in code, never by the
+    proposer -- a round that reached validation is revised from the candidate's
+    held-out record, one that did not is revised from the training records with
+    the absence stated in the prompt -- so both user variants are rendered here.
+
+    The evidence sections are read off disk by the real builder, so a scratch
+    round directory is staged with ``«…»`` values in the shape the builder
+    expects; the rubric section is the live rubric text, which is why the header
+    records that file's digest too.
+    """
+    import tempfile
+
+    from src.OpenClaw import interaction_rubric_proposer as proposer
+
+    def stub_run() -> dict:
+        return {
+            "problem_id": "«problem id»",
+            "repetition": "«n»",
+            "average_score": "«score»",
+            "interaction_receipt": {
+                "exchange_count": "«exchanges»",
+                "questions_asked": ["«question 1»", "«question 2»"],
+                "expert_answers": ["«reply 1»"],
+            },
+            "interaction_report_change_summary": "«what the run says the reply changed»",
+        }
+
+    # One stub serves both branches: the held-out result carries the same keys as
+    # the training one, and only these keys are read.
+    result = {
+        "utility": "«candidate utility on this split»",
+        "average_dimension_scores": {"«dimension»": "«score»"},
+        "workflow": {"policy_text": POLICY},
+        "problem_results": [{"problem_id": "«problem id»", "repetitions": [stub_run()]}],
+        "train_pre_utility": "«incumbent utility on the training batch»",
+        "train_post_utility": "«candidate utility on the training batch»",
+        "train_accepted": True,
+        "validation_utility": "«validation utility»",
+        "validation_accepted": "«validation gate»",
+    }
+    incumbent = {
+        "workflow_id": "«parent workflow id»",
+        "net_utility_on_current_training_batch": "«incumbent net utility»",
+        "workflow": {"policy_text": POLICY},
+        "training_evidence": {"training_runs": [stub_run()]},
+    }
+
+    rendered = []
+    with tempfile.TemporaryDirectory() as scratch:
+        round_dir = pathlib.Path(scratch) / "round_«N»"
+        round_dir.mkdir(parents=True)
+        (round_dir / "training_parent_evidence.json").write_text(
+            json.dumps([incumbent], ensure_ascii=False), encoding="utf-8"
+        )
+        for validated, heading in (
+            (
+                True,
+                "变体 A：候选通过训练门，验证集跑过 —— "
+                "「候选」一段是 held-out 记录",
+            ),
+            (
+                False,
+                "变体 B：候选未通过训练门，只有训练证据 —— "
+                "prompt 会明说没有 held-out 可用",
+            ),
+        ):
+            user = proposer.build_prompt(
+                result,
+                round_dir,
+                result,
+                "验证集（held-out）" if validated else "训练集",
+                validated=validated,
+            )
+            rendered.append(f"### {heading}\n\n{block(user)}")
+    return (
+        "# system 消息\n\n"
+        + block(proposer.SYSTEM_PROMPT)
+        + "\n# user 消息\n\n"
+        + "\n".join(rendered)
+    )
 
 
 class StubSolution(dict):
@@ -363,6 +449,36 @@ def build() -> dict[str, str]:
         + block(critic_user)
     )
 
+    from src.OpenClaw import interaction_rubric_proposer as proposer
+
+    rubric_file = proposer.current_rubric_path()
+    rubric_where = (
+        str(rubric_file.relative_to(REPO))
+        if str(rubric_file).startswith(str(REPO))
+        else str(rubric_file)
+    )
+    rubric = (
+        "# rubric 演化 prompt（协同演化臂）\n\n"
+        "协同演化臂每轮收尾时，把当轮证据交给 proposer，产出版本号 +1 的新 rubric，"
+        "并让后续轮次的 critic 立刻改用新版本。\n\n"
+        + provenance(
+            source_note(
+                "src/OpenClaw/interaction_rubric_proposer.py", 58, "SYSTEM_PROMPT"
+            )
+            + "、"
+            + source_note(
+                "src/OpenClaw/interaction_rubric_proposer.py", 245, "build_prompt()"
+            )
+            + f"；`# 现行 rubric` 一节是当前生效的 `{rubric_where}`（md5 `{digest(rubric_file)}`）",
+            "system 为静态常量；user 为模板 + 运行时证据（本文件为渲染结果）",
+            "仅协同演化臂（`launch_claude_coevolution.sh`）",
+        )
+        + "用哪一段证据由**代码**决定、不由 proposer 选：候选赢过母代则用它的 held-out 记录，"
+        "没赢则只用两边训练记录、并在 prompt 里明说没有 held-out。两个分支都渲染在下面"
+        "（`# 你的任务` 一节随分支不同）。\n\n"
+        + rubric_evolution_prompt()
+    )
+
     judge = (
         "# MM-Bench judge prompt\n\n"
         "打分用的四个维度 prompt，由基准自带的评测脚本发出。评分标准（固定 rubric）另行注入，"
@@ -407,6 +523,7 @@ def build() -> dict[str, str]:
         "solver_agent.md": solver,
         "optimizer_evolver.md": evolver,
         "critic.md": critic,
+        "rubric_evolution.md": rubric,
         "judge_mmbench.md": judge,
         "human_expert_role.md": expert,
         "interaction_policy_seed.md": (
@@ -441,6 +558,11 @@ ROWS = (
     ("solver_agent.md", "求解 agent", "建模求解 agent 收到的完整 prompt（两个臂变体）"),
     ("optimizer_evolver.md", "演化器", "产出下一版交互策略的 prompt（§1–§5 + 证据）"),
     ("critic.md", "critic", "协同演化臂的评审 prompt（system + user）"),
+    (
+        "rubric_evolution.md",
+        "rubric 演化器",
+        "产出下一版 rubric 的 prompt（system + 两个证据分支变体）",
+    ),
     ("judge_mmbench.md", "MM-Bench judge", "四个评分维度的打分 prompt"),
     ("human_expert_role.md", "人类专家", "扮演建模专家的角色设定"),
     ("interaction_policy_seed.md", "交互策略种子", "注入 solver prompt 的初始策略文本（本臂实际用的那份）"),

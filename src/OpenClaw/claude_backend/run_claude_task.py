@@ -258,6 +258,28 @@ def session_environment(config_dir: Path, port: int, model: str, api_key: str,
     env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = os.environ.get(
         "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "20000"
     )
+    # ...and the window that ceiling was computed against has to be the one the
+    # command line asks for.  Claude Code resolves the auto-compact window in
+    # this order (cli.js: `function ok(e,n)`): CLAUDE_CODE_AUTO_COMPACT_WINDOW
+    # first and it RETURNS on a hit, then --autocompact, then clientdata,
+    # experiment, model default.  So an inherited env var silently voids the
+    # --autocompact passed on the command line, and the CLI's own UI says as
+    # much: "CLAUDE_CODE_AUTO_COMPACT_WINDOW is set and takes precedence."
+    #
+    # It is not hypothetical.  A Claude Code session injects this variable into
+    # its own process, and `dict(os.environ)` above passes it straight through,
+    # so every solver launched from one inherited it.  Measured on
+    # claude_r0_val4x3 (2026-09-25): the value in force was 786432, which beat
+    # the --autocompact 100k on the command line; the window became
+    # min(model 200000, 786432) = 200000 and the threshold window-33000 = 167000,
+    # so none of the 12 runs compacted -- their peak contexts were 48806..125519.
+    # With the variable gone the window is min(200000, 100000) = 100000 and the
+    # threshold 67000, which 11 of those 12 runs would have crossed.
+    #
+    # The threshold is derived, never the raw window: Claude Code reserves the
+    # output budget (20000, capped at the model's own limit) and then a further
+    # 13000 of hardcoded slack, so compaction fires at window - 33000.
+    env.pop("CLAUDE_CODE_AUTO_COMPACT_WINDOW", None)
     # A modelling pipeline is legitimately slow: on 2020_D the solver's own
     # full run needs about five minutes, mostly null-model graph rebuilds.  The
     # CLI's stock ceiling of 600s is close enough to that for the agent to wrap

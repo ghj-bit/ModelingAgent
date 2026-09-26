@@ -1287,8 +1287,10 @@ only entries allowed in the workspace root: put everything you produce inside
 them. Do not create any other file or directory at the workspace root — a stray
 entry there fails the run outright, whatever the rest of the work looks like.
 
-Every script you run writes its outputs and its log under `{{{{LOGS_DIR}}}}`.
-To inspect what a script produced, read those files instead of running it again.
+Never run the same script twice. The only reason to run it again is that you
+changed its code. To see more of what it printed, read
+`{{{{LOGS_DIR}}}}/<script>.log` — do not re-run it with a different
+tail/head/sed filter.
 {interaction_evidence_note}
 
 # Python Environment

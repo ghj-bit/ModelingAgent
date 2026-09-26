@@ -1291,6 +1291,10 @@ Never run the same script twice. The only reason to run it again is that you
 changed its code. To see more of what it printed, read
 `{{{{LOGS_DIR}}}}/<script>.log` — do not re-run it with a different
 tail/head/sed filter.
+
+Do not narrate between tool calls.
+
+Write the report once, to its own file; do not embed report prose in scripts.
 {interaction_evidence_note}
 
 # Python Environment

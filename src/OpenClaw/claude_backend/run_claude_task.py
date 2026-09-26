@@ -202,6 +202,27 @@ def start_shim(
     raise RuntimeError(f"shim did not start within {SHIM_START_TIMEOUT:.0f}s")
 
 
+# Appended to Claude Code's own system prompt -- via --append-system-prompt, so
+# it lands in the system array next to the instruction it is fighting, not in
+# the task prompt where a rule has to out-shout it from a lower layer.
+#
+# It targets the edit-run loop: the solver makes two or three small edits, runs
+# the script, reads the failure, makes two or three more, runs again.  That is
+# ordinary development, but here every turn is a round trip to the model and
+# the round trip, not the edit, is what costs -- measured on one 2017_A run:
+# 50 Edits and 51 Bash runs against a single file, 123 turns, ~10s of fixed
+# overhead per turn.  A previous wording of this rule ("Batch your work: make
+# every change to one region ...") sat in the task prompt and did nothing,
+# because it named a principle rather than the act to stop.
+BATCHING_SYSTEM_PROMPT = (
+    "When a script fails, fix every error it revealed in one pass, then run it "
+    "once more — do not fix one error, run, fix the next error, run. Batch the "
+    "changes you already know a file needs before running it again. One run in "
+    "this experiment edited the same file 52 times across 51 script runs, and "
+    "each of those round trips cost more than the edit it carried."
+)
+
+
 def session_environment(config_dir: Path, port: int, model: str, api_key: str,
                         allowed_tools: str, permission_mode: str) -> tuple[dict, Path]:
     """Build the isolated environment and settings file for one session."""
@@ -227,6 +248,19 @@ def session_environment(config_dir: Path, port: int, model: str, api_key: str,
                     "deny": ["Bash(timeout *)"],
                 },
                 "enableAllProjectMcpServers": False,
+                # Stop the solver narrating between tool calls.  That habit is
+                # not the solver's invention: the default system prompt asks for
+                # it ("Before your first tool call, state in one sentence what
+                # you're about to do ... Brief is good -- silent is not."), so a
+                # rule in the task prompt only overrode it partially -- measured
+                # 22% fewer such turns, ~19 per validation problem still.  The
+                # built-in Concise style injects its prompt into the same
+                # system array and carries an explicit "these rules win" over
+                # other communication guidance, and unlike a custom style it
+                # keeps the coding instructions (keep-coding-instructions).
+                # Measured baseline it has to beat: 83 such turns per round-0
+                # validation phase (4 problems).
+                "outputStyle": "Concise",
             },
             indent=2,
         ),
@@ -351,6 +385,7 @@ def main() -> int:
             command.extend(["--max-turns", str(args.max_turns)])
         if args.autocompact and args.autocompact != "auto":
             command.extend(["--autocompact", str(args.autocompact)])
+        command.extend(["--append-system-prompt", BATCHING_SYSTEM_PROMPT])
 
         print(f"[claude] cwd={workspace}", flush=True)
         print(f"[claude] {' '.join(command)}", flush=True)

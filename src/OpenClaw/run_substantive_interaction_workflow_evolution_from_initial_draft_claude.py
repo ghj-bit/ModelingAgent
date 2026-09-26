@@ -1286,6 +1286,9 @@ Create directories when needed. Those four directories already exist and are the
 only entries allowed in the workspace root: put everything you produce inside
 them. Do not create any other file or directory at the workspace root — a stray
 entry there fails the run outright, whatever the rest of the work looks like.
+
+Every script you run writes its outputs and its log under `{{{{LOGS_DIR}}}}`.
+To inspect what a script produced, read those files instead of running it again.
 {interaction_evidence_note}
 
 # Python Environment

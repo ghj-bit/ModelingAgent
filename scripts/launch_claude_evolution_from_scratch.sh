@@ -42,8 +42,20 @@ PY=/public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python
 # the experiment -- the model's location never was the cause.
 DEEPSEEK_BASE_URL="${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:?export DEEPSEEK_API_KEY before running this script}"
-BASE_URL="${BASE_URL:-http://gpu6:18763/v1}"
-MODEL="${MODEL:-qwen3.8-27b}"
+# The local solver/optimizer/judge run on the FP8 build since 2026-09-26.
+# Measured with the same benchmark harness as bench/RESULTS.md: at TP=2 the
+# single-stream decode rate went 23.8 -> 40.2 tok/s and the 8-way rate
+# 116 -> 233 tok/s, because on this SM 8.6 hardware vLLM keeps FP8 weights
+# 8-bit and streams them through the Marlin weight-only kernel -- and this
+# workload is decode/bandwidth bound.  The KV pool at equal GPU_UTIL also
+# doubles (83k -> 173k tokens per replica), which is what raises how many
+# solving agents fit at once.
+#
+# The name is deliberately not "qwen3.8-27b": the served name is what lands in
+# each run's config.json, so an FP8 run must not be confusable with a bf16 one.
+# Override BASE_URL/MODEL in the environment to go back to the bf16 server.
+BASE_URL="${BASE_URL:-http://gpu6:18764/v1}"
+MODEL="${MODEL:-qwen3.8-27b-fp8}"
 EXPERT_MODEL="${EXPERT_MODEL:-deepseek-flash}"
 EXPERT_BASE_URL="${EXPERT_BASE_URL:-$DEEPSEEK_BASE_URL}"
 EXPERT_API_KEY="${EXPERT_API_KEY:-$DEEPSEEK_API_KEY}"

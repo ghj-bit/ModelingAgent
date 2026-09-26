@@ -143,7 +143,23 @@ def parse_args() -> argparse.Namespace:
     # (73+ turns) dies with its context stuck at ~100k.  The real mitigation is
     # the shim's retry with a halved output budget (see proxy.shrink_to_fit).
     # "auto" leaves the CLI's own default in place.
-    parser.add_argument("--autocompact", default="100k")
+    # 180k, raised from 100k on 2026-09-27.  The trigger is derived, not the raw
+    # value: compaction fires at window - 33000 (20000 output budget + 13000
+    # slack), so 180k here means a 147k trigger, and the CLI caps the model at a
+    # 200k window, making 167k the highest trigger reachable at all.
+    #
+    # Why raise it: a compaction costs 2.6-5.4 minutes, and the cost is the
+    # summary it *generates* (10-20k tokens at ~40 tok/s), not the context it
+    # reads.  Measured on claude_fp8_r15b round 1 (11 compactions over 4 runs),
+    # the runs kept working for 30-85 turns after 7 of them, but the last
+    # compaction of a run left only 2-15 turns -- one spent 167s to summarise a
+    # context it barely used again.  Break-even is 200s / 40 remaining turns =
+    # 5s of extra latency per turn, against whole turns that take 5-10s total
+    # here, so the longer context would have to double every remaining turn to
+    # pay for the summary.  Prefill is 0.9s of a 22.9s call, the prefix cache
+    # hits 95%, and 48 of this model's 64 layers are linear attention, so it is
+    # not expected to.
+    parser.add_argument("--autocompact", default="180k")
     parser.add_argument("--thinking", default="off")
     return parser.parse_args()
 

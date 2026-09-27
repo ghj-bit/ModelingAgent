@@ -11,7 +11,7 @@
 #     the task's pre-gathered data/external_data.md, and owns the modeling plan
 #     itself; no prompt section, step or policy line refers to a prior plan.
 #   * The initial interaction policy is the arm's own seed,
-#     interaction_policy.STRATEGIC_DECISION_CONSULTATION, plus one paragraph
+#     interaction_policy.OPERATOR_DRIVEN_CONSULTATION, plus one paragraph
 #     telling the solver to keep the consultation proportionate: the expert
 #     settles at most one strategic decision and the modeling work is still
 #     owed in full.  The paragraph lives in the from-scratch module, not in the

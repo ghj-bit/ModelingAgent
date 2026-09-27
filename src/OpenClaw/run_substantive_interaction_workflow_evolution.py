@@ -588,13 +588,30 @@ def workflow_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
 # fixed, so a round that rewrites it changes the starting point instead of
 # improving a policy and makes the rounds incomparable.
 #
-# Seeds differ in how they head that section (the escalation seed uses a level
-# three heading, the consultation seed a level one), so the level is read off the
+# Seeds differ in how they head that section -- the escalation seed uses a level
+# three heading, the consultation seed a level one -- so the level is read off the
 # policy instead of being assumed: the boundary is the next heading of the same or
 # a higher level, which keeps the workflow's own deeper steps inside it.
+#
+# They also differ in what the heading says.  Every accepted wording is listed
+# here rather than the strongest one being made canonical, because dropping a
+# wording is silent and expensive: a policy whose heading stops matching parses
+# as having no workflow section at all, which costs both the operator-level
+# similarity the rounds are compared through and -- because
+# `assert_fixed_policy_sections_unchanged` treats "no section" as "no boundary to
+# enforce" -- the guard that stops a round rewriting the sections held fixed.
 INTERACTION_WORKFLOW_HEADING = "Interaction Workflow"
+INTERACTION_WORKFLOW_HEADINGS = (
+    "Interaction Workflow",
+    "可选交互算子",
+)
 _WORKFLOW_HEADING_PATTERN = re.compile(
-    rf"(?m)^(#{{1,3}}) {re.escape(INTERACTION_WORKFLOW_HEADING)}\s*$"
+    rf"(?m)^(#{{1,3}}) (?:{'|'.join(re.escape(h) for h in INTERACTION_WORKFLOW_HEADINGS)})\s*$"
+)
+# For messages, which a candidate's own policy may have headed with any accepted
+# wording: naming one of them reads as "the other one is not a section".
+_WORKFLOW_HEADING_LABEL = " or ".join(
+    f"`{heading}`" for heading in INTERACTION_WORKFLOW_HEADINGS
 )
 
 
@@ -675,7 +692,7 @@ def assert_fixed_policy_sections_unchanged(
     if candidate_parts is None:
         raise ValueError(
             "candidate policy_text dropped the "
-            f"`{INTERACTION_WORKFLOW_HEADING}` section"
+            f"{_WORKFLOW_HEADING_LABEL} section"
         )
     reference_parts = _fixed_policy_parts(reference)
     for label, candidate_part, reference_part in zip(
@@ -686,7 +703,7 @@ def assert_fixed_policy_sections_unchanged(
         ):
             raise ValueError(
                 f"candidate rewrote policy text {label} the "
-                f"`{INTERACTION_WORKFLOW_HEADING}` section; only that section may change"
+                f"{_WORKFLOW_HEADING_LABEL} section; only that section may change"
             )
 
 
@@ -723,7 +740,7 @@ def assert_solver_policy_changed(
             raise ValueError(
                 f"candidate policy_text reproduces {label}, so the solver would "
                 "see no change; rewrite the "
-                f"`{INTERACTION_WORKFLOW_HEADING}` section instead of only the "
+                f"{_WORKFLOW_HEADING_LABEL} section instead of only the "
                 "action graph"
             )
 

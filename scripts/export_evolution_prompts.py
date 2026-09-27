@@ -94,7 +94,14 @@ def solver_prompts() -> tuple[str, str]:
     )
 
     base._benchmark = "mmbench"
-    sentinel = {"policy_text": POLICY, "workflow_id": "«workflow id»"}
+    # max_exchanges is a runtime field, so the sentinel has to carry one or the
+    # rendered block falls back to the engine's default of 1 and states a budget
+    # the arm does not use. Read it off the live seed rather than repeating it.
+    sentinel = {
+        "policy_text": POLICY,
+        "workflow_id": "«workflow id»",
+        "max_exchanges": scratch_seed_budget(),
+    }
     # The from-scratch launcher sets this, so its prompt is the one with the guard.
     os.environ["INTERACTION_RUNAWAY_GUARD"] = "1"
     from_scratch = scratch.build_from_scratch_solver_prompt(sentinel)
@@ -287,8 +294,12 @@ def seed_policy() -> str:
     Not `src/OpenClaw/prompts/initial_interaction_policy.md`: that file renders the
     *other* constant in `interaction_policy.py` and is exported by
     `scripts/export_initial_interaction_policy.py`.  The claude arm's seed is
-    `STRATEGIC_DECISION_CONSULTATION`, and the from-scratch arm runs it through
-    `strip_plan_references`, so this renders the workflow the arm actually mints.
+    `OPERATOR_DRIVEN_CONSULTATION`, which names no plan, so the from-scratch arm's
+    `strip_plan_references` returns it whole: both Claude arms mint the identical
+    text and there is no second variant to show.  What the solver sees does still
+    differ between the arms, but by the from-scratch module's proportionality
+    paragraph -- stated outside the policy so the optimizer cannot rewrite it --
+    and that is rendered below instead of a duplicate policy dump.
     """
     from src.OpenClaw import (
         run_substantive_interaction_workflow_evolution_from_scratch_claude as scratch,
@@ -296,17 +307,77 @@ def seed_policy() -> str:
     from src.OpenClaw import interaction_policy
 
     workflow = scratch.fixed_initial_workflow()
-    raw = interaction_policy.STRATEGIC_DECISION_CONSULTATION
+    raw = interaction_policy.OPERATOR_DRIVEN_CONSULTATION
+    identical = workflow.get("policy_text") == raw
+    operators = [
+        title
+        for title, _ in interaction_policy_step_titles(raw)
+    ]
     return (
-        "# 在用：`fixed_initial_workflow()` 产出的种子（已剔除 draft 相关行）\n\n"
+        "# 在用：`fixed_initial_workflow()` 产出的种子\n\n"
         f"`workflow_id` = `{workflow.get('workflow_id')}`，"
         f"`policy_text` {len(workflow.get('policy_text', ''))} 字符"
-        f"（原始常量 `interaction_policy.STRATEGIC_DECISION_CONSULTATION` {len(raw)} 字符）。\n\n"
+        f"（原始常量 `interaction_policy.OPERATOR_DRIVEN_CONSULTATION` {len(raw)} 字符）。"
+        + (
+            "两臂文本一致：该种子不含 `draft`，`strip_plan_references()` 是空操作。\n\n"
+            if identical
+            else "注意：两臂文本**不一致**，请检查 `strip_plan_references()`。\n\n"
+        )
         + block(workflow.get("policy_text", ""))
-        + "\n## 对照：未经 `strip_plan_references` 的原始常量\n\n"
-        "draft 臂用的是这一份；from-scratch 臂删掉了所有含 `draft` 的行，因为该臂没有起始计划。\n\n"
-        + block(raw)
+        + f"\n## 算子清单（从 `# {policy_heading(raw)}` 段解析）\n\n"
+        "每个算子是该段里的一个 `###` 子标题，演化器只被允许改写这一段：\n\n"
+        + "\n".join(f"{index}. {title}" for index, title in enumerate(operators, 1))
+        + "\n\n段外（自主默认、交互预算、停止条件、效率规则、禁止索取参数/计算/代码的清单）"
+        "由 `assert_fixed_policy_sections_unchanged()` 强制逐字保留。"
+        "段内最多 8 个算子：相似度按算子逐个数，阈值 "
+        f"{base_similarity_threshold():.2f}，第 9 个起每轮都会被判成重复。\n\n"
+        "## 对照：from-scratch 臂额外追加的一段\n\n"
+        "这段在策略文本**之外**，由 from-scratch 模块拼进 solver prompt，"
+        "所以演化器改不掉它；draft 臂没有它。\n\n"
+        + block(scratch.INTERACTION_PROPORTIONALITY_NOTE)
     )
+
+
+def interaction_policy_step_titles(policy_text: str) -> list[tuple[str, str]]:
+    """The operator headings the engine reads out of the workflow section.
+
+    Imported rather than re-parsed here, so this listing cannot disagree with the
+    graph the similarity guard compares rounds through.
+    """
+    from src.OpenClaw import (
+        run_substantive_interaction_workflow_evolution_from_initial_draft_claude as base,
+    )
+
+    return base._interaction_workflow_steps(policy_text)
+
+
+def policy_heading(policy_text: str) -> str:
+    """Whichever accepted heading this policy actually uses.
+
+    Read off the engine's list rather than written here, so renaming the section
+    again cannot leave this document naming a heading the policy does not carry.
+    """
+    from src.OpenClaw import run_substantive_interaction_workflow_evolution as workflow
+
+    for heading in workflow.INTERACTION_WORKFLOW_HEADINGS:
+        if re.search(rf"(?m)^#{{1,3}} {re.escape(heading)}\s*$", policy_text):
+            return heading
+    return workflow.INTERACTION_WORKFLOW_HEADING
+
+
+def scratch_seed_budget() -> int:
+    """The exchange budget the Claude arm's seed actually runs with."""
+    from src.OpenClaw import (
+        run_substantive_interaction_workflow_evolution_from_scratch_claude as scratch,
+    )
+
+    return int(scratch.fixed_initial_workflow()["max_exchanges"])
+
+
+def base_similarity_threshold() -> float:
+    from src.OpenClaw import run_substantive_interaction_workflow_evolution as workflow
+
+    return workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD
 
 
 def system_message_of(function) -> str:
@@ -530,11 +601,12 @@ def build() -> dict[str, str]:
             "# 交互策略种子（frozen seed）\n\n"
             "填进 solver prompt 交互段的初始策略，全部臂都从它出发，演化器只能改写它、不能换掉它。\n\n"
             + provenance(
-                source_note("src/OpenClaw/interaction_policy.py", 18, "STRATEGIC_DECISION_CONSULTATION")
+                source_note("src/OpenClaw/interaction_policy.py", 18, "OPERATOR_DRIVEN_CONSULTATION")
                 + " → "
                 + source_note("src/OpenClaw/run_substantive_interaction_workflow_evolution_from_scratch_claude.py", 99, "fixed_initial_workflow()"),
-                "静态常量 + 该臂的 `strip_plan_references()` 处理",
-                "from-scratch 臂与协同演化臂用上面的第一份；draft 臂用未剔除 draft 行的原始常量",
+                "静态常量（`strip_plan_references()` 对本种子是空操作）",
+                "三个 claude 臂（draft / from-scratch / 协同演化）用的是同一份策略文本；"
+                "差异只在策略之外那段 proportionality 提示",
             )
             + seed_policy()
         ),

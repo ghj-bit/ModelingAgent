@@ -15,8 +15,10 @@ runs' directories, which is where it was collected; the planner's own proposed
 solution is never copied or read.
 
 The initial interaction strategy is the same frozen seed the other Claude arm
-uses (``interaction_policy.STRATEGIC_DECISION_CONSULTATION``), so the two arms
+uses (``interaction_policy.OPERATOR_DRIVEN_CONSULTATION``), so the two arms
 differ in the starting point of the *work*, not in the policy being evolved.
+That seed names no plan, so ``strip_plan_references`` leaves it whole and both
+arms mint the identical policy text.
 
 One prompt addition is arm-specific rather than policy: the consultation is
 capped at one settled strategic decision and the solver is told so, because a

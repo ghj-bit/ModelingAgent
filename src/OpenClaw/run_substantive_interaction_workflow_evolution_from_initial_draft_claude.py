@@ -42,12 +42,12 @@ try:
     from . import claude_backend
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
-    from .interaction_policy import STRATEGIC_DECISION_CONSULTATION
+    from .interaction_policy import OPERATOR_DRIVEN_CONSULTATION
 except ImportError:
     import claude_backend
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
-    from src.OpenClaw.interaction_policy import STRATEGIC_DECISION_CONSULTATION
+    from src.OpenClaw.interaction_policy import OPERATOR_DRIVEN_CONSULTATION
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -745,9 +745,9 @@ object only (no markdown fences), matching the schema in §3.
 
 §1 Optimization goals. Evolve one executable human-expert interaction policy for
 a modeling agent that {solver_start} and otherwise solves autonomously. Treat the policy as the communication contract: it governs only the
-consultation itself — when the agent asks, what it asks, how many exchanges it
-uses, how those exchanges relate to one another, and what it does with each
-reply. It governs no other part of the solver's work, and a policy that asks
+consultation itself — which interaction operator the agent applies and when,
+what it asks under that operator, how it treats each reply, and how the
+exchanges relate to one another. It governs no other part of the solver's work, and a policy that asks
 the agent to account for, log, or document the consultation is not a
 behavioural improvement.
 
@@ -790,17 +790,43 @@ A candidate whose behavioural similarity to a round already evaluated reaches
 §2 Modification requirements.
 
 - Mutate the parent policy. Only one policy is live; crossover is unavailable.
-- Change only the consultation's own behaviour: what the agent does before it
-  asks (the question's content and form), how it treats the reply, and whether and
-  how a further exchange is used. Everything else in `interaction_policy` is fixed
-  and must be carried over exactly as the parent states it: the trigger conditions
-  for consulting, the exchange budget, the stop conditions, any efficiency or
-  scope rule, and any prohibition on asking the expert to compute, implement, or
-  execute. Where the parent marks the mutable part with a heading, that heading is
-  the boundary; the policy text itself is the only thing the solver reads.
-- Keep each step the policy states concise: one or two sentences each. A short
-  workflow the solver follows exactly is worth more than a longer one it follows
-  only in part. Do not restate the fixed parts inside the workflow.
+- Change only the operator repertoire inside the operator section, the one headed
+  `# 可选交互算子`: each operator's `When` (the trigger condition that selects it),
+  its `How` (how that operator is executed) and its `Example` (the exchange that
+  shows it), plus the rule that chooses among the operators. Everything the parent
+  states outside that section is fixed and must be carried over exactly as the
+  parent states it: the autonomy default, the exchange budget, and every
+  prohibition on what may be asked — including the ban on asking the expert for
+  parameter values, computation, derivation, or anything about code. That heading
+  is the boundary; the policy text itself is the only thing the solver reads.
+  Carry the heading itself over unchanged, and do not translate or reword it.
+- Keep every operator the parent defines. A round evolves what an operator means
+  and when it fires; it does not delete the repertoire, rename an operator
+  without changing its behaviour, or fold two operators into one.
+- Prefer sharpening an existing operator to adding one. A failure no operator
+  currently catches is usually a trigger drawn too narrowly, and widening that
+  trigger or rewriting that example costs the solver nothing it has not already
+  read, while a new operator costs it a whole new section to learn. Add one only
+  as a last resort: when the repertoire has already been well evolved — its
+  operators' `When`, `How` and `Example` rewritten across the rounds in
+  `evolution_history` — and the failure still cannot be expressed by any of them.
+  Name in `evolution_rationale` the operators you tried to sharpen and why none
+  could carry the patch.
+- A new operator is a new `### Operator N: <name>` step in the same
+  `When`/`How`/`Example` shape. It is bound by every fixed prohibition, and it must
+  leave the section at no more than eight operators. It has to name a decision the
+  expert can actually settle, not restate an existing operator in other words.
+- Give each operator exactly one `###` heading, and keep every other heading out
+  of that section: a round is compared against the parent by those headings, so a
+  stray one changes the comparison rather than the policy.
+- Keep each operator in its `When` / `How` / `Example` shape: one or two sentences
+  for `When`, one or two for `How`, and for `Example` one short exchange — the
+  agent's question and the expert's reply — as short as the other two and no more
+  specific to any task than the rest of the policy. An example that has to change
+  with the operator is part of evolving it: rewrite it rather than deleting it, and
+  keep it an exchange rather than prose about one. A short repertoire the solver
+  follows exactly is worth more than a longer one it follows only in part. Do not
+  restate the fixed parts inside the workflow.
 - Make the smallest edit that carries the patch. Add or rewrite only the lines
   your change needs and leave every other line of `interaction_policy` exactly as
   the parent wrote it. Rewording, reordering, and cosmetic deletion are not
@@ -832,7 +858,7 @@ the bookkeeping fields, and make it differ from the parent's text.
   "maximum_expert_interactions": <positive integer>,
   "termination_condition": "<concise textual stopping rule>",
   "evolution_mode": "mutation",
-  "changed_components": ["<non-empty list of behavioural changes>"],
+  "changed_components": ["<non-empty list naming the operator(s) whose `When`, `How` or `Example` changed, or `new operator: <name>`>"],
   "evolution_rationale": "<why the changes fit the parent policy's evidence>"
 }
 """
@@ -1161,6 +1187,22 @@ into a single loop.
         if os.environ.get("INTERACTION_RUNAWAY_GUARD") == "1"
         else ""
     )
+    # Test-only, env-gated like the runaway guard above.  The model *can* emit
+    # parallel tool calls -- a direct endpoint probe returned two on 3 of 3
+    # tries, and the shim carries multiple calls in both directions (it slots
+    # them by call index) -- but it never does so unprompted: of 346
+    # tool-calling messages in one measured run, none carried two calls.  This
+    # block is the experiment that asks whether saying so changes that.
+    parallel_guard = (
+        """
+Send independent calls together. When two commands do not need each other's
+output, put both in the same message instead of spending a turn on each: one run
+here made 346 calls one at a time and never once paired two.
+
+"""
+        if os.environ.get("SOLVER_PARALLEL_CALLS") == "1"
+        else ""
+    )
     if include_draft:
         intro = """# ModelingBench Task — Interactive Modeling Solver Agent
 
@@ -1292,6 +1334,19 @@ changed its code. To see more of what it printed, read
 `{{{{LOGS_DIR}}}}/<script>.log` — do not re-run it with a different
 tail/head/sed filter.
 
+The same holds for a probe. An inline `python -` that interrogates your model is
+a script like any other: send what it prints to a log, and when the model's code
+has not changed since, read that log instead of probing again — a repeated probe
+answers nothing new. One run here asked the same question 45 times with nothing
+changed in between.
+
+Write each model script so its constants come from the command line, and give it
+a way to print a table over a range of them, e.g.
+`python model.py --sweep K_ERODE=1e-4,1e-3,1e-2`. Then testing a value costs a
+short command instead of a new program: one run here spent 78,000 characters —
+40% of everything it wrote — on one-off sweep scripts that a single
+parameterised script would have replaced.
+{parallel_guard}
 Do not narrate between tool calls.
 
 Write the report once, to its own file; do not embed report prose in scripts.
@@ -1336,28 +1391,34 @@ Run all Python work with the `math_modeling` conda environment:
 def fixed_initial_workflow() -> dict:
     """Return the one frozen interaction policy used by the whole run.
 
-    This is the Claude Code arm's own seed (``STRATEGIC_DECISION_CONSULTATION``),
+    This is the Claude Code arm's own seed (``OPERATOR_DRIVEN_CONSULTATION``),
     not the text the OpenHands arm and the workflow-test runner pin: the two
     arms therefore start from different strengths of the same rule.  Everything
     downstream -- the gates, the utility, the evolution prompt -- is unchanged.
+
+    The seed's deliverable is the operator repertoire: four operators, each
+    stating when it applies and how it is executed, so a round can evolve one
+    operator's trigger, its execution, or add an operator the parent has not got.
+    The four is the seed's roster, not a ceiling -- nothing the solver reads may
+    state a count, or the fixed sections would contradict the first round that
+    adds one.
     """
     selected = {
-        "name": "Strategic decision consultation policy",
+        "name": "Interaction-operator consultation policy",
         "purpose": (
-            "Solve the task autonomously by default and consult the expert only "
-            "for a high-impact strategic decision -- an ambiguous objective, "
-            "fundamentally different modeling approaches, a critical assumption, "
-            "or a framework choice with major downstream impact."
+            "Solve the task autonomously by default and spend the fixed expert "
+            "budget through the interaction operator whose trigger condition the "
+            "current state meets -- resolving an open strategic uncertainty, "
+            "challenging a load-bearing line of reasoning, injecting missing "
+            "real-world knowledge, or correcting and deepening the model after an "
+            "earlier reply."
         ),
-        "policy_text": STRATEGIC_DECISION_CONSULTATION,
+        "policy_text": OPERATOR_DRIVEN_CONSULTATION,
         "max_exchanges": 3,
         "stop_condition": (
-            "Never end the run with zero expert replies: if no uncertainty "
-            "qualifies, consult once on the most consequential open modeling "
-            "decision. After the first reply, stop consulting once the strategic "
-            "uncertainty is resolved, the modeling direction is determined, and "
-            "the remaining decisions can be handled autonomously; never exceed "
-            "three expert replies."
+            "The consultation stops when its exchange budget is used: three "
+            "exchanges, one operator each, as the policy's Interaction Limits "
+            "section states. The policy states no other stop rule."
         ),
     }
     # Test-only: replay an already-evolved policy in an isolated experiment, so

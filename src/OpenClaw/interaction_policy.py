@@ -36,16 +36,21 @@ Before each exchange:
 
 Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.
 
-Determine what the expert is needed to do:
-
-- resolve ambiguity;
-- challenge a key assumption;
-- provide missing real-world knowledge;
-- refine a previously introduced modeling mechanism.
-
-Choose, from the above, the way that best matches the need, and name it -- its
+Choose which operator in the roster below the exchange needs, and name it -- its
 number and its name -- at the head of the question, so the exchange records which
-operator it applied. Every exchange carries one.
+operator it applied. Every exchange carries one. Which situation calls for which
+operator is this rule's to state.
+
+## Operator Roster
+
+- Operator 1 -- resolve ambiguity;
+- Operator 2 -- challenge a key assumption;
+- Operator 3 -- provide missing real-world knowledge;
+- Operator 4 -- refine a previously introduced modeling mechanism.
+
+The numbers are fixed. The exchange headings and every round's evidence are read
+back by number, so a question headed `Operator 2` is recorded as challenging a
+key assumption whatever the question actually asked.
 
 ## Prohibited Requests
 

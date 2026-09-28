@@ -808,6 +808,11 @@ State, in the parent's own order:
 - **when to ask it.** Which decision comes first, and what must be settled before
   the next question is worth asking.
 - **which operator carries the question**, and why that one rather than another.
+  The roster under `## Operator Roster` is fixed and states what each number
+  means; this rule is what decides which situation calls for which of them.  Use
+  the roster's numbers as it gives them -- the exchange headings and every
+  earlier round's evidence are read back by number, so a number put to another
+  use makes the record say the wrong thing.
 
 The patch must differ from the parent and from every policy in
 `evolution_history`; rewording that leaves behaviour identical is rejected as

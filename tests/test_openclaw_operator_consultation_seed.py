@@ -174,6 +174,63 @@ class OperatorSeedTests(unittest.TestCase):
                 self.assertNotIn(f"{count} {noun}", self.policy_text)
         self.assertNotRegex(self.policy_text, r"\b\d+\s+(interaction )?operators\b")
 
+    def test_the_seed_numbers_its_operators(self):
+        # "name it -- its number and its name" is only followable if the numbers
+        # are stated.  They used to be bullets in a fixed order and the solver
+        # had to infer the number from the position, which it got wrong: on
+        # 2020_F of claude_fp8_scratch_r10 round 0 it headed one question
+        # `Operator 2: refine a previously introduced modeling mechanism` and
+        # another `Operator 3: challenge a key assumption`, and
+        # `_USED_OPERATOR_PATTERN` read both back into the evidence by number.
+        for number, route in (
+            (1, "resolve ambiguity"),
+            (2, "challenge a key assumption"),
+            (3, "provide missing real-world knowledge"),
+            (4, "refine a previously introduced modeling mechanism"),
+        ):
+            # Punctuation is not pinned: the last item ends the list with a full
+            # stop where the others use semicolons.
+            self.assertIn(f"- Operator {number} -- {route}", self.policy_text)
+
+        # And the numbering must not read as workflow *steps*: the step splitter
+        # takes leading `N.` items, so writing this list as `1.`/`2.`/… would
+        # derive a four-action graph where the fallback one belongs, changing the
+        # workflow the similarity guard compares rounds through.
+        self.assertEqual(base._interaction_workflow_steps(self.policy_text), [])
+
+    def test_the_roster_is_frozen_and_the_strategy_around_it_is_not(self):
+        # The numbers the engine reads back are an interface, not strategy, so
+        # the roster sits outside the mutable section and a round cannot touch
+        # it.  This is the whole point of splitting it out: while the roster was
+        # a bulleted list inside `## Interaction Strategy`, a round replaced the
+        # section and took the definitions with it, leaving `Operator 2` in the
+        # rule meaning whatever the round felt like.
+        roster_start = self.policy_text.index("## Operator Roster")
+        roster_end = self.policy_text.index("## Prohibited Requests")
+        self.assertNotIn("Operator Roster", workflow.MUTABLE_POLICY_HEADINGS)
+        parent = [{"workflow": {"policy_text": self.policy_text, "workflow_id": "s"}}]
+        for mutation in (
+            self.policy_text.replace(
+                "- Operator 2 -- challenge a key assumption",
+                "- Operator 2 -- ask about parameters",
+            ),
+            self.policy_text[:roster_start] + self.policy_text[roster_end:],
+        ):
+            with self.assertRaises(ValueError):
+                workflow.assert_fixed_policy_sections_unchanged(
+                    {"policy_text": mutation}, parent
+                )
+        # And the rule around it is still the round's to rewrite.
+        workflow.assert_fixed_policy_sections_unchanged(
+            {
+                "policy_text": self.policy_text.replace(
+                    "Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.",
+                    "Identify the decision this exchange must settle.",
+                )
+            },
+            parent,
+        )
+
     def test_each_operator_states_when_and_how(self):
         for title, body in base._interaction_workflow_steps(self.policy_text):
             self.assertIn("**When.**", body, f"{title} states no trigger condition")
@@ -639,7 +696,7 @@ class PolicyPatchTests(unittest.TestCase):
         # harmless reflow of the surrounding prose.
         unwrapped = " ".join(self.seed["policy_text"].split())
         self.assertIn("name it -- its number and its name", unwrapped)
-        self.assertIn("Choose, from the above, the way that best matches the need", unwrapped)
+        self.assertIn("Choose which operator in the roster below the exchange needs", unwrapped)
 
     def test_the_solver_prompt_states_the_heading(self):
         # This block is rendered outside `policy_text`, so a round cannot evolve

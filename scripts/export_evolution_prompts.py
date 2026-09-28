@@ -123,14 +123,13 @@ def evolver_prompt() -> str:
     # substituted straight into the template; rendering the draft arm's values
     # would show the wrong sentence for this arm.
     scratch.patch_sibling_launcher()
-    head = (
-        base.EVOLUTION_PROMPT_HEAD.replace(
-            "{similarity_threshold}",
-            f"{base.workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD:.2f}",
-        )
-        .replace("{solver_source}", base.SOLVER_SOURCE_CONTEXT)
-        .replace("{solver_start}", base.SOLVER_START_CONTEXT)
-    )
+    # The same two substitutions the launcher makes, and only those: the
+    # similarity bound is enforced by the engine but no longer stated in the
+    # prompt, so a `{similarity_threshold}` pass here would render a placeholder
+    # the real prompt does not carry and hide the difference.
+    head = base.EVOLUTION_PROMPT_HEAD.replace(
+        "{solver_source}", base.SOLVER_SOURCE_CONTEXT
+    ).replace("{solver_start}", base.SOLVER_START_CONTEXT)
     return "\n".join(
         [
             head,
@@ -313,6 +312,11 @@ def seed_policy() -> str:
         title
         for title, _ in interaction_policy_step_titles(raw)
     ]
+    # The mutable surface is read off the engine rather than described from
+    # memory: the seed's shape has changed twice, and both times this commentary
+    # kept describing the shape it had before.
+    rule_spans = mutable_rule_spans(raw)
+    mutable_chars = sum(len(span) for span in rule_spans)
     return (
         "# 在用：`fixed_initial_workflow()` 产出的种子\n\n"
         f"`workflow_id` = `{workflow.get('workflow_id')}`，"
@@ -324,20 +328,45 @@ def seed_policy() -> str:
             else "注意：两臂文本**不一致**，请检查 `strip_plan_references()`。\n\n"
         )
         + block(workflow.get("policy_text", ""))
-        + f"\n## 算子清单（从 `# {policy_heading(raw)}` 段解析）\n\n"
-        "每个算子是该段里的一个 `###` 子标题，演化器只被允许改写这一段：\n\n"
-        + "\n".join(f"{index}. {title}" for index, title in enumerate(operators, 1))
-        + "\n\n段外（自主默认、交互预算、停止条件、效率规则、禁止清单）"
-        "由 `assert_fixed_policy_sections_unchanged()` 强制逐字保留。"
-        "禁止清单只管实现/调参/推导/计算，**不管参数合理性**："
-        "请专家判断 agent 自己假定的常数是否量级合理是允许的。"
-        "段内最多 8 个算子：相似度按算子逐个数，阈值 "
-        f"{base_similarity_threshold():.2f}，第 9 个起每轮都会被判成重复。\n\n"
+        + f"\n## 可变面：`{policy_heading(raw)}` 段\n\n"
+        + (
+            "这一段是唯一可变的一段"
+            f"（{len(rule_spans)} 段 / {mutable_chars} 字符），演化器只能改写它。\n\n"
+        )
+        + (
+            "段内算子（每个是一个 `###` 子标题）：\n\n"
+            + "\n".join(f"{index}. {title}" for index, title in enumerate(operators, 1))
+            + "\n\n"
+            if operators
+            else "该种子**不含算子库**：段内没有 `###` 子标题，"
+            "可变面就是这段散文规则本身。\n\n"
+        )
+        + "段外（禁止清单、交互预算、停止条件）由 "
+        "`assert_fixed_policy_sections_unchanged()` 强制逐字保留；"
+        "引擎另外拒绝任何命名 `### Operator` 段的补丁。"
+        "禁止清单只剩三条——实现/编码/调试、标准数学推导、计算或数据处理；"
+        "**参数合理性不在其中**：请专家判断 agent 自己假定的常数是否量级合理、"
+        "是否落在合理区间、该在什么区间上检查，都是允许的。\n\n"
+        f"相似度按**这段的文本**比对（不是按算子计数），阈值 "
+        f"{base_similarity_threshold():.2f}：行为不变、只换措辞的候选会被判成重复。\n\n"
         "## 对照：from-scratch 臂额外追加的一段\n\n"
         "这段在策略文本**之外**，由 from-scratch 模块拼进 solver prompt，"
         "所以演化器改不掉它；draft 臂没有它。\n\n"
         + block(scratch.INTERACTION_PROPORTIONALITY_NOTE)
     )
+
+
+def mutable_rule_spans(policy_text: str) -> list[str]:
+    """The rule text a round may rewrite, as the similarity guard reads it.
+
+    Imported rather than re-split here, so this description cannot disagree with
+    the spans `assert_fixed_policy_sections_unchanged` enforces.
+    """
+    from src.OpenClaw import (
+        run_substantive_interaction_workflow_evolution as workflow,
+    )
+
+    return workflow._rule_section_texts(policy_text)
 
 
 def interaction_policy_step_titles(policy_text: str) -> list[tuple[str, str]]:
@@ -358,10 +387,12 @@ def policy_heading(policy_text: str) -> str:
 
     Read off the engine's list rather than written here, so renaming the section
     again cannot leave this document naming a heading the policy does not carry.
+    Searched over the *mutable* headings: the rule's heading and the repertoire's
+    are two separate lists in the engine, and this seed carries only the first.
     """
     from src.OpenClaw import run_substantive_interaction_workflow_evolution as workflow
 
-    for heading in workflow.INTERACTION_WORKFLOW_HEADINGS:
+    for heading in workflow.MUTABLE_POLICY_HEADINGS:
         if re.search(rf"(?m)^#{{1,3}} {re.escape(heading)}\s*$", policy_text):
             return heading
     return workflow.INTERACTION_WORKFLOW_HEADING
@@ -471,7 +502,7 @@ def build() -> dict[str, str]:
                 "EVOLUTION_PROMPT_HEAD / EVOLUTION_OUTPUT_SCHEMA / EVOLUTION_EVIDENCE_GUIDE / EVOLUTION_PROMPT_FOOT",
             ),
             "静态常量拼接 + 运行时证据（本文件为渲染结果）",
-            "三个 claude 臂共用；臂差异只体现在 `{solver_source}` / `{solver_start}` 两个句子上",
+            "三个 claude 臂共用；臂差异只体现在 §1 的 `{solver_start}` 一句上"
         )
         + "注意：上文的 §1–§5 是**用户消息**；调用时另有一条独立的 system 消息（见下），"
         "以及一条把单次 run 压成 50 字变更摘要的辅助调用（它产出的摘要进入 §4 证据）。\n\n"

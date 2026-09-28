@@ -638,6 +638,7 @@ INTERACTION_WORKFLOW_HEADING = "Interaction Workflow"
 INTERACTION_WORKFLOW_HEADINGS = (
     "Interaction Workflow",
     "可选交互算子",
+    "Interaction Operators",
 )
 _WORKFLOW_HEADING_PATTERN = re.compile(
     rf"(?m)^(#{{1,3}}) (?:{'|'.join(re.escape(h) for h in INTERACTION_WORKFLOW_HEADINGS)})\s*$"
@@ -650,11 +651,25 @@ _WORKFLOW_HEADING_LABEL = " or ".join(
 
 
 def _workflow_section(text: str) -> tuple[str, int, int] | None:
-    """Return (section text, its start, its heading level) for the workflow part."""
-    heading = _WORKFLOW_HEADING_PATTERN.search(text)
+    """Return (section text, its start, its heading level) for the workflow part.
+
+    The SHALLOWEST matching heading wins, not the first.  A policy can carry an
+    accepted wording at two levels: the `claude_fp8_ab_*` era heads its strategy
+    prose `## Interaction Operators` and the repertoire `# 可选交互算子`, and the
+    later seeds move that wording down onto the repertoire.  `search` would take
+    whichever came first in the text, which for those policies is the prose --
+    so the version that merely added the new wording without this rule read the
+    wrong section.  Shallowest resolves both layouts to the repertoire, which is
+    what the boundary and the step list are both read off.
+    """
+    heading = None
+    level = 0
+    for candidate in _WORKFLOW_HEADING_PATTERN.finditer(text):
+        candidate_level = len(candidate.group(1))
+        if heading is None or candidate_level < level:
+            heading, level = candidate, candidate_level
     if heading is None:
         return None
-    level = len(heading.group(1))
     body_start = heading.end()
     closing = re.search(rf"\n#{{1,{level}}} ", text[body_start:])
     if closing is None:
@@ -702,19 +717,22 @@ def _fixed_policy_parts(text: str) -> tuple[str, str] | None:
 
 # The sections a round may rewrite.  A round evolves the consultation, and the
 # consultation is stated in two places: the rule that chooses among the operators
-# and the repertoire it chooses from.  Keeping only the second mutable made every
-# round rewrite the same operator -- the repertoire is what the evidence points
-# at, and the rule that assembles it was out of reach.
+# (`## Interaction Strategy`) and the repertoire it chooses from
+# (`# Interaction Operators`).  Keeping only the second mutable made every round
+# rewrite the same operator -- the repertoire is what the evidence points at, and
+# the rule that assembles it was out of reach.  The two names are kept side by
+# side here for the same reason the workflow headings are: the rule section was
+# once headed `## Interaction Operators`, so policies from that era still carry
+# the wording, on the section that is now the repertoire rather than the rule.
 #
 # Everything else stays frozen, and each frozen piece is load-bearing:
-# `## Principle` carries the autonomy default, `## Prohibited Requests` the ban
-# that keeps the expert out of computation, derivation and code, and
-# `# Interaction Limits` the exchange budget.  A round that could rewrite those
-# would be able to buy score by putting computation back on the expert while
-# still presenting itself as a valid candidate.
-MUTABLE_POLICY_HEADINGS = (
-    "Interaction Operators",
-    *INTERACTION_WORKFLOW_HEADINGS,
+# `## Prohibited Requests` carries the ban that keeps the expert out of
+# computation, derivation and code, and `# Interaction Limits` the exchange
+# budget.  A round that could rewrite those would be able to buy score by putting
+# computation back on the expert while still presenting itself as a valid
+# candidate.
+MUTABLE_POLICY_HEADINGS = tuple(
+    dict.fromkeys(("Interaction Strategy", *INTERACTION_WORKFLOW_HEADINGS))
 )
 # For retry messages: the optimizer reads these to learn what it may rewrite,
 # so they name the mutable sections rather than the boundary it overstepped.
@@ -832,7 +850,7 @@ def _section_span(text: str, heading: str) -> tuple[int, int] | None:
     a hypothetical `## Operator 4: Refine / correct` are different sections.  A
     block runs from its heading line to the next heading at the same or a
     shallower level, which is what makes an operator's `###` sub-block a block
-    and the `# 可选交互算子` section a section under the same rule.
+    and the `# Interaction Operators` section a section under the same rule.
     """
     wanted = _POLICY_HEADING_PATTERN.match(heading)
     if wanted is None:
@@ -928,7 +946,7 @@ def apply_policy_patch(
                 raise ValueError(
                     f"{POLICY_PATCH_FIELD} rewrites {', '.join(operators)}, but "
                     "the operator sections are frozen this round: rewrite "
-                    "`## Interaction Operators` and nothing else. The rule is "
+                    "`## Interaction Strategy` and nothing else. The rule is "
                     "what the evidence implicates, and holding the repertoire "
                     "fixed is what lets a round's result be attributed to the "
                     "rule alone"
@@ -937,7 +955,7 @@ def apply_policy_patch(
                 f"{POLICY_PATCH_FIELD} rewrites {len(operators)} operator sections "
                 f"({'; '.join(operators)}); a round may rewrite at most "
                 f"{POLICY_PATCH_OPERATOR_LIMIT}.  Change the rule under "
-                "`## Interaction Operators` instead of the repertoire: a patch "
+                "`## Interaction Strategy` instead of the repertoire: a patch "
                 "that moves several operators at once leaves the next round "
                 "unable to attribute its result to any one of them"
             )
@@ -955,7 +973,7 @@ def apply_policy_patch(
                 f"{POLICY_PATCH_FIELD} rewrites {', '.join(unjustified)}, but the "
                 f"rollouts this round read reached for: {ran}.  An operator the "
                 "consultation never applied cannot be shown to have failed, so "
-                "change `## Interaction Operators` instead -- or an operator the "
+                "change `## Interaction Strategy` instead -- or an operator the "
                 "rollouts did use"
             )
     text = str(parent_workflow.get("policy_text") or "")
@@ -1012,11 +1030,20 @@ def apply_policy_patch(
             )
         text = text[:start] + f"{heading}\n\n{body}\n\n" + text[end:]
     candidate["interaction_policy"] = text
-    # The budget and the stopping rule are not the round's to change, so they are
-    # carried from the parent rather than asked for and re-typed.
-    for key in ("max_exchanges", "stop_condition"):
+    # The budget, the stopping rule and the purpose are not the round's to
+    # change, so they are carried from the parent rather than asked for and
+    # re-typed.  `purpose` is validated -- `validate_workflow` rejects a value
+    # under twelve characters -- so an arm whose schema stops asking for it has
+    # to have it filled here or every candidate it returns is refused.
+    for key in ("max_exchanges", "stop_condition", "purpose"):
         if not candidate.get(key) and parent_workflow.get(key) is not None:
             candidate[key] = parent_workflow[key]
+    # The mode names which evolution operator produced the round, and an arm that
+    # has closed that choice to one mode no longer asks the optimizer to state
+    # it.  Only filled when the arm really has no choice: with two modes live the
+    # optimizer still has to say which one it used.
+    if not candidate.get("evolution_mode") and len(CPE_EVOLUTION_MODES) == 1:
+        candidate["evolution_mode"] = next(iter(CPE_EVOLUTION_MODES))
     candidate.pop(POLICY_PATCH_FIELD, None)
     return candidate
 

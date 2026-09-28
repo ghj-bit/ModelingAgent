@@ -5,20 +5,22 @@ policy the initial-draft solution-evolution launcher and the workflow-test
 runner pin for every task, so the two cannot drift.
 
 ``OPERATOR_DRIVEN_CONSULTATION`` is the seed the *Claude Code* solution
-evolution arm runs on instead.  It states the consultation as a repertoire of
-interaction operators, seeded with four -- resolve uncertainty, challenge
-reasoning, inject knowledge, refine/correct -- each carrying its own trigger
-condition and execution rule.  The operators and the rule that chooses among
-them are the mutable surface the rounds rewrite; the autonomy default, the
-exchange budget and the prohibition list -- coding/implementation, parameter
-tuning, standard derivations and computation -- sit outside it and are enforced
-as fixed by ``assert_fixed_policy_sections_unchanged``.  The list bars parameter
-*tuning*, not parameter *plausibility*: asking the expert whether a constant the
-agent has itself assumed is of a sensible order of magnitude stays permitted,
-and Operator 3 says so.  A round may also add an operator,
-which is why the repertoire is stated as steps rather than as a table the engine
-would have to be taught to extend -- and why nothing in the policy, fixed
-sections included, may state how many operators there are.
+evolution arm runs on instead.  It states the consultation as one prose rule
+under ``## Interaction Strategy`` -- what the agent must find out before each
+exchange, what it puts on the table, and how it treats the reply -- and carries
+no operator repertoire at all: the rounds evolve the rule, and the engine
+rejects any patch naming an operator section, so there is no second thing for
+them to move.  That rule is the seed's only mutable section; the prohibition
+list and the exchange budget sit outside it and are enforced as fixed by
+``assert_fixed_policy_sections_unchanged``.
+
+The prohibition list is three items -- coding/implementation, standard
+mathematical derivations, and computation or data processing.  Parameter
+*plausibility* is deliberately not among them: asking the expert whether a
+constant the agent has itself assumed is of a sensible order of magnitude,
+whether it sits inside a plausible range, and over what interval it should be
+checked stays permitted, and the rule's own wording is what has to carry that
+ask.
 
 The OpenHands arm and the workflow-test runner keep ``MODELING_STRATEGY_
 ESCALATION``, so their runs stay comparable with the ones already collected.
@@ -28,87 +30,30 @@ MODELING_STRATEGY_ESCALATION = '# Human Expert Interaction\n\n## Interaction Pol
 
 OPERATOR_DRIVEN_CONSULTATION = """# Human Expert Interaction
 
-## Principle
-
-The agent solves the modeling task autonomously by default: the model, the code, the calculation, the validation, and the report are its own work. It consults the expert for strategic, qualitative judgment it cannot reach from the problem statement, the pre-gathered evidence, or its own analysis.
-
-The expert never does computation. Every technical translation of a reply -- assumptions, equations, parameter values, code, and validation -- stays with the agent, which must be able to justify each one on its own evidence.
-
-## Interaction Operators
+## Interaction Strategy
 
 Before each exchange:
 
 Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.
 
-Determine what kind of expert input is needed:
+Determine what the expert is needed to do:
 
 - resolve ambiguity;
 - challenge a key assumption;
 - provide missing real-world knowledge;
 - refine a previously introduced modeling mechanism.
 
-Select the operator that best matches that need.
-
-Name the operator you selected -- its number and its name -- at the head of the
-question, so the exchange records which operator it applied. Every exchange
-carries one.
-
-Ask exactly one focused question.
-
-After each expert reply:
-
-Determine what decision, assumption, constraint, or mechanism changed.
-
-Incorporate the required implications into the model.
-
-Identify any new high-impact uncertainty introduced by the reply.
-
-Re-rank the remaining unresolved decisions before choosing the next operator.
-
-Later exchanges must depend on earlier replies. Do not predefine an operator sequence and do not choose an operator merely for diversity.
+Choose, from the above, the way that best matches the need, and name it -- its
+number and its name -- at the head of the question, so the exchange records which
+operator it applied. Every exchange carries one.
 
 ## Prohibited Requests
 
 The agent must not request feedback for:
 
 - coding, debugging, or implementation issues;
-- parameter tuning or optimization details;
 - standard mathematical derivations;
-- computation, data processing, or routine validation.
-
-# 可选交互算子
-
-### Operator 1: Resolve uncertainty
-
-**When.** An open decision could change the modeling direction, framework, or conclusions, and the problem statement, the evidence, and the agent's own analysis cannot separate two or more defensible readings.
-
-**How.** Lay out the competing readings and what each implies for the model, then ask which one the real-world setting favors. State no preference.
-
-**Example.** Agent: "Should the objective minimize peak demand or total consumption? They imply different models." Expert: "Peak -- that is what the system is constrained by."
-
-### Operator 2: Challenge reasoning
-
-**When.** A load-bearing assumption or chain of reasoning has gone uncriticized, and being wrong about it would move the conclusions.
-
-**How.** State it plainly and without defending it, then ask the expert to attack it or name a factor the model left out. Validate the changes yourself.
-
-**Example.** Agent: "The model treats the two effects as independent." Expert: "They are not -- the second saturates at high load, and you leave that out."
-
-### Operator 3: Inject knowledge
-
-**When.** The model depends on how the real-world system actually behaves, and that knowledge is missing from the problem statement and the evidence and cannot be reached by calculation.
-
-**How.** Name the missing context and how the model changes if it turns out differently, then ask the expert to explain it qualitatively, including whether the order of magnitude you have assumed is plausible for the real setting. Derive the values yourself.
-
-**Example.** Agent: "The model turns on how maintenance is scheduled in practice, which nothing here records." Expert: "In planned blocks -- not at random."
-
-### Operator 4: Refine / correct
-
-**When.** After an earlier reply, a weakness that reply exposed is still unresolved, or an aspect stayed shallower than the decision deserves.
-
-**How.** Show the model as it now stands after that reply, then ask the expert to correct what is still wrong or deepen what is still shallow.
-
-**Example.** Agent: "I adopted your reading of the objective. What does the revised model still leave wrong?" Expert: "The constraint that reading implies is missing."
+- computation or data processing.
 
 # Interaction Limits
 
@@ -117,7 +62,7 @@ The consultation runs three exchanges, one operator each; an exchange is one que
 After this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."""
 
 
-_ROUTED_SECTION_HEADING = "# 可选交互算子"
+_ROUTED_SECTION_HEADING = "# Interaction Operators"
 
 # The Router makes the operator choice an explicit, stated decision instead of
 # one the solver reaches by reading four `When` clauses and picking.  It exists
@@ -146,15 +91,30 @@ _ROUTER_STEP = """### Router
 # that a property of the code instead of a claim about a careful copy -- a
 # retyped second policy could drift from the first and quietly turn the
 # comparison into two changes.
+#
+# The seed no longer carries an operator section, so there is nothing for the
+# Router to be inserted into and the derivation does not apply.  That used to
+# raise here, at import, which took the whole module -- and so every arm, routed
+# or not -- down with it.  The failure is real but it belongs to the arm that
+# asks for the routed seed, so it is reported by `routed_seed()` below instead.
 OPERATOR_DRIVEN_CONSULTATION_ROUTED = OPERATOR_DRIVEN_CONSULTATION.replace(
     f"{_ROUTED_SECTION_HEADING}\n\n",
     f"{_ROUTED_SECTION_HEADING}\n\n{_ROUTER_STEP}\n\n",
     1,
 )
-if OPERATOR_DRIVEN_CONSULTATION_ROUTED == OPERATOR_DRIVEN_CONSULTATION:
-    # Loud, because the silent version of this is an experiment whose two arms
-    # are the same policy with different labels.
-    raise RuntimeError(
-        "routed seed: the operator section heading moved, so the Router step was "
-        f"not inserted (looked for {_ROUTED_SECTION_HEADING!r})"
-    )
+ROUTED_SEED_AVAILABLE = OPERATOR_DRIVEN_CONSULTATION_ROUTED != OPERATOR_DRIVEN_CONSULTATION
+
+
+def routed_seed() -> str:
+    """The routed policy, or a loud failure if the seed cannot carry one.
+
+    Loud, because the silent version of this is an experiment whose two arms are
+    the same policy with different labels.
+    """
+    if not ROUTED_SEED_AVAILABLE:
+        raise RuntimeError(
+            "routed seed: the seed states no operator section, so the Router step "
+            f"was not inserted (looked for {_ROUTED_SECTION_HEADING!r}).  Run "
+            "without INTERACTION_SEED=routed, or restore the operator repertoire."
+        )
+    return OPERATOR_DRIVEN_CONSULTATION_ROUTED

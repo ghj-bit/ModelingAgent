@@ -40,12 +40,14 @@ from pathlib import Path
 
 try:
     from . import claude_backend
+    from . import interaction_policy
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from .interaction_policy import OPERATOR_DRIVEN_CONSULTATION
     from .interaction_policy import OPERATOR_DRIVEN_CONSULTATION_ROUTED
 except ImportError:
     import claude_backend
+    import interaction_policy
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from src.OpenClaw.interaction_policy import OPERATOR_DRIVEN_CONSULTATION
@@ -750,31 +752,26 @@ def evolution_history_entries(patch_history: list[dict]) -> list[dict]:
 
 
 EVOLUTION_PROMPT_HEAD = """System prompt. You are a senior interaction-policy engineer.
-The downstream solver agent solves MM-Bench modeling tasks {solver_source}
-and may consult a human expert while it works. You must respond with one JSON
-object only (no markdown fences), matching the schema in §3.
+The downstream solver agent solves MM-Bench modeling tasks from the problem
+description, the attachments, and the corresponding data, and may consult a human
+expert while it works. You must respond with one JSON object only (no markdown
+fences), matching the schema in §3.
 
 §1 Optimization goals. Evolve one executable human-expert interaction policy for
-a modeling agent that {solver_start} and otherwise solves autonomously. Treat the policy as the communication contract: it governs only the
-consultation itself — which interaction operator the agent applies and when,
-what it asks under that operator, how it treats each reply, and how the
-exchanges relate to one another. It governs no other part of the solver's work, and a policy that asks
-the agent to account for, log, or document the consultation is not a
-behavioural improvement.
+a modeling agent that {solver_start} and otherwise solves autonomously. Under
+multi-round interaction, the policy settles what to ask, when to ask it, and
+which interaction operator carries each question.
 
-The evidence JSON holds the single training parent and its rollouts on the current
-training batch, the historical validation champion, and every round already run.
-Each sampled task carries its problem statement, the complete expert dialogue, a
-short summary of what the reply changed in the work, and its scores. It also carries
-`judge_report_feedback`: the MM-Bench Judge's per-criterion reasons and scores for
-that run. Read them to learn *which dimension* a consultation failed to move — a
-score difference alone cannot say that, and on a two-problem batch it is mostly
-noise. Read the change summaries and scores as the coarse consequences of the
-consultation, and judge the consultation by the questions the agent asked and the
-replies it received — what was asked, when, how often, and what the agent did with
-each reply. Do not treat the Judge's wording as the thing to optimize: a reason
-that names a report weakness is evidence about the modeling work, not an
-instruction to make the consultation produce that phrase.
+The agent must not request feedback for:
+
+- coding, debugging, or implementation issues;
+- standard mathematical derivations;
+- computation or data processing.
+
+The evidence JSON holds the training parent and its rollouts on the current batch,
+the validation champion, and every round already run. Each sampled task carries its
+problem statement, the expert dialogue, a short summary of what the reply changed,
+its scores, and `judge_report_feedback` (the Judge's per-criterion reasons).
 
 Use the parent's rollouts to identify communication failures and transferable
 successes, and treat the aggregate net utilities and the decision history as
@@ -790,10 +787,6 @@ resubmit that direction in the same shape. Either abandon it, or change it enoug
 that the failure it produced no longer applies — and name the earlier round you
 are departing from in `evolution_rationale`.
 
-The solver agent keeps all calculation, implementation, external-data validation,
-simulation, debugging, and report writing; the expert supplies high-impact
-strategic judgment only. Keep the policy compact.
-
 `policy_patch` is the whole deliverable. You do not return the policy: you return
 the sections you are changing, and the engine splices them into the parent to
 produce the one the solver reads. Every change you intend must appear in the
@@ -801,121 +794,26 @@ patch, and the patch must leave the policy different from the parent's -- a patc
 that rewrites a section into what it already said is discarded and the attempt is
 wasted.
 
-The quantity is the distance from the parent, not the size of the edit: two
-rounds that say the same thing in different words have run the same consultation
-twice, and the budget spent on the second is wasted. So a candidate is compared
-against every round already evaluated, and one whose behavioural similarity to
-any of them reaches {similarity_threshold} is rejected before it runs. That bound
-is the floor on difference, not the target: the target is the failure the
-rollouts show, repaired without disturbing what they show working. A round is
-scored on the model it produces, and a round that changed everything at once
-cannot be read afterwards — neither which of its changes earned the utility it
-got, nor which to put back when it loses.
-
 §2 Modification requirements.
 
-- Mutate the parent policy. Only one policy is live; crossover is unavailable.
-- Change the consultation, not the contract. You patch one or more of these
-  sections, naming each by the heading line the parent states:
+Rewrite one section and nothing else: `## Interaction Strategy`, named by the
+parent's heading line verbatim -- that is how the patch finds it, and a heading
+that does not match the parent's is rejected before the round runs.
 
-  * `## Interaction Operators` — the rule that assembles the consultation
-    before and after each exchange. **This is the section a round is expected to
-    move**: it governs what the agent asks, what it must put on the table first,
-    what a reply is allowed to settle, and how a later exchange is built on an
-    earlier one. Prefer changing it to changing any single operator.
-  * an operator's `### Operator N: <name>` block under `# 可选交互算子` — its
-    `When`, its `How` and its `Example`. **Frozen for now**: the engine rejects a
-    patch naming any `### Operator` section, so this round is `## Interaction
-    Operators` and nothing else. The rule is where the evidence points, and
-    holding the repertoire fixed is what lets the result be attributed to the
-    rule rather than to one of four triggers moving with it. An operator reopens
-    only on its own exchange showing it failed; the rollouts now head every
-    question with the operator it applied, which is the record that rests on.
+State, in the parent's own order:
 
-  Everything outside those is fixed and must be carried over exactly as the
-  parent states it: the autonomy default in `## Principle`, the whole prohibition
-  list in `## Prohibited Requests`, and the exchange budget in
-  `# Interaction Limits`. That list bars coding and implementation issues,
-  parameter *tuning* or optimization details, standard mathematical derivations,
-  and computation, data processing or routine validation. Note what it does not
-  bar: asking the expert whether a constant the agent has itself assumed is of a
-  sensible order of magnitude is permitted, and Operator 3 states it. Quote every
-  `section` heading from the parent verbatim, and do not translate or reword one:
-  it is how the patch finds the section, and a heading that does not match the
-  parent's is rejected before the round runs.
-- Evolve the consultation, not the exchanges. The thing to state is how the
-  exchanges relate: what the first question commits the agent to for the rest of
-  the consultation, what a reply settles once and for all, what a later question
-  may reopen and what it may not, and what the agent must carry across a boundary
-  between one exchange and the next. A rule that only says what to do *before
-  each exchange* and *after each reply* leaves the consultation as three
-  adjacent questions; the solver asks them in order without any of them
-  inheriting from the last, and the budget buys three separate opinions instead
-  of one that builds. **Read the recorded dialogue as a sequence when you decide
-  what to patch** — did the third question use what the first two settled, did an
-  earlier reply constrain the model that came after it, or did the exchanges run
-  in parallel and inherit nothing? Where the rollouts show isolated exchanges,
-  the rule is what has to change, and the change has to be a statement about the
-  sequence rather than another instruction about a single turn.
-- The consultation's own content is still yours to move — the question the agent
-  puts to the expert, the context it must establish before asking it, what the
-  reply is allowed to settle. An operator's `When` is one lever among several,
-  and a `How` that changes what the agent must put on the table before the expert
-  answers is as much a behavioural change as a widened trigger. Do not spend the
-  round restating the fixed sections in other words to look like one.
-- The repertoire is yours to restructure. A round may sharpen an operator, add
-  one, merge two, or delete one the evidence shows never fires — the seed's four
-  are a roster, not a contract. Any shape is acceptable that leaves at least one
-  operator and no more than eight, keeps each operator a `### Operator N: <name>`
-  step in the same `When`/`How`/`Example` form, and stays bound by every fixed
-  prohibition. Whatever you restructure, `evolution_rationale` must say which
-  operator the evidence implicated and why the new shape carries that failure
-  better than the parent's did — adding an operator the parent's four could
-  already express is not a change.
-- A new operator must name a decision the expert can actually settle, not restate
-  an existing operator in other words.
-- Give each operator exactly one `###` heading, and keep every other heading out
-  of that section: a round is compared against the parent by those headings, so a
-  stray one changes the comparison rather than the policy.
-- Keep each operator in its `When` / `How` / `Example` shape: one or two sentences
-  for `When`, one or two for `How`, and for `Example` one short exchange — the
-  agent's question and the expert's reply — as short as the other two and no more
-  specific to any task than the rest of the policy. An example that has to change
-  with the operator is part of evolving it: rewrite it rather than deleting it, and
-  keep it an exchange rather than prose about one. A short repertoire the solver
-  follows exactly is worth more than a longer one it follows only in part. Do not
-  restate the fixed parts inside the workflow.
-- Change what the evidence requires, and nothing else. Inside the section you
-  rewrite, change only what the change needs. The evidence you have is about the
-  consultation as a whole — it cannot single out one instruction and call it the
-  weak one — so an instruction the rollouts do not indict is left standing even
-  where you would have written it differently. Name in `evolution_rationale`
-  which instructions you left standing and which failure moved the ones you did
-  not.
-- Keep the parent's organisation. Its headings, its split into *before each
-  exchange* and *after each reply*, and its numbered steps are the frame the
-  solver already reads and the frame two rounds are compared through: a round that
-  rearranges them has changed the frame rather than the rule, and after it the two
-  policies can no longer be read against each other — the round cannot be scored
-  as a refinement of its parent, and the next round cannot tell what the previous
-  one moved. Write the change into the parent's structure. If what you want to say
-  does not fit it, put the closest version that does, and say in
-  `evolution_rationale` what the frame could not carry.
-- Leave every line outside the two mutable sections exactly as the parent wrote
-  it, and do not restate a fixed section inside the one you rewrite. Rewording
-  that leaves the behaviour identical is not a change and is rejected as noise —
-  as is a round that rewrites an operator the evidence never implicated.
-- Return `name`, `purpose` and the patch. The budget and the stopping rule are
-  fixed and are carried over from the parent, so do not restate them and do not
-  try to change them.
-- The policy the patch produces must differ from the parent's and from every
-  policy already listed in `evolution_history`. A patch that splices back to
-  either is rejected before the round runs, whatever else it changes. Do not
-  spend a retry re-submitting the parent in new wording.
-- `changed_components` must name only sections the patch actually rewrites.
-  Guidance the parent already states is not a change; describing it as one
-  misreports the
-  round and is recorded as such in `evolution_history`.
+- **what to ask.** Name the kind of gap, not a topic: a value it has assumed and
+  cannot source, a choice the evidence leaves open, a mechanism it cannot reach
+  from the problem statement.
+- **when to ask it.** Which decision comes first, and what must be settled before
+  the next question is worth asking.
+- **which operator carries the question**, and why that one rather than another.
+
+The patch must differ from the parent and from every policy in
+`evolution_history`; rewording that leaves behaviour identical is rejected as
+noise. Return `name` and the patch; the purpose, the budget and the stopping rule
+are carried over from the parent. `changed_components` names only the sections
+the patch rewrites.
 """
 
 
@@ -927,24 +825,15 @@ place a change counts. Return the sections you are rewriting -- not the policy.
 {
   "policy_patch": [
     {
-      "section": "<the heading line of a section you may rewrite, copied from the parent exactly, e.g. `## Interaction Operators` or `### Operator 4: Refine / correct`>",
+      "section": "<the heading line of a section you may rewrite, copied from the parent exactly, e.g. `## Interaction Strategy` or `### Operator 4: Refine / correct`>",
       "body": "<the new text for that section: the heading line itself is not repeated, and no heading of any level may appear inside it>",
       "after": "<only when `section` is one the parent does not have: the heading line to insert the new section after>"
     }
   ],
   "name": "<concise policy name>",
-  "purpose": "<the strategic role of human interaction>",
-  "evolution_mode": "mutation",
   "changed_components": ["<non-empty list naming the section(s) the patch rewrites>"],
   "evolution_rationale": "<why these changes fit the parent policy's evidence>"
 }
-
-The body of `## Interaction Operators` is the consultation rule: ordinary prose,
-no headings. The body of a `### Operator N: <name>` section is that operator's
-`**When.**`, `**How.**` and `**Example.**` paragraphs. No `### Operator` section
-may appear in a patch: the repertoire is frozen and only the rule changes. The
-exchange budget and the stopping rule are fixed and are carried over from the
-parent, so neither appears in the patch.
 """
 
 
@@ -1021,11 +910,14 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
     evidence_json = json.dumps(evidence_bundle, ensure_ascii=False, indent=2)
     return "\n".join(
         [
+            # The similarity bound is enforced by the engine but no longer
+            # stated in the prompt, so only the two arm-context sentences are
+            # substituted here.  §2 still tells the round that a patch which
+            # splices back to the parent or to any policy in `evolution_history`
+            # is rejected; the numeric threshold it is rejected at is not named.
             EVOLUTION_PROMPT_HEAD.replace(
-                "{similarity_threshold}",
-                f"{workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD:.2f}",
-            ).replace("{solver_source}", SOLVER_SOURCE_CONTEXT)
-            .replace("{solver_start}", SOLVER_START_CONTEXT),
+                "{solver_source}", SOLVER_SOURCE_CONTEXT
+            ).replace("{solver_start}", SOLVER_START_CONTEXT),
             EVOLUTION_OUTPUT_SCHEMA,
             EVOLUTION_EVIDENCE_GUIDE,
             "",
@@ -1542,7 +1434,7 @@ def fixed_initial_workflow() -> dict:
             "earlier reply."
         ),
         "policy_text": (
-            OPERATOR_DRIVEN_CONSULTATION_ROUTED
+            interaction_policy.routed_seed()
             if routed
             else OPERATOR_DRIVEN_CONSULTATION
         ),
@@ -2206,17 +2098,18 @@ def main() -> None:
     # moved -- and the reasons are the only evidence in the pipeline that can.
     # The OpenHands arm keeps the original prose-free evidence.
     workflow.CPE_INCLUDE_JUDGE_REPORT_FEEDBACK = True
-    # The repertoire is frozen: a round rewrites the consultation rule and
-    # nothing else.  Raise this to 1 to open one operator per round -- the
-    # machinery below and in `apply_policy_patch` is already in place -- but only
-    # once the rollouts label their exchanges, because an operator no exchange
-    # ran cannot be shown to have failed.  The rule is the lever the evidence
-    # implicates either way: rounds 2-5 of claude_fp8_judgefb_r10 each rewrote
-    # Operator 4 alone and none of them moved validation.
+    # The repertoire stays closed: a round rewrites the consultation rule and
+    # nothing else.  The seed now states no operators, so there is nothing for an
+    # operator patch to target, and the rule is the only lever either way --
+    # rounds 2-5 of claude_fp8_judgefb_r10 each rewrote one operator and none of
+    # them moved validation.  Opening this is a separate decision: the machinery
+    # is in `apply_policy_patch`, and 1 is not a usable value because a policy
+    # with steps needs two to eight of them (one step is one action, and
+    # `validate_workflow` requires two to eight actions).
     workflow.POLICY_PATCH_OPERATOR_LIMIT = 0
-    # Kept on even while the limit is 0: it is what will gate the first operator a
-    # round is allowed to touch, and the seed asks the solver to head every
-    # question with the operator it applies so the record exists by then.
+    # Kept on: it is what gates the operator a round would be allowed to touch,
+    # and the seed asks the solver to head every question with the operator it
+    # applies so the record exists by the time a round may use it.
     workflow.POLICY_PATCH_ONLY_USED_OPERATORS = True
     workflow.ensure_cpe_original_report_scores = lambda *_args, **_kwargs: {}
     workflow.MIN_CPE_EVOLUTION_ROUNDS = None

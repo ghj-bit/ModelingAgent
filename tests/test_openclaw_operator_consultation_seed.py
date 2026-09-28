@@ -10,7 +10,7 @@ round and contradict the first one that adds an operator.
 Two properties make the experiment work, and both are mechanical rather than
 editorial, so they are asserted here:
 
-* the operators sit inside the policy's operator section (headed ``# 可选交互算子``),
+* the operators sit inside the policy's operator section (headed ``# Interaction Operators``),
   which is the only region ``assert_fixed_policy_sections_unchanged`` lets a round
   rewrite.  An operator that drifted outside it could not be evolved, and a round
   that rewrote the prohibition list outside it could weaken the ban on asking the
@@ -49,10 +49,14 @@ from src.OpenClaw import (
     run_substantive_interaction_workflow_evolution_from_scratch_claude as scratch,
 )
 
-WORKFLOW_HEADING = "# 可选交互算子"
-# The heading the other arms' seeds still use.  The engine accepts both, and the
-# boundary guard depends on that: a wording it stops recognising is not an error
-# anywhere, it is a policy with no mutable section and no fixed-section check.
+# The seed's ONLY mutable section.  It used to be the repertoire
+# (`# Interaction Operators`); the repertoire has been emptied and stays closed,
+# so the rule under this heading is the whole mutable surface.
+WORKFLOW_HEADING = "## Interaction Strategy"
+# A heading the other arms' seeds still use, and one the engine accepts.  The
+# boundary guard depends on recognising the wording: a heading it stops
+# recognising is not an error anywhere, it is a policy with no mutable section
+# and therefore no fixed-section check.
 LEGACY_WORKFLOW_HEADING = "# Interaction Workflow"
 
 OPERATORS = [
@@ -63,15 +67,15 @@ OPERATORS = [
 ]
 
 # The prohibitions the rounds may not touch.  Each is a line of the fixed section.
-# The list bars parameter *tuning*, not parameter *plausibility*: asking the
-# expert whether a constant the agent assumed itself is of a sensible order of
-# magnitude is permitted, and Operator 3 says so.  PROHIBITIONS[3] is the
-# computation line the weakening case below rewrites.
+# The list is three items and stops there: parameter plausibility is not on it,
+# so the section leaves the question open rather than sanctioned, and the
+# evolution prompt is where the optimizer is told the direction is inside the
+# contract (see the needles in `test_evolution_prompt_teaches_the_operator_surface`).
+# PROHIBITIONS[2] is the computation line the weakening case below rewrites.
 PROHIBITIONS = (
     "- coding, debugging, or implementation issues;",
-    "- parameter tuning or optimization details;",
     "- standard mathematical derivations;",
-    "- computation, data processing, or routine validation.",
+    "- computation or data processing.",
 )
 
 
@@ -107,27 +111,39 @@ class OperatorSeedTests(unittest.TestCase):
         self.seed = base.fixed_initial_workflow()
         self.policy_text = self.seed["policy_text"]
 
-    def test_seed_is_the_four_operators_in_order(self):
-        steps = base._interaction_workflow_steps(self.policy_text)
-        self.assertEqual([title for title, _ in steps], OPERATORS)
-
     def test_both_accepted_headings_parse_and_enforce(self):
         # Each accepted wording must yield the same steps and the same boundary,
-        # or one arm silently runs unguarded.  The legacy wording is what the
-        # OpenHands seed still carries.
-        reference = base._interaction_workflow_steps(self.policy_text)
-        for heading in (WORKFLOW_HEADING, LEGACY_WORKFLOW_HEADING):
-            other = self.policy_text.replace(WORKFLOW_HEADING, heading)
-            self.assertEqual(
-                base._interaction_workflow_steps(other),
-                reference,
-                f"{heading!r} is no longer accepted as the operator section",
+        # or an arm whose seed uses it silently runs unguarded.  This is a
+        # property of the ENGINE, and this arm's seed can no longer exercise it:
+        # the repertoire is gone, so the seed states no such heading.  A minimal
+        # policy stands in, one operator under each accepted wording.
+        body = (
+            "### Operator 1: Resolve uncertainty\n\n**When.** X.\n\n**How.** Y.\n\n"
+            '**Example.** Agent: "Q?" Expert: "A."'
+        )
+        reference = None
+        # The engine's tuple holds heading *titles*, not heading lines.
+        for title in workflow.INTERACTION_WORKFLOW_HEADINGS:
+            heading = f"# {title}"
+            policy_text = (
+                f"# Human Expert Interaction\n\n{heading}\n\n{body}\n\n"
+                "# Interaction Limits\n\nEnds here.\n"
             )
-            parent = [{"workflow": {"policy_text": other, "workflow_id": "seed"}}]
-            rewritten_before = other.replace("The expert never does computation.", "x")
+            steps = base._interaction_workflow_steps(policy_text)
+            self.assertEqual(
+                len(steps), 1, f"{heading!r} is no longer accepted as the operator section"
+            )
+            if reference is None:
+                reference = steps
+            else:
+                self.assertEqual(steps, reference, f"{heading!r} parses differently")
+            parent = [{"workflow": {"policy_text": policy_text, "workflow_id": "seed"}}]
+            # The operator body sits INSIDE the section, so rewriting it is what
+            # the boundary permits; it is the text outside that must be refused.
+            # `# Interaction Limits` is frozen, so its body is the probe.
             with self.assertRaises(ValueError):
                 workflow.assert_fixed_policy_sections_unchanged(
-                    {"policy_text": rewritten_before}, parent
+                    {"policy_text": policy_text.replace("Ends here.", "x")}, parent
                 )
 
     def test_a_reworded_heading_is_rejected_not_ignored(self):
@@ -143,7 +159,7 @@ class OperatorSeedTests(unittest.TestCase):
             )
         # The message has to name the accepted wordings: it is the only thing
         # telling the optimizer why its rewrite was refused.
-        for heading in ("可选交互算子", "Interaction Workflow"):
+        for heading in ("Interaction Operators", "Interaction Workflow"):
             self.assertIn(heading, str(caught.exception))
 
     def test_policy_states_no_operator_count(self):
@@ -184,31 +200,19 @@ class OperatorSeedTests(unittest.TestCase):
     def test_prohibitions_are_present_and_outside_the_mutable_section(self):
         for line in PROHIBITIONS:
             self.assertIn(line, self.policy_text)
-        # The boundary the engine enforces: everything before the workflow
-        # heading is fixed, so the prohibitions must sit there.
-        preamble, _, _ = self.policy_text.partition(WORKFLOW_HEADING)
+        # The boundary the engine enforces: the prohibitions must sit outside
+        # every section a round may rewrite.  Read off the mutable spans rather
+        # than off "text before the workflow heading", which assumed the mutable
+        # section came first -- the mutable rule now sits *above* the
+        # prohibitions, so a positional check would read the wrong side.
+        spans = workflow._mutable_policy_spans(self.policy_text)
+        self.assertTrue(spans, "the seed must state a mutable section")
         for line in PROHIBITIONS:
-            self.assertIn(line, preamble)
-
-    def test_operator_edit_passes_and_a_weakening_edit_is_rejected(self):
-        parent = [{"workflow": {"policy_text": self.policy_text, "workflow_id": "seed"}}]
-
-        operator_edit = self.policy_text.replace(
-            "**When.** The agent has committed to a load-bearing assumption",
-            "**When.** The agent has committed to a load-bearing assumption or a\nmechanism it cannot defend",
-        )
-        workflow.assert_fixed_policy_sections_unchanged(
-            {"policy_text": operator_edit}, parent
-        )
-
-        for weakened in (
-            self.policy_text.replace(PROHIBITIONS[3], "- computation, if convenient;"),
-            self.policy_text.replace(WORKFLOW_HEADING, "## Workflow"),
-        ):
-            with self.assertRaises(ValueError):
-                workflow.assert_fixed_policy_sections_unchanged(
-                    {"policy_text": weakened}, parent
-                )
+            offset = self.policy_text.index(line)
+            self.assertFalse(
+                any(start <= offset < end for start, end in spans),
+                f"{line!r} sits inside a section a round may rewrite",
+            )
 
     def operator_regime(self):
         """Similarity with the repertoire open, as it was before the freeze."""
@@ -218,28 +222,6 @@ class OperatorSeedTests(unittest.TestCase):
 
     def frozen_regime(self):
         return unittest.mock.patch.object(workflow, "POLICY_PATCH_OPERATOR_LIMIT", 0)
-
-    def test_one_operator_round_clears_the_duplicate_threshold(self):
-        # Anchor the mutation on the `**How.**` label rather than on the prose
-        # under it: the wording of an operator is exactly what the seed is
-        # expected to be edited and evolved through, and a test that quotes it
-        # breaks on every such edit while proving nothing extra.
-        parent = as_workflow(self.policy_text)
-        mutated = self.policy_text.replace(
-            "**How.** ", "**How.** Answer directly. ", 1
-        )
-        self.assertNotEqual(mutated, self.policy_text)
-        with self.operator_regime():
-            similarity = workflow.workflow_similarity(as_workflow(mutated), parent)
-            self.assertLess(
-                similarity, workflow.DEFAULT_CANDIDATE_SIMILARITY_THRESHOLD
-            )
-            # The denominator is the units similarity is judged on: the operators
-            # plus the mutable rule section, which a round may also rewrite.
-            # Pinned rather than written as a literal so adding a unit cannot
-            # leave the number here describing a policy that no longer exists.
-            units = len(workflow.workflow_behavior(parent)["steps"])
-            self.assertEqual(similarity, (units - 1) / units)
 
     def test_a_rule_only_round_clears_the_duplicate_threshold(self):
         # The repertoire is frozen, so the rule is the only thing a round can
@@ -271,8 +253,8 @@ class OperatorSeedTests(unittest.TestCase):
         # tell neither from the other.
         parent = as_workflow(self.policy_text)
         reworded = self.policy_text.replace(
-            "Ask exactly one focused question.",
-            "Ask exactly one focused question, and make it answerable.",
+            "Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.",
+            "Identify the most important unresolved decision that could materially affect the modeling direction or the conclusions.",
             1,
         )
         self.assertNotEqual(reworded, self.policy_text)
@@ -306,25 +288,25 @@ class OperatorSeedTests(unittest.TestCase):
     def test_evolution_prompt_teaches_the_operator_surface(self):
         prompt = base_prompt_for(self.seed)
         for needle in (
-            # The surface is two sections, and both are named: a round that is
-            # told only about the repertoire rewrites the repertoire every time.
-            "Change the consultation, not the contract.",
-            "You patch one or more of these\n  sections",
-            "`## Interaction Operators`",
-            # All three parts of an operator are still named, so the shape is
-            # stated even while the sections themselves are frozen -- the first
-            # round that reopens one needs to know what it is editing.
-            "`**When.**`, `**How.**` and `**Example.**` paragraphs",
-            # What a round evolves is the consultation as a sequence, not a
-            # single turn -- and the strategy section is the one it is pointed
-            # at first.
-            "Evolve the consultation, not the exchanges.",
-            "Read the recorded dialogue as a sequence",
-            "This is the section a round is expected to\n    move",
-            # The repertoire may be restructured, bounded by the engine's ceiling.
-            "The repertoire is yours to restructure.",
-            "`### Operator N: <name>`",
-            "no more than eight",
+            # The one section a round may rewrite is named.  What the engine
+            # does with any other heading is left to §3 and §5, which say it
+            # where the patch schema is defined rather than repeating it here.
+            "Rewrite one section and nothing else",
+            "`## Interaction Strategy`",
+            # What a round evolves is what the agent asks, when it asks it, and
+            # which operator carries it -- the three questions §1 opens with.
+            #
+            # The "when" is back by request.  An earlier iteration had removed
+            # the relation *between* exchanges as a thing to state, on the
+            # grounds that with a three-exchange budget a rule about which
+            # question follows which is really a rule about what all three ask,
+            # and that the rounds which wrote one spent the budget on the
+            # ordering instead of on the questions.  If rounds start doing that
+            # again, that is the trade this reinstates.
+            "what to ask",
+            "when to ask it",
+            "which operator carries the question",
+            "Which decision comes first",
             # The answer is a patch, and the prompt has to say so where the
             # deliverable is defined -- §1, §2, §3 and §5 all name it, because a
             # schema the model reads once is not what it re-reads on a retry.
@@ -332,21 +314,42 @@ class OperatorSeedTests(unittest.TestCase):
             "the engine splices them into the parent",
             "`policy_patch` comes first because it is the deliverable",
             "no heading of any level may appear inside it",
-            "fixed and are carried over from the parent",
-            # The frozen sections are named, so the optimizer knows where the
-            # boundary is without having to infer it from a rejected round --
-            # and the ban survives in the prompt too, so it is told which
-            # prohibitions it may not weaken.  Parameter *plausibility* is not
-            # among them, or it would never propose such a question.
-            # Single-line needles: the prompt is line-wrapped, so a phrase
-            # spanning a wrap point would break on a harmless reflow.
-            "the autonomy default in `## Principle`",
-            "`## Prohibited Requests`",
-            "`# Interaction Limits`",
-            "*tuning* or optimization details",
-            "sensible order of magnitude is permitted",
+            # The budget, the stopping rule and the purpose are carried over by
+            # `apply_policy_patch` rather than returned by the round, so the
+            # prompt names them as carried rather than as fields to emit.
+            "are carried over from the parent",
         ):
             self.assertIn(needle, prompt)
+
+        # The sequence framing is gone, not reworded.  Every round of
+        # claude_fp8_rankguard_r10 wrote a rule about which question must follow
+        # which -- Sequence, Scope, Integration -- because the prompt asked for
+        # exactly that and nothing else; the third one cost the run its rigor
+        # score (0.900 -> 0.800, all four problems down).  A prompt that asks for
+        # it again gets the same three rules back, whatever else changed around
+        # it, so this half is asserted as hard as the needles above.
+        for gone in (
+            "Evolve the consultation, not the exchanges",
+            "statement about the sequence",
+            "Read the recorded dialogue as a sequence",
+            "how the exchanges relate to one another",
+            "how a later exchange is built on an earlier one",
+        ):
+            self.assertNotIn(gone, prompt)
+
+        # §2 names the one section a round may rewrite and stops there.  The
+        # frozen sections and the ban they carry are not recited in the prompt:
+        # the parent policy is quoted whole in §4's evidence, so the round reads
+        # the prohibition list in the very text it is patching.  Asserted as an
+        # absence because that recital is what grew back every time this section
+        # was trimmed.
+        for gone in (
+            "Carry over verbatim",
+            "Keep the parent's headings",
+            "Change only what the evidence requires",
+            "### Operator N` section",
+        ):
+            self.assertNotIn(gone, prompt)
 
     def test_prompt_and_guard_agree_on_the_mutable_surface(self):
         # The prompt lives in the Claude arm and the spans in the shared engine,
@@ -385,7 +388,7 @@ class OperatorSeedTests(unittest.TestCase):
                     accepted(edited(heading)),
                     f"the prompt offers {heading!r} as mutable but the guard refuses it",
                 )
-        for heading in ("## Principle", "## Prohibited Requests", "# Interaction Limits"):
+        for heading in ("## Prohibited Requests", "# Interaction Limits"):
             with self.subTest(fixed=heading):
                 self.assertFalse(
                     accepted(edited(heading)),
@@ -457,25 +460,6 @@ class PolicyPatchTests(unittest.TestCase):
             }
         ]
 
-    def test_rule_alone_splices_and_keeps_the_repertoire(self):
-        candidate = self.splice(
-            [{"section": "## Interaction Operators", "body": "Read the state first."}]
-        )
-        self.assertIn("Read the state first.", candidate["policy_text"])
-        self.assertEqual(len(candidate["actions"]), 4)
-        self.assertIn(
-            "Operator 4: Refine / correct", candidate["policy_text"]
-        )
-
-    def test_one_operator_alongside_the_rule_is_allowed(self):
-        candidate = self.splice(
-            [
-                {"section": "## Interaction Operators", "body": "Read the state first."},
-                {"section": "### Operator 4: Refine / correct", "body": self.OPERATOR_BODY},
-            ]
-        )
-        self.assertIn(self.OPERATOR_BODY, candidate["policy_text"])
-
     def test_two_operators_are_rejected(self):
         with self.assertRaises(ValueError) as caught:
             self.splice(
@@ -486,7 +470,7 @@ class PolicyPatchTests(unittest.TestCase):
             )
         # The message has to name the limit: it is the whole retry hint.
         self.assertIn("at most 1", str(caught.exception))
-        self.assertIn("## Interaction Operators", str(caught.exception))
+        self.assertIn("## Interaction Strategy", str(caught.exception))
 
     def test_an_added_operator_counts_towards_the_limit(self):
         with self.assertRaises(ValueError):
@@ -502,7 +486,7 @@ class PolicyPatchTests(unittest.TestCase):
             )
 
     def test_frozen_sections_cannot_be_patched(self):
-        for heading in ("## Principle", "## Prohibited Requests", "# Interaction Limits"):
+        for heading in ("## Prohibited Requests", "# Interaction Limits"):
             with self.subTest(heading=heading):
                 with self.assertRaises(ValueError):
                     self.splice([{"section": heading, "body": "rewritten"}])
@@ -512,7 +496,7 @@ class PolicyPatchTests(unittest.TestCase):
             self.splice(
                 [
                     {
-                        "section": "## Interaction Operators",
+                        "section": "## Interaction Strategy",
                         "body": "prose\n\n### Smuggled\n\nmore",
                     }
                 ]
@@ -520,17 +504,20 @@ class PolicyPatchTests(unittest.TestCase):
 
     def test_the_budget_is_carried_from_the_parent(self):
         candidate = self.splice(
-            [{"section": "## Interaction Operators", "body": "Read the state first."}]
+            [{"section": "## Interaction Strategy", "body": "Read the state first."}]
         )
         self.assertEqual(candidate["max_exchanges"], self.seed["max_exchanges"])
         self.assertEqual(candidate["stop_condition"], self.seed["stop_condition"])
 
-    def test_the_prompt_states_that_the_repertoire_is_frozen(self):
+    def test_the_arm_is_wired_to_the_frozen_repertoire(self):
         prompt = base_prompt_for(self.seed)
-        # The engine rejects any operator edit, so the prompt has to say so -- a
-        # rule the optimizer cannot read is a rule that costs it a round.
-        self.assertIn("**Frozen for now**", prompt)
-        self.assertIn("No `### Operator` section", prompt)
+        # The prompt no longer states the freeze: §2 names the one section a
+        # round may rewrite and §3 gives the schema, and the freeze itself is
+        # carried by the engine.  What the prompt must still do is name the one
+        # section, because a round that patches a heading the engine refuses
+        # spends an attempt learning what the prompt could have said.
+        self.assertIn("Rewrite one section and nothing else", prompt)
+        self.assertIn("`## Interaction Strategy`", prompt)
         # The rules are enforced by the engine but only under an arm's opt-in,
         # and the arm opts in from `main()` -- which no test runs.  Read the
         # wiring off the source instead of the module, so a round that loses the
@@ -547,7 +534,7 @@ class PolicyPatchTests(unittest.TestCase):
         for patch in (
             [{"section": "### Operator 4: Refine / correct", "body": self.OPERATOR_BODY}],
             [
-                {"section": "## Interaction Operators", "body": "Read the state first."},
+                {"section": "## Interaction Strategy", "body": "Read the state first."},
                 {"section": "### Operator 1: Resolve uncertainty", "body": self.OPERATOR_BODY},
             ],
             [
@@ -563,10 +550,10 @@ class PolicyPatchTests(unittest.TestCase):
                     self.splice(patch)
                 # The message has to name the section that is still allowed,
                 # or the retry has nowhere to go.
-                self.assertIn("`## Interaction Operators`", str(caught.exception))
+                self.assertIn("`## Interaction Strategy`", str(caught.exception))
         # ...and the rule alone still splices.
         candidate = self.splice(
-            [{"section": "## Interaction Operators", "body": "Read the state first."}]
+            [{"section": "## Interaction Strategy", "body": "Read the state first."}]
         )
         self.assertIn("Read the state first.", candidate["policy_text"])
         self.assertEqual(len(candidate["actions"]), 4)
@@ -582,16 +569,6 @@ class PolicyPatchTests(unittest.TestCase):
         self.assertEqual(workflow.cpe_used_operator_headings([]), set())
         # A rollout that heads nothing states nothing.
         self.assertEqual(workflow.cpe_used_operator_headings(self.evidence()), set())
-
-    def test_an_operator_the_rollouts_reached_for_may_be_rewritten(self):
-        allowed = workflow.cpe_used_operator_headings(
-            self.evidence("Operator 4: Refine / correct")
-        )
-        candidate = self.splice(
-            [{"section": "### Operator 4: Refine / correct", "body": self.OPERATOR_BODY}],
-            allowed=allowed,
-        )
-        self.assertIn(self.OPERATOR_BODY, candidate["policy_text"])
 
     def test_an_operator_no_rollout_reached_for_is_rejected(self):
         allowed = workflow.cpe_used_operator_headings(
@@ -619,7 +596,7 @@ class PolicyPatchTests(unittest.TestCase):
 
     def test_the_rule_alone_is_allowed_however_the_rollout_ran(self):
         candidate = self.splice(
-            [{"section": "## Interaction Operators", "body": "Read the state first."}],
+            [{"section": "## Interaction Strategy", "body": "Read the state first."}],
             allowed=set(),
         )
         self.assertIn("Read the state first.", candidate["policy_text"])
@@ -628,7 +605,19 @@ class PolicyPatchTests(unittest.TestCase):
         # The engine reads the label off the question heading; without the seed
         # asking for it there is nothing to read, and the rule above degenerates
         # to "no operator may ever change".
-        self.assertIn("Name the operator you selected", self.seed["policy_text"])
+        #
+        # The seed states no operators, so the requirement names no operator: the
+        # solver is told to pick the way that matches the need from the kinds
+        # listed above, and to label the question with what it picked.
+        # `test_solver_prompt_states_the_heading` covers the heading shape, which
+        # is rendered outside `policy_text` and so cannot be evolved away.
+        #
+        # Read against the unwrapped text: the requirement is the thing being
+        # asserted, and a needle that has to stay on one line breaks on any
+        # harmless reflow of the surrounding prose.
+        unwrapped = " ".join(self.seed["policy_text"].split())
+        self.assertIn("name it -- its number and its name", unwrapped)
+        self.assertIn("Choose, from the above, the way that best matches the need", unwrapped)
 
     def test_the_solver_prompt_states_the_heading(self):
         # This block is rendered outside `policy_text`, so a round cannot evolve

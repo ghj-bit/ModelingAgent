@@ -503,9 +503,24 @@ def workflow_behavior(workflow: dict[str, Any]) -> dict[str, Any]:
     workflow has one: some arms still render it into their prompt, and it is
     internal bookkeeping everywhere else.  Similarity is judged on the steps, so
     the graph cannot make two different interaction workflows look alike.
+
+    The steps are the repertoire plus every other mutable section, because a
+    round may rewrite either and the guard has to see whichever it moved.  With
+    the repertoire frozen the rule is the only thing that can change; judged on
+    the repertoire alone, every candidate would score 1.0 against its parent and
+    the duplicate guard would reject the round before it ever ran.
     """
+    policy_text = str(workflow.get("policy_text") or "")
+    steps = interaction_workflow_steps(policy_text)
+    steps.extend(
+        normalized
+        for normalized in (
+            normalize_text(chunk) for chunk in _rule_section_texts(policy_text)
+        )
+        if normalized
+    )
     behavior: dict[str, Any] = {
-        "steps": interaction_workflow_steps(str(workflow.get("policy_text") or "")),
+        "steps": steps,
         "max_exchanges": workflow.get("max_exchanges"),
         "stop_condition": normalize_text(workflow.get("stop_condition")),
     }
@@ -569,7 +584,26 @@ def workflow_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
     change in characters, and a character ratio would report every such candidate
     as a duplicate of its parent.  With steps, ``1.0`` means the same steps in the
     same words and ``0.0`` means no step in common.
+
+    While the repertoire is frozen the comparison is the rule section's text and
+    nothing else.  The rule is then the only thing a round can move, so it is the
+    only thing this guard can honestly measure: counting the four operators it may
+    not touch alongside it averages the signal away, and a wholesale rewrite of
+    the rule still lands at 0.89 -- inside the duplicate threshold, which is the
+    gate that decides whether the round runs at all.
     """
+    left_rule = _rule_section_texts(str(left.get("policy_text") or ""))
+    right_rule = _rule_section_texts(str(right.get("policy_text") or ""))
+    if POLICY_PATCH_OPERATOR_LIMIT == 0 and left_rule and right_rule:
+        # autojunk would treat the characters that make up most of any English
+        # prose as noise and collapse the ratio to ~0.1; the default is meant
+        # for sequence alignment, not for comparing two documents.
+        return difflib.SequenceMatcher(
+            None,
+            "\n".join(left_rule),
+            "\n".join(right_rule),
+            autojunk=False,
+        ).ratio()
     left_behavior = workflow_behavior(left)
     right_behavior = workflow_behavior(right)
     left_steps = left_behavior.get("steps") or []
@@ -666,6 +700,327 @@ def _fixed_policy_parts(text: str) -> tuple[str, str] | None:
     return text[:heading_start], text[after_start:]
 
 
+# The sections a round may rewrite.  A round evolves the consultation, and the
+# consultation is stated in two places: the rule that chooses among the operators
+# and the repertoire it chooses from.  Keeping only the second mutable made every
+# round rewrite the same operator -- the repertoire is what the evidence points
+# at, and the rule that assembles it was out of reach.
+#
+# Everything else stays frozen, and each frozen piece is load-bearing:
+# `## Principle` carries the autonomy default, `## Prohibited Requests` the ban
+# that keeps the expert out of computation, derivation and code, and
+# `# Interaction Limits` the exchange budget.  A round that could rewrite those
+# would be able to buy score by putting computation back on the expert while
+# still presenting itself as a valid candidate.
+MUTABLE_POLICY_HEADINGS = (
+    "Interaction Operators",
+    *INTERACTION_WORKFLOW_HEADINGS,
+)
+# For retry messages: the optimizer reads these to learn what it may rewrite,
+# so they name the mutable sections rather than the boundary it overstepped.
+_MUTABLE_SECTION_LABEL = " or ".join(
+    f"`{heading}`" for heading in MUTABLE_POLICY_HEADINGS
+)
+_POLICY_HEADING_PATTERN = re.compile(r"(?m)^(#{1,3}) (\S.*?)\s*$")
+
+
+def _mutable_policy_spans(text: str) -> list[tuple[int, int]]:
+    """Return (start, end) offsets of every section a round may rewrite."""
+    headings = [
+        (match.start(), len(match.group(1)), match.group(2))
+        for match in _POLICY_HEADING_PATTERN.finditer(text)
+    ]
+    spans: list[tuple[int, int]] = []
+    for index, (start, level, title) in enumerate(headings):
+        if title not in MUTABLE_POLICY_HEADINGS:
+            continue
+        end = len(text)
+        for later_start, later_level, _ in headings[index + 1 :]:
+            if later_level <= level:
+                end = later_start
+                break
+        spans.append((start, end))
+    return spans
+
+
+def _rule_section_texts(text: str) -> list[str]:
+    """The mutable sections that are not the operator repertoire itself.
+
+    The rule that assembles the consultation is as much of the behaviour as the
+    operators are, and while the repertoire is frozen it is the only thing a
+    round can change -- so it has to be one of the units similarity is judged on.
+    Read from the workflow section alone, every candidate would score 1.0 against
+    its parent, and the duplicate guard would reject the whole evolution.
+    """
+    section = _workflow_section(text)
+    repertoire_start = None
+    if section is not None:
+        _, body_start, _ = section
+        repertoire_start = text[:body_start].rfind("#")
+    return [
+        text[start:end]
+        for start, end in _mutable_policy_spans(text)
+        if start != repertoire_start
+    ]
+
+
+def _frozen_policy_fragments(text: str) -> list[str] | None:
+    """Return the frozen text between the mutable sections, in order.
+
+    ``None`` means the text states no mutable section at all, which is what a
+    policy that reworded the heading away parses as -- the caller treats that as
+    a dropped boundary rather than as an empty diff.
+    """
+    spans = _mutable_policy_spans(text)
+    if not spans:
+        return None
+    fragments = []
+    cursor = 0
+    for start, end in spans:
+        if start > cursor:
+            fragments.append(text[cursor:start])
+        cursor = max(cursor, end)
+    if cursor < len(text):
+        fragments.append(text[cursor:])
+    return fragments
+
+
+# The optimizer answers with sections to rewrite rather than with the whole
+# policy.  A round used to return the complete ~4 KB text, and the call is a
+# verbatim-copy task at that size: in claude_fp8_judgefb_r10 the parent came back
+# byte-identical on 11 of 19 attempts, and the retries it burned killed the run
+# at round 6.  A patch is a few hundred characters of new prose and nothing to
+# copy, so the failure mode is gone by construction rather than by asking the
+# model more firmly.
+POLICY_PATCH_FIELD = "policy_patch"
+
+# A round may move the consultation rule and at most this many operators.  The
+# rule is what the experiment is about -- what the agent asks, what it must put
+# on the table first, and what a reply is allowed to settle -- and a patch that
+# rewrites every operator at once changes every step the similarity guard
+# compares by, so the next round cannot attribute its result to any one of them.
+# ``None`` leaves the count unbounded, which is what an arm that has not opted
+# in gets.
+POLICY_PATCH_OPERATOR_LIMIT: int | None = None
+# `### Operator 1: Resolve uncertainty` and deeper.  The level is not pinned:
+# a seed may nest its operators, and what makes a block an operator block is
+# that it sits under the repertoire section rather than that it sits at `###`.
+_OPERATOR_HEADING_PATTERN = re.compile(r"^#{3,6} Operator\b")
+# What the solver writes above a question: `# Expert Question 2 (Operator 2:
+# Challenge reasoning)`.  The name runs to the closing bracket, a dash, a
+# newline or a heading mark, and stops there -- operator names contain letters,
+# spaces and `/` ("Refine / correct") and nothing else.
+_USED_OPERATOR_PATTERN = re.compile(
+    r"Operator\s+(\d+)\s*:\s*([A-Za-z][A-Za-z0-9 /_'-]*)"
+)
+
+# Restrict a round's operator edits to the operators its rollouts used.  A round
+# rewriting an operator the consultation never reached for changes a trigger no
+# observed exchange can justify -- the evidence cannot say the operator failed,
+# because it never ran.  An operator the rollout did use is a different matter:
+# the exchange is there to read.  Off unless an arm opts in, because it depends
+# on the solver labelling its exchanges, and an arm whose seed does not ask for
+# that labels nothing.
+POLICY_PATCH_ONLY_USED_OPERATORS = False
+
+
+def _section_span(text: str, heading: str) -> tuple[int, int] | None:
+    """Return the (start, end) of ``heading``'s block, or None if it is absent.
+
+    ``heading`` is a whole Markdown heading line, as the patch names it; both its
+    level and its title have to match, so `### Operator 4: Refine / correct` and
+    a hypothetical `## Operator 4: Refine / correct` are different sections.  A
+    block runs from its heading line to the next heading at the same or a
+    shallower level, which is what makes an operator's `###` sub-block a block
+    and the `# 可选交互算子` section a section under the same rule.
+    """
+    wanted = _POLICY_HEADING_PATTERN.match(heading)
+    if wanted is None:
+        return None
+    wanted_level, wanted_title = len(wanted.group(1)), wanted.group(2)
+    for match in _POLICY_HEADING_PATTERN.finditer(text):
+        if len(match.group(1)) != wanted_level or match.group(2) != wanted_title:
+            continue
+        end = len(text)
+        for later in _POLICY_HEADING_PATTERN.finditer(text, match.end()):
+            if len(later.group(1)) <= wanted_level:
+                end = later.start()
+                break
+        return match.start(), end
+    return None
+
+
+def _operator_title(heading: str) -> str | None:
+    """`### Operator 4: Refine / correct` -> `Operator 4: Refine / correct`."""
+    if _OPERATOR_HEADING_PATTERN.match(heading) is None:
+        return None
+    return heading.lstrip("#").strip()
+
+
+def cpe_used_operator_headings(training_parents: list[dict[str, Any]]) -> set[str]:
+    """The operators the round's rollouts actually reached for.
+
+    Read off the headings the solver writes above each question -- `Operator 2:
+    Challenge reasoning` -- which is the only record in the evidence of which
+    operator an exchange applied.  A rollout that states none contributes
+    nothing, so a policy whose consultation never names its operators yields an
+    empty set and no operator may be rewritten.
+    """
+    used: set[str] = set()
+    for parent in training_parents or []:
+        evidence = parent.get("training_evidence") if isinstance(parent, dict) else None
+        for run in (evidence or {}).get("training_runs", []):
+            for artifact in run.get("artifacts", []):
+                for match in _USED_OPERATOR_PATTERN.finditer(
+                    str(artifact.get("content") or "")
+                ):
+                    used.add(f"Operator {match.group(1)}: {match.group(2).strip()}")
+    return used
+
+
+def _parent_workflow(training_parents: list[dict[str, Any]]) -> dict[str, Any]:
+    """The workflow a patch is spliced into: the first training parent's."""
+    for parent in training_parents or []:
+        workflow_value = parent.get("workflow") if isinstance(parent, dict) else None
+        if isinstance(workflow_value, dict) and str(
+            workflow_value.get("policy_text") or ""
+        ):
+            return workflow_value
+    raise ValueError("cannot apply a policy patch without a parent policy_text")
+
+
+def apply_policy_patch(
+    candidate: dict[str, Any],
+    parent_workflow: dict[str, Any],
+    allowed_operator_sections: set[str] | None = None,
+) -> dict[str, Any]:
+    """Splice the optimizer's patch into the parent policy.
+
+    The candidate carries ``policy_patch``: a list of ``{"section": "<heading
+    line>", "body": "<new text under it>"}``.  Each section is replaced in place,
+    and a section the parent does not have is inserted after the one named by
+    ``after``.  Only the mutable regions may be named -- a patch that targets a
+    frozen section is rejected here, by offset, rather than by matching text, so
+    the error says which heading was out of bounds.
+
+    Returns the candidate with ``interaction_policy`` set to the spliced text.
+    A candidate that already carries ``interaction_policy`` and no patch is
+    returned untouched, so the arms that still answer with a whole policy keep
+    working.
+    """
+    patches = candidate.get(POLICY_PATCH_FIELD)
+    if patches is None:
+        return candidate
+    if not isinstance(patches, list) or not patches:
+        raise ValueError(
+            f"{POLICY_PATCH_FIELD} must be a non-empty list of "
+            '{"section": ..., "body": ...} objects'
+        )
+    if POLICY_PATCH_OPERATOR_LIMIT is not None:
+        operators = [
+            str(item.get("section") or "").strip()
+            for item in patches
+            if isinstance(item, dict)
+            and _OPERATOR_HEADING_PATTERN.match(str(item.get("section") or "").strip())
+        ]
+        if len(operators) > POLICY_PATCH_OPERATOR_LIMIT:
+            if POLICY_PATCH_OPERATOR_LIMIT == 0:
+                raise ValueError(
+                    f"{POLICY_PATCH_FIELD} rewrites {', '.join(operators)}, but "
+                    "the operator sections are frozen this round: rewrite "
+                    "`## Interaction Operators` and nothing else. The rule is "
+                    "what the evidence implicates, and holding the repertoire "
+                    "fixed is what lets a round's result be attributed to the "
+                    "rule alone"
+                )
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD} rewrites {len(operators)} operator sections "
+                f"({'; '.join(operators)}); a round may rewrite at most "
+                f"{POLICY_PATCH_OPERATOR_LIMIT}.  Change the rule under "
+                "`## Interaction Operators` instead of the repertoire: a patch "
+                "that moves several operators at once leaves the next round "
+                "unable to attribute its result to any one of them"
+            )
+    if allowed_operator_sections is not None:
+        unjustified = [
+            title
+            for item in patches
+            if isinstance(item, dict)
+            and (title := _operator_title(str(item.get("section") or "").strip()))
+            and title not in allowed_operator_sections
+        ]
+        if unjustified:
+            ran = ", ".join(sorted(allowed_operator_sections)) or "none"
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD} rewrites {', '.join(unjustified)}, but the "
+                f"rollouts this round read reached for: {ran}.  An operator the "
+                "consultation never applied cannot be shown to have failed, so "
+                "change `## Interaction Operators` instead -- or an operator the "
+                "rollouts did use"
+            )
+    text = str(parent_workflow.get("policy_text") or "")
+    for index, patch in enumerate(patches, start=1):
+        if not isinstance(patch, dict):
+            raise ValueError(f"{POLICY_PATCH_FIELD}[{index}] is not an object")
+        heading = str(patch.get("section") or "").strip()
+        body = str(patch.get("body") or "").strip()
+        if not heading or not body:
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD}[{index}] needs both 'section' and 'body'"
+            )
+        if _POLICY_HEADING_PATTERN.match(heading) is None:
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD}[{index}] section {heading!r} is not a "
+                "Markdown heading line"
+            )
+        if any(
+            _POLICY_HEADING_PATTERN.match(line)
+            for line in body.splitlines()
+        ):
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD}[{index}] body contains a heading; a "
+                "patch replaces one section and may not introduce another"
+            )
+        spans = _mutable_policy_spans(text)
+        span = _section_span(text, heading)
+        if span is None:
+            after = str(patch.get("after") or "").strip()
+            if not after:
+                raise ValueError(
+                    f"{POLICY_PATCH_FIELD}[{index}] adds {heading!r}, so it must "
+                    "name the existing section to insert it after in 'after'"
+                )
+            anchor = _section_span(text, after)
+            if anchor is None:
+                raise ValueError(
+                    f"{POLICY_PATCH_FIELD}[{index}] 'after' names {after!r}, "
+                    "which the policy does not state"
+                )
+            if not any(start < anchor[0] < end for start, end in spans):
+                raise ValueError(
+                    f"{POLICY_PATCH_FIELD}[{index}] inserts after {after!r}, "
+                    "which sits outside the sections a round may rewrite"
+                )
+            insertion = f"{heading}\n\n{body}\n\n"
+            text = text[: anchor[1]] + insertion + text[anchor[1] :]
+            continue
+        start, end = span
+        if not any(s <= start < e for s, e in spans):
+            raise ValueError(
+                f"{POLICY_PATCH_FIELD}[{index}] targets {heading!r}, which sits "
+                "outside the sections a round may rewrite"
+            )
+        text = text[:start] + f"{heading}\n\n{body}\n\n" + text[end:]
+    candidate["interaction_policy"] = text
+    # The budget and the stopping rule are not the round's to change, so they are
+    # carried from the parent rather than asked for and re-typed.
+    for key in ("max_exchanges", "stop_condition"):
+        if not candidate.get(key) and parent_workflow.get(key) is not None:
+            candidate[key] = parent_workflow[key]
+    candidate.pop(POLICY_PATCH_FIELD, None)
+    return candidate
+
+
 def _normalise_policy_fragment(text: str) -> str:
     return "\n".join(line.rstrip() for line in text.strip().splitlines())
 
@@ -674,36 +1029,55 @@ def assert_fixed_policy_sections_unchanged(
     candidate: dict[str, Any],
     parents: list[dict[str, Any]],
 ) -> None:
-    """Reject a candidate that rewrote policy text outside the workflow section."""
+    """Reject a candidate that rewrote policy text outside the mutable sections."""
     reference = None
     for parent in parents or []:
         workflow_value = parent.get("workflow") if isinstance(parent, dict) else None
         if not isinstance(workflow_value, dict):
             continue
         text = str(workflow_value.get("policy_text") or "")
-        if _fixed_policy_parts(text) is not None:
+        if _frozen_policy_fragments(text) is not None:
             reference = text
             break
     if reference is None:
         # The parent predates the marker, so there is no boundary to enforce.
         return
 
-    candidate_parts = _fixed_policy_parts(str(candidate.get("policy_text") or ""))
-    if candidate_parts is None:
+    candidate_fragments = _frozen_policy_fragments(
+        str(candidate.get("policy_text") or "")
+    )
+    if candidate_fragments is None:
         raise ValueError(
             "candidate policy_text dropped the "
             f"{_WORKFLOW_HEADING_LABEL} section"
         )
-    reference_parts = _fixed_policy_parts(reference)
-    for label, candidate_part, reference_part in zip(
-        ("before", "after"), candidate_parts, reference_parts
+    reference_fragments = _frozen_policy_fragments(reference)
+    # Checked before the fragments themselves: a candidate that widened a
+    # mutable span has swallowed fixed text rather than rewritten it, and that
+    # shows up here as a missing fragment, not as a differing one.
+    if len(candidate_fragments) != len(reference_fragments):
+        raise ValueError(
+            "candidate changed the number of fixed policy sections around the "
+            f"{_WORKFLOW_HEADING_LABEL} section; only the operator repertoire "
+            "and the rule that chooses among the operators may change"
+        )
+    for index, (candidate_part, reference_part) in enumerate(
+        zip(candidate_fragments, reference_fragments)
     ):
         if _normalise_policy_fragment(candidate_part) != _normalise_policy_fragment(
             reference_part
         ):
+            where = (
+                "before"
+                if index == 0
+                else "after"
+                if index == len(reference_fragments) - 1
+                else "between"
+            )
             raise ValueError(
-                f"candidate rewrote policy text {label} the "
-                f"{_WORKFLOW_HEADING_LABEL} section; only that section may change"
+                f"candidate rewrote policy text {where} the mutable sections; "
+                "only the operator repertoire and the rule that chooses among "
+                "the operators may change"
             )
 
 
@@ -740,7 +1114,7 @@ def assert_solver_policy_changed(
             raise ValueError(
                 f"candidate policy_text reproduces {label}, so the solver would "
                 "see no change; rewrite the "
-                f"{_WORKFLOW_HEADING_LABEL} section instead of only the "
+                f"{_MUTABLE_SECTION_LABEL} section instead of only the "
                 "action graph"
             )
 
@@ -1074,7 +1448,15 @@ CPE_WITHHELD_JUDGE_FIELDS = frozenset(
 
 
 def assert_no_cpe_judge_evidence(value: Any, path: str = "evidence") -> None:
-    """Prevent task-level ModelingBench Judge outputs entering a CPE prompt."""
+    """Prevent task-level ModelingBench Judge outputs entering a CPE prompt.
+
+    ``judge_report_feedback`` is deliberately not one of the withheld names: it
+    is the curated, reasons-only field an arm opts into through
+    ``CPE_INCLUDE_JUDGE_REPORT_FEEDBACK``.  The withheld names cover the raw
+    Judge artifacts -- the nested ``judge_result`` it is derived from, the
+    stability record's path, and the report-utility fields -- so a leak of those
+    still fails loudly while the deliberate field passes.
+    """
     if isinstance(value, dict):
         leaked = sorted(CPE_WITHHELD_JUDGE_FIELDS & set(value))
         if leaked:
@@ -1107,6 +1489,53 @@ def training_run_scores(run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Whether the Judge's per-dimension reasons travel with each training run into
+# the evolution prompt.
+#
+# Off by default: the original design withheld Judge prose so the optimizer
+# would read the consultation itself rather than chase the Judge's wording, and
+# every arm already collected under that rule stays comparable while this is
+# off.  The Claude arms switch it on deliberately -- their rounds were observed
+# proposing patches against the aggregate score alone, which cannot say *which*
+# dimension a consultation failed to move, and the per-criterion reasons are the
+# only evidence in the pipeline that names it.
+CPE_INCLUDE_JUDGE_REPORT_FEEDBACK: bool = False
+
+
+def cpe_judge_report_feedback(run: dict[str, Any]) -> dict[str, Any]:
+    """The Judge's per-criterion verdicts for one run, as reasons rather than prose.
+
+    Returns ``{dimension: [{criterion, score, reason}, ...]}`` for whichever
+    dimensions the Judge scored.  Empty when the run carries no Judge result,
+    which is what the no-interaction baselines look like.
+    """
+    judged = run.get("judge_result")
+    if not isinstance(judged, dict):
+        return {}
+    feedback: dict[str, Any] = {}
+    for dimension, entries in judged.items():
+        if not isinstance(entries, dict):
+            continue
+        criteria = []
+        for criterion in sorted(entries):
+            entry = entries[criterion]
+            if not isinstance(entry, dict):
+                continue
+            reason = str(entry.get("reason", "")).strip()
+            if not reason:
+                continue
+            criteria.append(
+                {
+                    "criterion": criterion,
+                    "score": entry.get("score"),
+                    "reason": reason,
+                }
+            )
+        if criteria:
+            feedback[str(dimension)] = criteria
+    return feedback
+
+
 def cpe_training_parent_evidence(
     result: dict[str, Any],
     parent_rank: int,
@@ -1114,7 +1543,12 @@ def cpe_training_parent_evidence(
     evidence_dir: Path,
     args,
 ) -> dict[str, Any]:
-    """Expose one training parent and its rollouts without Judge prose."""
+    """Expose one training parent and its rollouts.
+
+    The Judge's numeric scores always travel.  Its per-criterion reasons travel
+    only under ``CPE_INCLUDE_JUDGE_REPORT_FEEDBACK``, which is off unless an arm
+    asks for it -- see the constant for why an arm would.
+    """
     training_runs = []
     for run in result.get("problem_results", []):
         problem_id = str(run["problem_id"])
@@ -1126,6 +1560,10 @@ def cpe_training_parent_evidence(
             "artifacts": optimizer_interaction_artifacts(Path(run["run_dir"])),
             "scores": training_run_scores(run),
         }
+        if CPE_INCLUDE_JUDGE_REPORT_FEEDBACK:
+            feedback = cpe_judge_report_feedback(run)
+            if feedback:
+                run_evidence["judge_report_feedback"] = feedback
         summary = summarize_interaction_report_changes(run, evidence_dir, args)
         if summary:
             run_evidence["interaction_report_change_summary"] = summary
@@ -1682,6 +2120,19 @@ def propose_cpe_workflow(
                 round_dir / f"evolution_response_attempt_{attempt}.json", candidate
             )
             workflow_evolution.write_json(round_dir / "evolution_response.json", candidate)
+            # Written before the splice so the files above hold the optimizer's
+            # own answer -- the patch, not the policy it produces.  A rejected
+            # round is read back from them, and the patch is what says which
+            # section the round tried to move.
+            candidate = apply_policy_patch(
+                candidate,
+                _parent_workflow(training_parents),
+                (
+                    cpe_used_operator_headings(training_parents)
+                    if POLICY_PATCH_ONLY_USED_OPERATORS
+                    else None
+                ),
+            )
             changed = candidate.get("changed_components")
             if not isinstance(changed, list) or not any(
                 str(item).strip() for item in changed

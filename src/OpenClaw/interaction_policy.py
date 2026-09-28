@@ -10,9 +10,12 @@ interaction operators, seeded with four -- resolve uncertainty, challenge
 reasoning, inject knowledge, refine/correct -- each carrying its own trigger
 condition and execution rule.  The operators and the rule that chooses among
 them are the mutable surface the rounds rewrite; the autonomy default, the
-exchange budget and the prohibition on asking the expert for parameters,
-computation or anything about code sit outside it and are enforced as fixed by
-``assert_fixed_policy_sections_unchanged``.  A round may also add an operator,
+exchange budget and the prohibition list -- coding/implementation, parameter
+tuning, standard derivations and computation -- sit outside it and are enforced
+as fixed by ``assert_fixed_policy_sections_unchanged``.  The list bars parameter
+*tuning*, not parameter *plausibility*: asking the expert whether a constant the
+agent has itself assumed is of a sensible order of magnitude stays permitted,
+and Operator 3 says so.  A round may also add an operator,
 which is why the repertoire is stated as steps rather than as a table the engine
 would have to be taught to extend -- and why nothing in the policy, fixed
 sections included, may state how many operators there are.
@@ -33,20 +36,45 @@ The expert never does computation. Every technical translation of a reply -- ass
 
 ## Interaction Operators
 
-The consultation is assembled from the interaction operators set out below. Each states when it applies and how it is executed. They are a repertoire, not a checklist: an operator is applied only when its trigger condition is met, never merely because the consultation still has budget.
+Before each exchange:
 
-Apply exactly one operator per exchange, and apply an operator again only for a decision distinct from every decision it has already addressed. Address one decision at a time, in descending order of its effect on the modeling direction. The exchange budget is fixed and is to be filled: when no trigger condition is met, put the most consequential open decision to the expert through the operator whose question fits it best.
+Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.
+
+Determine what kind of expert input is needed:
+
+- resolve ambiguity;
+- challenge a key assumption;
+- provide missing real-world knowledge;
+- refine a previously introduced modeling mechanism.
+
+Select the operator that best matches that need.
+
+Name the operator you selected -- its number and its name -- at the head of the
+question, so the exchange records which operator it applied. Every exchange
+carries one.
+
+Ask exactly one focused question.
+
+After each expert reply:
+
+Determine what decision, assumption, constraint, or mechanism changed.
+
+Incorporate the required implications into the model.
+
+Identify any new high-impact uncertainty introduced by the reply.
+
+Re-rank the remaining unresolved decisions before choosing the next operator.
+
+Later exchanges must depend on earlier replies. Do not predefine an operator sequence and do not choose an operator merely for diversity.
 
 ## Prohibited Requests
 
-No operator, in any wording, may put any of the following to the expert. This list does not change.
+The agent must not request feedback for:
 
-- parameter values, ranges, estimates, initial conditions, or calibration targets;
-- computation, derivation, data processing, statistical analysis, or simulation;
-- code in any form: writing, reading, reviewing, debugging, or tool usage;
-- model validation, result checking, error analysis, or numerical comparison;
-- routine method selection, minor assumption adjustments, or anything a reasonable default would settle;
-- approval, confirmation, or review of a decision the agent has already made.
+- coding, debugging, or implementation issues;
+- parameter tuning or optimization details;
+- standard mathematical derivations;
+- computation, data processing, or routine validation.
 
 # 可选交互算子
 
@@ -70,7 +98,7 @@ No operator, in any wording, may put any of the following to the expert. This li
 
 **When.** The model depends on how the real-world system actually behaves, and that knowledge is missing from the problem statement and the evidence and cannot be reached by calculation.
 
-**How.** Name the missing context and how the model changes if it turns out differently, then ask the expert to explain it qualitatively. Derive the values yourself.
+**How.** Name the missing context and how the model changes if it turns out differently, then ask the expert to explain it qualitatively, including whether the order of magnitude you have assumed is plausible for the real setting. Derive the values yourself.
 
 **Example.** Agent: "The model turns on how maintenance is scheduled in practice, which nothing here records." Expert: "In planned blocks -- not at random."
 
@@ -87,3 +115,46 @@ No operator, in any wording, may put any of the following to the expert. This li
 The consultation runs three exchanges, one operator each; an exchange is one question and one reply.
 
 After this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."""
+
+
+_ROUTED_SECTION_HEADING = "# 可选交互算子"
+
+# The Router makes the operator choice an explicit, stated decision instead of
+# one the solver reaches by reading four `When` clauses and picking.  It exists
+# because that implicit routing collapsed in practice: across the first 22
+# consultations of claude_fp8_opseed_r10, 45% ran the identical 1-2-4 arc, the
+# last exchange was Operator 4 in 78% of them, and Operator 3 was reached for in
+# only 8% -- a fixed script, not a reading of the state.
+#
+# It targets the three failures that audit found, and nothing else:
+#   * the state is read into one line before anything is chosen, so the choice
+#     has a stated basis rather than a habitual one;
+#   * the arc is declared an output of that reading, which makes "it is this
+#     operator's turn" an explicit failure rather than a default;
+#   * no operator may be reached for without the reply its `When` requires, which
+#     is what let Operator 4 become the automatic last move.
+_ROUTER_STEP = """### Router
+
+**When.** Before each exchange, and again after every reply. The choice is made here, from the state as it now stands, and is never carried forward from the previous exchange.
+
+**How.** Read the state into one line: the modeling stage, the decisions the earlier replies already settled, and the single largest decision still open. Choose the operator whose `When` that decision meets, name that decision in one line before the question, and put that one decision to the expert. The arc is an output of this reading and not a plan: repeating a familiar sequence is a routing failure unless the state genuinely repeated, and no operator may be reached for because it is the turn it usually takes.
+
+**Example.** State: the direction is settled and the model validated; the load assumption the conclusion rests on has never been criticized; no reply has exposed anything unresolved. Choice: Operator 2, because the uncriticized assumption is the largest open decision. Not Operator 4: no reply exposed a weakness for it to act on."""
+
+# Derived rather than retyped.  The two arms of the routing experiment have to
+# differ by this block and by nothing else, and deriving the routed seed makes
+# that a property of the code instead of a claim about a careful copy -- a
+# retyped second policy could drift from the first and quietly turn the
+# comparison into two changes.
+OPERATOR_DRIVEN_CONSULTATION_ROUTED = OPERATOR_DRIVEN_CONSULTATION.replace(
+    f"{_ROUTED_SECTION_HEADING}\n\n",
+    f"{_ROUTED_SECTION_HEADING}\n\n{_ROUTER_STEP}\n\n",
+    1,
+)
+if OPERATOR_DRIVEN_CONSULTATION_ROUTED == OPERATOR_DRIVEN_CONSULTATION:
+    # Loud, because the silent version of this is an experiment whose two arms
+    # are the same policy with different labels.
+    raise RuntimeError(
+        "routed seed: the operator section heading moved, so the Router step was "
+        f"not inserted (looked for {_ROUTED_SECTION_HEADING!r})"
+    )

@@ -42,7 +42,13 @@ DEFAULT_EXPERT_MODEL = "deepseek-v4-pro"
 # --enforce-substantive-interaction-gate without changing the experiment logic.
 ENFORCE_SUBSTANTIVE_INTERACTION_GATE = False
 ORIGINAL_PREPARE_VALIDATION_PROBLEM = interaction.prepare_validation_problem
-EXPERT_REQUEST_TIMEOUT = 180.0
+# Maximum seconds for one question/reply handshake.  Both sides read it: it is
+# rendered into the solver prompt as `--timeout` and passed to the controller as
+# `--expert-request-timeout`.  The handshake costs about two seconds in practice
+# (controller pickup 0.004-0.03 s, expert answer 1.0-1.7 s, measured on
+# claude_fp8_keepframe_r10), so 70 s is ~40x the observed latency and still fails
+# an unproductive exchange while the solve is running rather than long after.
+EXPERT_REQUEST_TIMEOUT = 70.0
 SECRET_PATTERNS = (
     re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),

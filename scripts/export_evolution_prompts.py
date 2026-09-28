@@ -327,8 +327,10 @@ def seed_policy() -> str:
         + f"\n## 算子清单（从 `# {policy_heading(raw)}` 段解析）\n\n"
         "每个算子是该段里的一个 `###` 子标题，演化器只被允许改写这一段：\n\n"
         + "\n".join(f"{index}. {title}" for index, title in enumerate(operators, 1))
-        + "\n\n段外（自主默认、交互预算、停止条件、效率规则、禁止索取参数/计算/代码的清单）"
+        + "\n\n段外（自主默认、交互预算、停止条件、效率规则、禁止清单）"
         "由 `assert_fixed_policy_sections_unchanged()` 强制逐字保留。"
+        "禁止清单只管实现/调参/推导/计算，**不管参数合理性**："
+        "请专家判断 agent 自己假定的常数是否量级合理是允许的。"
         "段内最多 8 个算子：相似度按算子逐个数，阈值 "
         f"{base_similarity_threshold():.2f}，第 9 个起每轮都会被判成重复。\n\n"
         "## 对照：from-scratch 臂额外追加的一段\n\n"
@@ -601,7 +603,7 @@ def build() -> dict[str, str]:
             "# 交互策略种子（frozen seed）\n\n"
             "填进 solver prompt 交互段的初始策略，全部臂都从它出发，演化器只能改写它、不能换掉它。\n\n"
             + provenance(
-                source_note("src/OpenClaw/interaction_policy.py", 18, "OPERATOR_DRIVEN_CONSULTATION")
+                source_note("src/OpenClaw/interaction_policy.py", 26, "OPERATOR_DRIVEN_CONSULTATION")
                 + " → "
                 + source_note("src/OpenClaw/run_substantive_interaction_workflow_evolution_from_scratch_claude.py", 99, "fixed_initial_workflow()"),
                 "静态常量（`strip_plan_references()` 对本种子是空操作）",
@@ -641,14 +643,42 @@ ROWS = (
     ("planner_draft.md", "planner", "上游证据预取用的规划 prompt（本臂只复用其产物）"),
 )
 
+# Artifacts that live in this directory but are one run's output rather than a
+# template, so this script does not write them.  They are listed because a
+# README that regenerates without them turns them into undocumented orphans --
+# the loss is silent, and the files are the only record of what a round produced.
+EXTRA_ROWS = (
+    ("interaction_policy_evolved.md", "演化后的交互策略", "最近一次真实演化调用产出的 patch 拼接到 seed 上的完整策略"),
+    ("policy_patch.json", "patch 原文", "该次演化返回的 patch，即模型实际吐出的 JSON"),
+    ("workflow.json", "工作流", "拼接后的完整 workflow（含合成的 actions），引擎交给 solver 的形态"),
+    # Kept so the effect of each rule change stays visible instead of being
+    # overwritten by the next run: the same evidence under three rule sets.
+    ("policy_patch_before_freeze.json", "早期 patch（对照）", "repertoire 冻结前：同一份证据产出 5 段 patch（策略 + 全部 4 个算子）"),
+    ("policy_patch_per_exchange_rule.json", "早期 patch（对照）", "冻结后、但演化目标仍是逐次规则：只改策略段，骨架依旧是「每次交互前/后」"),
+    ("policy_patch_cross_exchange.json", "早期 patch（对照）", "目标改为跨轮后：「单一累积论证 + 第一轮确立约束性框架」，但组织骨架未变"),
+    ("policy_patch_wholesale_rewrite.json", "早期 patch（对照）", "「改动要明显」指令下的整段重写：seed 的 8 项内容全丢，骨架未变"),
+    ("policy_patch_skeleton_broken.json", "早期 patch（对照）", "「父本组织不是模板」指令下骨架被换：改为按位置索引，seed 指令 0/14 保留"),
+)
 
-def readme(prompts: dict[str, str]) -> str:
+
+def readme(prompts: dict[str, str], output: pathlib.Path) -> str:
     listing = "\n".join(
         f"| `{name}` | {role} | {what} |" for name, role, what in ROWS if name in prompts
     )
     missing = [name for name, _, _ in ROWS if name not in prompts]
     if missing:
         listing += "\n" + "\n".join(f"| `{name}` | — | 本次未生成 |" for name in missing)
+    extra = "\n".join(
+        f"| `{name}` | {role} | {what} |"
+        for name, role, what in EXTRA_ROWS
+        if (output / name).is_file()
+    )
+    extra_section = (
+        "\n### 具体产物（不是模板，本脚本不生成也不覆盖）\n\n"
+        "| 文件 | 角色 | 内容 |\n|---|---|---|\n" + extra + "\n"
+        if extra
+        else ""
+    )
     return f"""# 交互策略演化实验的 prompt 全集
 
 本目录由 `scripts/export_evolution_prompts.py` 生成，内容为**渲染后的 prompt 模板**：
@@ -662,7 +692,7 @@ def readme(prompts: dict[str, str]) -> str:
 | 文件 | 角色 | 内容 |
 |---|---|---|
 {listing}
-
+{extra_section}
 ## 不放在本目录的两类内容
 
 - **评分标准（rubric）**：固定 rubric `src/OpenClaw/interaction_initial_substantive_v1.json` 与
@@ -688,7 +718,7 @@ def main(argv: list[str]) -> int:
     prompts = build()
     for name, text in prompts.items():
         write(output / name, text)
-    write(output / "README.md", readme(prompts))
+    write(output / "README.md", readme(prompts, output))
     return 0
 
 

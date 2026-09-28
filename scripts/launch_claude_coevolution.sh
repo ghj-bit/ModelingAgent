@@ -50,6 +50,18 @@ JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 JUDGE_BASE_URL="${JUDGE_BASE_URL:-$BASE_URL}"
 JUDGE_API_KEY="${JUDGE_API_KEY:-EMPTY}"
 
+# The optimizer stays on the same local server as the solver.  It used to share
+# `--opt-model "$MODEL"` directly; the three names below only make the role
+# overridable, so a DeepSeek optimizer can be tried with
+# `OPT_MODEL=deepseek-flash OPT_BASE_URL=https://api.deepseek.com OPT_API_KEY=...`
+# without editing the launcher.  Note what a weak optimizer costs here: the call
+# re-emits the whole ~4.7 KB policy with a targeted patch, and the FP8 build
+# answered with the parent text unchanged on 11 of 19 attempts in
+# claude_fp8_judgefb_r10 -- which is what killed that run at round 6.
+OPT_MODEL="${OPT_MODEL:-$MODEL}"
+OPT_BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
+OPT_API_KEY="${OPT_API_KEY:-EMPTY}"
+
 # claude_backend takes its endpoint from the environment, not from --model or
 # --base-url, so without these the arm would fall back to the backend's own
 # defaults rather than to what is configured here.  Same values as the flags
@@ -172,7 +184,7 @@ setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolutio
   --fixed-rubric "$REPO/src/OpenClaw/interaction_initial_substantive_v1.json" \
   --baseline-report-root "$REPO" \
   --model "$MODEL" \
-  --opt-model "$MODEL"      --opt-base-url "$BASE_URL"      --opt-api-key EMPTY \
+  --opt-model "$OPT_MODEL"  --opt-base-url "$OPT_BASE_URL"  --opt-api-key "$OPT_API_KEY" \
   --expert-model "$EXPERT_MODEL" --expert-base-url "$EXPERT_BASE_URL" --expert-api-key "$EXPERT_API_KEY" \
   --judge-feedback-model "$MODEL" \
   --mmbench-judge-model "$JUDGE_MODEL" --mmbench-judge-base-url "$JUDGE_BASE_URL" --mmbench-judge-api-key "$JUDGE_API_KEY" \

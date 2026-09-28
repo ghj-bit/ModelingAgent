@@ -49,8 +49,10 @@ from pathlib import Path
 
 # The rubric proposer runs on the optimizer endpoint unless the environment
 # names another one -- the same split the launch script uses for the critic.
-_DEFAULT_OPT_MODEL = os.environ.get("OPT_MODEL") or "qwen3.8-27b"
-_DEFAULT_OPT_BASE_URL = os.environ.get("OPT_BASE_URL") or "http://gpu6:18763/v1"
+# The fallbacks are the from-scratch arm's endpoint (FP8 on 18764); the bf16
+# server these used to name, 18763, is no longer served.
+_DEFAULT_OPT_MODEL = os.environ.get("OPT_MODEL") or "qwen3.8-27b-fp8"
+_DEFAULT_OPT_BASE_URL = os.environ.get("OPT_BASE_URL") or "http://gpu6:18764/v1"
 _DEFAULT_OPT_API_KEY = os.environ.get("OPT_API_KEY") or "EMPTY"
 
 try:

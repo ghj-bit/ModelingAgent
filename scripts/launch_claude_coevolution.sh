@@ -33,14 +33,24 @@ set -euo pipefail
 
 REPO=/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent
 PY=/public1/home/stu52275901007/anaconda3/envs/math_modeling/bin/python
-BASE_URL="${BASE_URL:-http://gpu6:18763/v1}"
-MODEL="${MODEL:-qwen3.8-27b}"
+# The local solver/optimizer/judge run on the FP8 build since 2026-09-26, the
+# same server the from-scratch arm uses.  Measured with the same benchmark
+# harness as bench/RESULTS.md: at TP=2 the single-stream decode rate went
+# 23.8 -> 40.2 tok/s and the 8-way rate 116 -> 233 tok/s, because on this SM 8.6
+# hardware vLLM keeps FP8 weights 8-bit and streams them through the Marlin
+# weight-only kernel -- and this workload is decode/bandwidth bound.  The KV
+# pool at equal GPU_UTIL also doubles (83k -> 173k tokens per replica), which is
+# what raises how many solving agents fit at once.
+#
+# The name is deliberately not "qwen3.8-27b": the served name is what lands in
+# each run's config.json, so an FP8 run must not be confusable with a bf16 one.
+# Override BASE_URL/MODEL in the environment to go back to the bf16 server.
+BASE_URL="${BASE_URL:-http://gpu6:18764/v1}"
+MODEL="${MODEL:-qwen3.8-27b-fp8}"
 
-# The human expert runs on DeepSeek; the MM-Bench judge stays on the locally
-# served model (a DeepSeek judge was reverted: its reply format broke MM-Bench's
-# parser).  The critic keeps a DeepSeek endpoint of its own -- its output is
-# parsed by our own tolerant reader and a failure is never fatal, so it does not
-# need the judge's stability -- set CRITIC_MODEL/CRITIC_BASE_URL to move it.
+# The human expert runs on DeepSeek.  The MM-Bench judge stays on the locally
+# served model: a DeepSeek judge was reverted because its reply format broke
+# MM-Bench's parser.  The critic is on the local model too -- see below.
 DEEPSEEK_BASE_URL="${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:?export DEEPSEEK_API_KEY before running this script}"
 EXPERT_MODEL="${EXPERT_MODEL:-deepseek-flash}"
@@ -70,9 +80,16 @@ export CLAUDE_MODEL="$MODEL"
 export CLAUDE_BASE_URL="$BASE_URL"
 export CLAUDE_API_KEY="$JUDGE_API_KEY"
 
-export CRITIC_MODEL="${CRITIC_MODEL:-deepseek-flash}"
-export CRITIC_BASE_URL="${CRITIC_BASE_URL:-$DEEPSEEK_BASE_URL}"
-export CRITIC_API_KEY="${CRITIC_API_KEY:-$DEEPSEEK_API_KEY}"
+# The critic runs on the same local FP8 server as the solver and the optimizer.
+# It used to sit on DeepSeek, on the grounds that its output is parsed by our own
+# tolerant reader and a failure is never fatal, so it did not need the stability
+# the judge requires.  Keeping it local instead makes the arm one endpoint
+# lighter and puts the review on the model that also writes the policies, which
+# is what the rubric is meant to measure.  Set CRITIC_MODEL/CRITIC_BASE_URL to
+# point it somewhere else; the module's own fallback is the same local role.
+export CRITIC_MODEL="${CRITIC_MODEL:-$MODEL}"
+export CRITIC_BASE_URL="${CRITIC_BASE_URL:-$BASE_URL}"
+export CRITIC_API_KEY="${CRITIC_API_KEY:-EMPTY}"
 
 # The rubric proposer runs on the optimizer endpoint: revising the measuring
 # stick is an optimization step, not a review step, so it stays on the model
@@ -113,6 +130,19 @@ fi
 # searches and 30-minute foreground commands is on by default here.  Set to 0 to
 # drop that paragraph from the prompt.
 export INTERACTION_RUNAWAY_GUARD="${INTERACTION_RUNAWAY_GUARD:-1}"
+
+# Foreground command budget, lowered from the 30 minutes run_claude_task.py
+# defaults to.  Trial, not a settled setting -- the value it replaces was itself
+# chosen against evidence: run_claude_task.py records that a 5-minute default
+# was tried before and killed a `sleep 420 && tail progress.log` poll at 300 s,
+# because the solver treats the default as its own budget (49 of 50 Bash calls
+# leave the timeout unset).  Lower it only while chasing a specific runaway:
+# this run spent 30 minutes and ~180 GB on an array that gained an axis per loop
+# pass, and the point of the shorter cap is that the agent is handed control at
+# the moment the command turns expensive instead of half an hour later.
+# Raise it back to 1800000 to restore the default.
+export BASH_DEFAULT_TIMEOUT_MS="${BASH_DEFAULT_TIMEOUT_MS:-300000}"
+export BASH_MAX_TIMEOUT_MS="${BASH_MAX_TIMEOUT_MS:-300000}"
 
 # Optional: pin the CPE sampling seed, so a re-run draws the same training
 # batches in the same order as the run it is compared against.

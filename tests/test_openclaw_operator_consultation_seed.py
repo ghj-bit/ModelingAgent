@@ -314,10 +314,10 @@ class OperatorSeedTests(unittest.TestCase):
             "the engine splices them into the parent",
             "`policy_patch` comes first because it is the deliverable",
             "no heading of any level may appear inside it",
-            # The budget, the stopping rule and the purpose are carried over by
+            # The budget and the stopping rule are carried over by
             # `apply_policy_patch` rather than returned by the round, so the
             # prompt names them as carried rather than as fields to emit.
-            "are carried over from the parent",
+            "the budget and the stopping rule are carried",
         ):
             self.assertIn(needle, prompt)
 
@@ -418,14 +418,17 @@ class PolicyPatchTests(unittest.TestCase):
         )
 
     def splice(self, patch, parent=None, allowed=None):
-        # The shape a round's response actually has: the patch, plus the two
-        # labels the schema still asks for.  The budget and the stop condition
-        # are deliberately absent -- the engine carries those from the parent.
+        # The shape a round's response actually has: the patch, plus the one
+        # label the schema still asks for.  The purpose, the budget and the stop
+        # condition are deliberately absent -- the engine carries all three from
+        # the parent, and a fixture that supplies them tests nothing about the
+        # carrying.  This is not hypothetical: claude_fp8_scratch_r10 died with
+        # five "invalid purpose" rejections because the fixture wrote one while
+        # the prompt no longer asked for it.
         candidate = workflow.apply_policy_patch(
             {
                 "policy_patch": patch,
                 "name": "A patched consultation policy",
-                "purpose": "Spend the fixed expert budget where the state says it matters.",
             },
             parent if parent is not None else self.seed,
             allowed,
@@ -508,6 +511,25 @@ class PolicyPatchTests(unittest.TestCase):
         )
         self.assertEqual(candidate["max_exchanges"], self.seed["max_exchanges"])
         self.assertEqual(candidate["stop_condition"], self.seed["stop_condition"])
+
+    def test_a_candidate_without_a_purpose_still_validates(self):
+        # `purpose` is not required, and that is load-bearing rather than
+        # cosmetic.  The optimizer no longer returns one (§3 stopped asking) and
+        # the parent the splice sees has it stripped by `optimizer_workflow()`,
+        # so nothing supplies it.  While `validate_workflow` required it, every
+        # candidate was refused -- five times in round 1 of
+        # claude_fp8_scratch_r10, which is what killed that run.
+        candidate = self.splice(
+            [{"section": "## Interaction Strategy", "body": "Read the state first."}]
+        )
+        self.assertNotIn("purpose", candidate)
+
+        # And the requirement is gone at the seam the real pipeline crosses, not
+        # just in this fixture: the copy handed to the splice has no purpose
+        # either, and a workflow missing one still passes validation.
+        parent_copy = workflow.optimizer_workflow(dict(self.seed))
+        self.assertNotIn("purpose", parent_copy)
+        workflow.validate_workflow(dict(parent_copy, purpose=""))
 
     def test_the_arm_is_wired_to_the_frozen_repertoire(self):
         prompt = base_prompt_for(self.seed)

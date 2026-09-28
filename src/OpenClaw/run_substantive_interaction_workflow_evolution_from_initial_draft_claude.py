@@ -811,9 +811,9 @@ State, in the parent's own order:
 
 The patch must differ from the parent and from every policy in
 `evolution_history`; rewording that leaves behaviour identical is rejected as
-noise. Return `name` and the patch; the purpose, the budget and the stopping rule
-are carried over from the parent. `changed_components` names only the sections
-the patch rewrites.
+noise. Return `name` and the patch; the budget and the stopping rule are carried
+over from the parent. `changed_components` names only the sections the patch
+rewrites.
 """
 
 

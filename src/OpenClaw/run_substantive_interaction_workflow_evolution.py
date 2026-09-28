@@ -1030,12 +1030,9 @@ def apply_policy_patch(
             )
         text = text[:start] + f"{heading}\n\n{body}\n\n" + text[end:]
     candidate["interaction_policy"] = text
-    # The budget, the stopping rule and the purpose are not the round's to
-    # change, so they are carried from the parent rather than asked for and
-    # re-typed.  `purpose` is validated -- `validate_workflow` rejects a value
-    # under twelve characters -- so an arm whose schema stops asking for it has
-    # to have it filled here or every candidate it returns is refused.
-    for key in ("max_exchanges", "stop_condition", "purpose"):
+    # The budget and the stopping rule are not the round's to change, so they
+    # are carried from the parent rather than asked for and re-typed.
+    for key in ("max_exchanges", "stop_condition"):
         if not candidate.get(key) and parent_workflow.get(key) is not None:
             candidate[key] = parent_workflow[key]
     # The mode names which evolution operator produced the round, and an arm that
@@ -1147,7 +1144,15 @@ def assert_solver_policy_changed(
 
 
 def validate_workflow(workflow: dict[str, Any]) -> None:
-    for field in ("name", "purpose", "stop_condition"):
+    # `purpose` is not required.  It was, and that requirement outlived the
+    # prompt that asked for it: once §3 stopped asking the optimizer to return a
+    # purpose, the only source left was the parent -- and the parent the splice
+    # sees is `optimizer_workflow()`'s copy, which strips it.  Every candidate
+    # then failed here and claude_fp8_scratch_r10 died in round 1 with five
+    # rejections and no valid workflow.  The field survives in the seed and in
+    # stored workflows as description; nothing reads it when a policy_text is
+    # present, which it always is.
+    for field in ("name", "stop_condition"):
         if len(str(workflow.get(field, "")).strip()) < 12:
             raise ValueError(f"interaction workflow has invalid {field}")
     for removed_field in ("transitions", "completion_output", "success_test"):

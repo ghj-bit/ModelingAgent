@@ -1534,6 +1534,79 @@ def training_run_scores(run: dict[str, Any]) -> dict[str, Any]:
 CPE_INCLUDE_JUDGE_REPORT_FEEDBACK: bool = False
 
 
+# Whether each training run's submitted ``solution.json`` travels with the
+# evidence.
+#
+# Off by default: the artifact is large (one run submits five tasks, ~20 KB), and
+# every arm collected under the original evidence shape stays comparable while
+# this is off.  The Claude arms switch it on deliberately -- those rounds were
+# observed rewriting the consultation rule against the dialogue and a 50-char
+# change summary alone, so the optimizer could see what was asked and what the
+# reply moved but never what the run finally asserted.  The Judge scores that
+# container, not the report, so a policy cannot be argued about rigor,
+# practicality or result-handling without it: the same four fields the rubric
+# proposer reads are the ones exposed here.
+#
+# Training runs only.  The validation champion is exposed as policy text plus a
+# net utility and carries no runs at all (``cpe_validation_champion_signal``), so
+# nothing held-out reaches the optimizer by turning this on.
+CPE_INCLUDE_SUBMITTED_SOLUTION: bool = False
+
+# The share of one submission that travels when it does, and the four fields the
+# Judge scores.  Deliberately the same shape and the same limits as
+# ``interaction_rubric_proposer.solution_block``, which reads this artifact for
+# the rubric side: one definition of "what the submission says" for both prompts.
+# Keep the two in step.
+CPE_SOLUTION_FIELDS = (
+    ("task_description", 300),
+    ("task_analysis", 400),
+    ("mathematical_modeling_process", 500),
+    ("subtask_outcome_analysis", 400),
+)
+CPE_MAX_SOLUTION_TASKS = 2
+CPE_MAX_SOLUTION_CHARS = 1800
+
+
+def submitted_solution(run_dir: Path) -> dict[str, Any]:
+    """One run's submitted ``solution.json``, clipped to what the Judge scores.
+
+    Returns ``{}`` when the run submitted nothing readable, which is what a run
+    that failed before the submission container looks like.  ``task_count`` is
+    the untruncated count so a reader can tell how much of the submission is
+    shown.
+
+    The budget is spent across the shown tasks rather than gating them: both
+    tasks are rendered and the tail is cut when the budget runs out, which is
+    what makes a submission whose first task is long still show the second.
+    """
+    payload = workflow_evolution.read_json(
+        Path(run_dir) / "output" / "results" / "solution.json", {}
+    )
+    tasks = payload.get("tasks") if isinstance(payload, dict) else None
+    if not isinstance(tasks, list) or not tasks:
+        return {}
+    shown: list[dict[str, str]] = []
+    remaining = CPE_MAX_SOLUTION_CHARS
+    for task in tasks[:CPE_MAX_SOLUTION_TASKS]:
+        if not isinstance(task, dict) or remaining <= 0:
+            continue
+        fields: dict[str, str] = {}
+        for field, limit in CPE_SOLUTION_FIELDS:
+            if remaining <= 0:
+                break
+            value = " ".join(str(task.get(field) or "").split())
+            if not value:
+                continue
+            value = value[: min(limit, remaining)]
+            remaining -= len(value)
+            fields[field] = value
+        if fields:
+            shown.append(fields)
+    if not shown:
+        return {}
+    return {"task_count": len(tasks), "tasks": shown}
+
+
 def cpe_judge_report_feedback(run: dict[str, Any]) -> dict[str, Any]:
     """The Judge's per-criterion verdicts for one run, as reasons rather than prose.
 
@@ -1578,8 +1651,9 @@ def cpe_training_parent_evidence(
     """Expose one training parent and its rollouts.
 
     The Judge's numeric scores always travel.  Its per-criterion reasons travel
-    only under ``CPE_INCLUDE_JUDGE_REPORT_FEEDBACK``, which is off unless an arm
-    asks for it -- see the constant for why an arm would.
+    only under ``CPE_INCLUDE_JUDGE_REPORT_FEEDBACK``, and the run's submitted
+    ``solution.json`` only under ``CPE_INCLUDE_SUBMITTED_SOLUTION``; both are off
+    unless an arm asks for them -- see each constant for why an arm would.
     """
     training_runs = []
     for run in result.get("problem_results", []):
@@ -1596,6 +1670,10 @@ def cpe_training_parent_evidence(
             feedback = cpe_judge_report_feedback(run)
             if feedback:
                 run_evidence["judge_report_feedback"] = feedback
+        if CPE_INCLUDE_SUBMITTED_SOLUTION:
+            solution = submitted_solution(Path(run["run_dir"]))
+            if solution:
+                run_evidence["submitted_solution"] = solution
         summary = summarize_interaction_report_changes(run, evidence_dir, args)
         if summary:
             run_evidence["interaction_report_change_summary"] = summary

@@ -8,6 +8,7 @@ wrapper is exercised on its skip, success and failure paths.
 """
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -181,7 +182,9 @@ class RubricEvolutionHookTests(unittest.TestCase):
     RUBRIC_V4 = (
         "Interaction Strategy: Multi-Round Consultation\n\n"
         "[60] First criterion: does the first thing, stated at length enough to judge.\n\n"
-        "[40] Second criterion: does the second thing, stated at length enough to judge.\n"
+        "[40] Second criterion: does the second thing, stated at length enough to judge.\n\n"
+        "Scores are summed and normalized by this rubric's theoretical maximum (100): "
+        "normalized = total / 100. Score only the dialogue.\n"
     )
 
     def _revise(self, temporary: str, result: dict) -> tuple[Path | None, str]:
@@ -189,15 +192,12 @@ class RubricEvolutionHookTests(unittest.TestCase):
         rubric = Path(temporary) / "interaction_strategy_rubric_v4.md"
         rubric.write_text(self.RUBRIC_V4, encoding="utf-8")
         payload = {
-            "op": "reword",
-            "target": "First criterion",
-            "new_criteria": [
-                {
-                    "name": "First criterion",
-                    "max": 60,
-                    "rule": "a rewritten first rule, long enough to pass validation",
-                }
-            ],
+            "criterion": {
+                "name": "Names a magnitude",
+                "max": 10,
+                "rule": "The question asks for a value the text does not carry, or it is not a gap.",
+                "example": "Asks for the tidal range; not asking whether the model is any good.",
+            },
             "evolution_rationale": "x" * 40,
         }
         with patch.dict("os.environ", {"CRITIC_RUBRIC": str(rubric)}), patch.object(
@@ -234,7 +234,12 @@ class RubricEvolutionHookTests(unittest.TestCase):
             self.assertIn("本轮候选在训练集上的表现", prompt)
             self.assertNotIn("验证集（held-out）", prompt)
             self.assertIn("没有 held-out 证据", prompt)
-            self.assertIn("未运行", prompt, "the decision block must not claim a gate ran")
+            self.assertIn("验证：未运行", prompt, "the decision block must not claim a gate ran")
+            written = out.read_text(encoding="utf-8")
+            self.assertIn("[60] First criterion", written, "earlier criteria must not move")
+            self.assertIn("[10] Names a magnitude", written)
+            self.assertIn("Example: Asks for the tidal range", written)
+            self.assertIn("theoretical maximum (110)", written, "the footer states the new total")
 
     def test_a_validated_round_revises_from_the_held_out_record(self):
         """When validation ran, the held-out record is the evidence."""
@@ -254,6 +259,9 @@ class RubricEvolutionHookTests(unittest.TestCase):
             self.assertIn("本轮候选在验证集（held-out）上的表现", prompt)
             self.assertIn("验证门（须高于现任冠军", prompt)
             self.assertNotIn("未运行", prompt)
+            written = out.read_text(encoding="utf-8")
+            self.assertIn("[10] Names a magnitude", written)
+            self.assertIn("theoretical maximum (110)", written)
 
     def test_hook_hands_the_round_to_the_proposer(self):
         with patch.object(coevolution.proposer, "evolve_rubric") as evolve:
@@ -273,43 +281,223 @@ class RubricEvolutionHookTests(unittest.TestCase):
         self.assertEqual(result, ["stored"])
         persist.assert_called_once()
 
-    def test_proposal_must_move_exactly_one_criterion(self):
-        """The protocol the rubric files state: one structural change per version."""
+    def test_append_keeps_every_existing_criterion_byte_identical(self):
+        """The protocol: one appended criterion per version, nothing else moves."""
         current = proposer.parse_criteria(
             "Interaction Strategy: T\n\n"
             "[60] First criterion: does the first thing, stated at length.\n\n"
             "[40] Second criterion: does the second thing, stated at length.\n"
         )
-        no_op = {
-            "op": "reword",
-            "target": "First criterion",
-            "new_criteria": [
-                {"name": "First criterion", "max": 60, "rule": "does the first thing, stated at length."}
-            ],
+        payload = {
+            "criterion": {
+                "name": "Names a magnitude",
+                "max": 10,
+                "rule": "The question asks for a value the text does not carry, or it is not a gap.",
+                "example": "Asks for the tidal range; not asking whether the model is any good.",
+            },
             "evolution_rationale": "x" * 40,
         }
-        self.assertEqual(proposer.apply_edit(current, no_op)[0]["rule"], current[0]["rule"])
+        self.assertEqual(proposer.proposal_errors(payload, current), [])
+        updated = proposer.append_criterion(current, payload)
+        self.assertEqual(updated[:2], current, "the criteria in force must not move")
+        self.assertEqual(len(updated), 3)
+        self.assertEqual(updated[2]["example"].startswith("Asks for"), True)
 
-        moved = dict(no_op, new_criteria=[{**no_op["new_criteria"][0], "rule": "a rewritten rule of sufficient length"}])
-        updated = proposer.apply_edit(current, moved)
-        self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1], current[1], "the untouched criterion must be byte-identical")
-
-    def test_weights_must_still_sum_to_one_hundred(self):
+    def test_proposal_without_an_example_is_rejected(self):
+        """The rule and one short example are both required of the new criterion."""
         current = proposer.parse_criteria(
-            "Interaction Strategy: T\n\n"
-            "[60] First criterion: does the first thing, stated at length.\n\n"
-            "[40] Second criterion: does the second thing, stated at length.\n"
+            "[60] First criterion: does the first thing, stated at length.\n"
         )
-        add_over = {
-            "op": "add",
-            "target": None,
-            "new_criteria": [{"name": "Third criterion", "max": 20, "rule": "an added rule of sufficient length"}],
+        payload = {
+            "criterion": {
+                "name": "Names a magnitude",
+                "max": 10,
+                "rule": "The question asks for a value the text does not carry, or it is not a gap.",
+            },
             "evolution_rationale": "x" * 40,
         }
-        self.assertTrue(any("sum to 120" in error for error in proposer.proposal_errors(add_over, current)))
-        balanced = {**add_over, "weights": {"First criterion": 50, "Second criterion": 30}}
-        self.assertEqual(proposer.proposal_errors(balanced, current), [])
+        errors = proposer.proposal_errors(payload, current)
+        self.assertTrue(any("example" in error for error in errors), errors)
+
+    def test_criterion_already_in_the_rubric_is_rejected(self):
+        """Appending is monotone: a duplicate adds nothing and is refused."""
+        current = proposer.parse_criteria(
+            "[60] Names a magnitude: the question asks for a value, stated at length.\n"
+        )
+        payload = {
+            "criterion": {
+                "name": "Names a magnitude",
+                "max": 10,
+                "rule": "The question asks for a value the text does not carry, or it is not a gap.",
+                "example": "Asks for the tidal range; not asking whether the model is any good.",
+            },
+            "evolution_rationale": "x" * 40,
+        }
+        errors = proposer.proposal_errors(payload, current)
+        self.assertTrue(any("already in the rubric" in error for error in errors), errors)
+
+    def test_the_submission_is_part_of_a_run_record(self):
+        """A criterion about the consultation needs to see what the work asserted."""
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary) / "run"
+            (run_dir / "output" / "results").mkdir(parents=True)
+            (run_dir / "output" / "results" / "solution.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "task_description": "the scope of the model, stated at length",
+                                "task_analysis": "the assumptions, stated at length enough",
+                                "mathematical_modeling_process": "the model and its equations, at length",
+                                "subtask_outcome_analysis": "results and biases, at length enough",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            block = proposer.run_record(
+                {"problem_id": "2020_B", "average_score": 0.8}, run_dir
+            )
+            self.assertIn("提交的 solution.json", block)
+            self.assertIn("mathematical_modeling_process: the model and its equations", block)
+
+    def test_parent_submissions_are_resolved_from_the_phase_result(self):
+        """The bundle carries no run directory, so the phase result supplies it."""
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment"
+            round_dir = experiment / "workflows" / "round_3"
+            round_dir.mkdir(parents=True)
+            run_dir = (
+                experiment / "cpe_evaluations" / "round_3" / "train_parent_1"
+                / "runs" / "round_3" / "r1p1_stamp"
+            )
+            (run_dir / "output" / "results").mkdir(parents=True)
+            (run_dir / "output" / "results" / "solution.json").write_text(
+                json.dumps({"tasks": [{"task_analysis": "the parent's assumptions, at length"}]}),
+                encoding="utf-8",
+            )
+            phase_dir = (
+                experiment / "cpe_evaluations" / "round_3" / "train_parent_1"
+                / "workflows" / "round_3"
+            )
+            phase_dir.mkdir(parents=True)
+            (phase_dir / "result.json").write_text(
+                json.dumps(
+                    {"problem_results": [{"problem_id": "2014_C", "repetitions": [{"run_dir": str(run_dir)}]}]}
+                ),
+                encoding="utf-8",
+            )
+            (round_dir / "training_parent_evidence.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "parent_rank": 1,
+                            "workflow_id": "interaction_workflow_parent",
+                            "net_utility_on_current_training_batch": 0.8,
+                            "workflow": {"policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nx"},
+                            "training_evidence": {
+                                "training_runs": [
+                                    {"problem_id": "2014_C", "scores": {"report_score": 0.8}}
+                                ]
+                            },
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            block = proposer.training_evidence_block(round_dir)
+            self.assertIn("提交的 solution.json", block)
+            self.assertIn("the parent's assumptions", block)
+
+    def test_render_states_the_new_total_in_the_footer(self):
+        """An appended criterion raises the basis above 100, and the footer says so."""
+        template = (
+            "Interaction Strategy: T\n\n"
+            "[100] Only criterion: does the one thing, stated at length.\n\n"
+            "Scores are summed and normalized by this rubric's theoretical maximum (100): "
+            "normalized = total / 100. Score only the dialogue.\n"
+        )
+        criteria = proposer.parse_criteria(template)
+        criteria = proposer.append_criterion(
+            criteria,
+            {
+                "criterion": {
+                    "name": "Names a magnitude",
+                    "max": 10,
+                    "rule": "The question asks for a value the text does not carry, or it is not a gap.",
+                    "example": "Asks for the tidal range; not asking whether the model is any good.",
+                },
+                "evolution_rationale": "x" * 40,
+            },
+        )
+        rendered = proposer.render_rubric_markdown(criteria, template=template)
+        self.assertIn("theoretical maximum (110)", rendered)
+        self.assertIn("total / 110", rendered)
+        self.assertIn("[100] Only criterion: does the one thing, stated at length.", rendered)
+        self.assertIn("Example: Asks for the tidal range", rendered)
+
+
+class StrategyFormSelectionTests(unittest.TestCase):
+    """The evolution prompt's `{strategy_form}` slot, and its default.
+
+    The slot decides only what shape the rewritten rule must take; everything
+    else in the prompt is the same text.  Two things therefore have to hold, and
+    neither is visible from the emitted policy: an unnamed form must render the
+    prompt exactly as it read before the slot existed, and a named form must
+    change that slot and nothing else.
+    """
+
+    def _head(self, value=None):
+        environ = (
+            {} if value is None else {"EVOLUTION_STRATEGY_FORM": value}
+        )
+        with patch.dict(os.environ, environ, clear=False):
+            if value is None:
+                os.environ.pop("EVOLUTION_STRATEGY_FORM", None)
+            form = base.evolution_strategy_form()
+        return base.EVOLUTION_PROMPT_HEAD.replace("{strategy_form}", form), form
+
+    def test_the_slot_is_always_filled(self):
+        for value in (None, "linear", "conditional", "workflow", "nonsense"):
+            with self.subTest(value=value):
+                head, _ = self._head(value)
+                self.assertNotIn("{strategy_form}", head)
+
+    def test_no_form_selected_renders_the_linear_text(self):
+        head, form = self._head()
+        self.assertEqual(form, base.STRATEGY_FORM_LINEAR)
+        self.assertIn("State, in the parent's own order:", head)
+
+    def test_an_unknown_form_falls_back_to_the_linear_text(self):
+        linear, linear_form = self._head()
+        for value in ("", "nonsense", "LINEAR", "linear-2"):
+            with self.subTest(value=value):
+                head, form = self._head(value)
+                self.assertEqual(form, linear_form, f"{value!r} must fall back")
+                self.assertEqual(head, linear, f"{value!r} must render the default")
+
+    def test_every_named_form_replaces_only_that_slot(self):
+        linear, _ = self._head()
+        for name, body in base.STRATEGY_FORMS.items():
+            with self.subTest(form=name):
+                head, form = self._head(name)
+                self.assertEqual(form, body)
+                self.assertNotEqual(head, linear)
+                # Same prompt everywhere else: cutting the slot out of each
+                # rendering leaves one identical remainder.
+                before, after = base.EVOLUTION_PROMPT_HEAD.split("{strategy_form}")
+                self.assertEqual(head, before + body + after)
+
+    def test_both_extra_forms_ask_for_conditions_and_the_workflow_one_for_stages(self):
+        conditional, workflow = (
+            base.STRATEGY_FORMS["conditional"],
+            base.STRATEGY_FORMS["workflow"],
+        )
+        for body in (conditional, workflow):
+            self.assertIn('"if"', body, "a conditional form has to ask for conditions")
+        self.assertIn("the stages", workflow, "the workflow form has to ask for stages")
+        self.assertNotIn("the stages", conditional)
 
 
 if __name__ == "__main__":

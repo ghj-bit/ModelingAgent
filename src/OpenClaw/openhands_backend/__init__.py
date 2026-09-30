@@ -330,11 +330,20 @@ def run_openhands_modeling_phase(
     substantive.run_consolidated_refinement_check(prepared)
 
 
+# The Claude-oriented launchers ask for the phase runner under this name.  The
+# alias is what lets a wrapper swap this backend in without changing the shared
+# workflow engine -- the same one line ``codex_backend`` carries, for the same
+# reason.  Without it the swap fails at the first phase with an AttributeError,
+# which is late enough to cost a round.
+run_claude_modeling_phase = run_openhands_modeling_phase
+
+
 __all__ = [
     "REGISTRY_STUB",
     "TASK_DRIVER",
     "default_settings",
     "openhands_command",
+    "run_claude_modeling_phase",
     "run_openhands_modeling_phase",
     "submission_path",
     "synthesize_report_from_submission",

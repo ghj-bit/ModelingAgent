@@ -122,8 +122,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", required=True)
     # The OpenAI-compatible endpoint the shim translates for.
     parser.add_argument("--base-url", required=True)
-    parser.add_argument("--api-key", default="EMPTY")
+    # The key may also arrive by environment, so it does not have to appear in
+    # this process's command line (which any local user can read).
+    parser.add_argument(
+        "--api-key", default=os.environ.get("OPENCLAW_UPSTREAM_API_KEY", "EMPTY")
+    )
     parser.add_argument("--upstream-model", default="qwen3.8-27b")
+    parser.add_argument(
+        "--reasoning-effort",
+        default="",
+        choices=("", "minimal", "low", "medium", "high"),
+        help=(
+            "OpenAI reasoning_effort for a reasoning upstream (e.g. rightapi's "
+            "gpt-5.6-sol); empty keeps the vLLM thinking switch"
+        ),
+    )
     parser.add_argument("--claude-bin", default=DEFAULT_CLAUDE_BIN)
     parser.add_argument("--timeout", type=float, default=7200.0)
     parser.add_argument("--permission-mode", default="acceptEdits")
@@ -172,7 +185,7 @@ def free_port() -> int:
 
 
 def start_shim(
-    base_url: str, model: str, api_key: str, log_path: Path
+    base_url: str, model: str, api_key: str, log_path: Path, reasoning_effort: str = ""
 ) -> tuple[subprocess.Popen, int]:
     """Start the translation shim and wait until it answers.
 
@@ -192,8 +205,10 @@ def start_shim(
             str(port),
             "--model",
             model,
-            "--api-key",
-            api_key,
+            # The key travels by environment instead of argv so it does not sit
+            # in the shim's command line; --api-key is read from the same
+            # variable by default.
+            *(["--reasoning-effort", reasoning_effort] if reasoning_effort else []),
         ],
         stdout=log,
         stderr=log,
@@ -376,8 +391,15 @@ def main() -> int:
     # runs inherit the same CPU window.
     pin_to_cpu_lane(workspace, announce=lambda line: print(line, flush=True))
 
+    # The shim reads its bearer token from this variable rather than argv, so
+    # the key does not appear in either process's command line.
+    os.environ["OPENCLAW_UPSTREAM_API_KEY"] = args.api_key
     shim, port = start_shim(
-        args.base_url, args.upstream_model, args.api_key, args.persistence_dir / "shim.log"
+        args.base_url,
+        args.upstream_model,
+        args.api_key,
+        args.persistence_dir / "shim.log",
+        args.reasoning_effort,
     )
     try:
         env, settings_path = session_environment(

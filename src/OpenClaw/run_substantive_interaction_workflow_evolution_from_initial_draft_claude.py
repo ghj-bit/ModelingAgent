@@ -44,14 +44,12 @@ try:
     from . import run_substantive_interaction_workflow_evolution as workflow
     from . import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from .interaction_policy import OPERATOR_DRIVEN_CONSULTATION
-    from .interaction_policy import OPERATOR_DRIVEN_CONSULTATION_ROUTED
 except ImportError:
     import claude_backend
     import interaction_policy
     import run_substantive_interaction_workflow_evolution as workflow
     import run_substantive_interaction_workflow_evolution_from_clean_baseline as clean
     from src.OpenClaw.interaction_policy import OPERATOR_DRIVEN_CONSULTATION
-    from src.OpenClaw.interaction_policy import OPERATOR_DRIVEN_CONSULTATION_ROUTED
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -138,7 +136,16 @@ PLANNING_DRAFT_VALIDATION_ROOT = (
 )
 TRAIN_PROBLEMS: list[str] = []
 VALIDATION_PROBLEMS: list[str] = []
-DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE = 2
+# Three problems per training batch, each run ``DEFAULT_TRAIN_REPETITIONS``
+# times, so a train phase is six agent runs.  The batch is what the train gate
+# and the elite selection are computed on, so its size is the resolution of the
+# gate: a 2-problem batch averages 0.04 of per-problem rollout noise down only to
+# ~0.02, which is the same size as the differences the evolution is chasing.
+# The launch scripts pass ``--train-batch-size 3`` explicitly; this is the
+# fallback for a launch that does not, kept equal so the two cannot disagree
+# (the value is part of the CPE sampling contract -- a mismatch refuses a
+# resume).
+DEFAULT_INITIAL_DRAFT_TRAIN_BATCH_SIZE = 3
 DEFAULT_INITIAL_DRAFT_VALIDATION_SIZE = 5
 # Experiments live under their own subtree with a short name.  Everything below
 # a run directory is long (cpe_evaluations/round_N/<phase>/runs/round_N/
@@ -154,7 +161,11 @@ DEFAULT_JUDGE_REPEATS = 3
 # averaged, so a train batch of three costs six agent runs.  A single run of one
 # problem can swing by 0.03-0.06, which is larger than the differences the
 # evolution is chasing, so one run per problem cannot support a gate decision.
-DEFAULT_TRAIN_REPETITIONS = 2
+# Overridable per run with TRAIN_REPETITIONS: a wider batch may not need the
+# repetition (batch x reps is what the gate averages over), and the launch
+# scripts pass the variable straight through.  Read at import -- the value is
+# fixed for the life of the process, which is what a sampling contract needs.
+DEFAULT_TRAIN_REPETITIONS = int(os.environ.get("TRAIN_REPETITIONS", "2"))
 # A candidate must beat the incumbent train utility by more than this to be
 # worth a validation run.  Set deliberately *below* the observed spread of the
 # same policy re-run (that spread exceeds 0.01), so a candidate can clear this
@@ -195,17 +206,36 @@ MMBENCH_TEST_PROBLEMS = (
 )
 # 2020_C retired 2026-09-25: its review-text task makes agents launch unbounded
 # parallel sentiment jobs (one run measured at 127 threads / 59 of 104 cores),
-# which starved every other run in the phase.  Four problems now, so
-# --validation-size must be 4 -- see launch_claude_evolution_from_scratch.sh.
+# which starved every other run in the phase.  It stays out even now that the
+# pool is widened.
+#
+# Eight problems, not four: the champion bar is a mean over four problems whose
+# per-problem rollout noise is ~0.04, so a candidate and a champion can differ by
+# more from run-to-run variance than from the policy being compared, and the
+# validation gate then accepts or rejects on noise.  See the CPE noise ledger in
+# `solver-optimization-ledger` for the measurement.  Widening the pool is the
+# cheaper half of the fix: `--validation-size` must equal this length.
+#
+# The four appended ids are the lightest problems in the training pool -- the
+# ones `evolve_exp/train_pool_single_model_8.md` records as having no sub-model
+# blocks (2018_E measured at 26 min, 2017_D at 34 min; 3-6x cheaper than a
+# multi-model task) -- because only 35 problems in MMBench have pre-gathered
+# evidence, and eight held-out problems cannot come out of the five-problem
+# validation pool alone.  They are **moved**, not borrowed: they are removed
+# from ``MMBENCH_TRAIN_PROBLEMS`` below, so the split is 26 training / 8
+# validation with nothing in both.  A validation problem that a round can also
+# train on would make the champion bar partly a training score, which is the one
+# thing the held-out split exists to prevent.
 MMBENCH_VALIDATION_PROBLEMS = (
     "2020_B", "2020_D", "2020_E", "2020_F",
+    "2018_E", "2017_D", "2018_A", "2017_A",
 )
 MMBENCH_TRAIN_PROBLEMS = (
     "2014_C",
     "2015_A", "2015_B", "2015_C", "2015_D",
     "2016_A", "2016_B", "2016_C", "2016_D", "2016_E", "2016_F",
-    "2017_A", "2017_B", "2017_C", "2017_D", "2017_E", "2017_F",
-    "2018_A", "2018_B", "2018_C", "2018_D", "2018_E", "2018_F",
+    "2017_B", "2017_C", "2017_E", "2017_F",
+    "2018_B", "2018_C", "2018_D", "2018_F",
     "2019_A", "2019_B", "2019_C", "2019_D", "2019_E", "2019_F",
     "2020_A",
 )
@@ -249,6 +279,7 @@ _original_utility_basis = workflow.CPE_UTILITY_BASIS
 _original_cost_weight = workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT
 _original_latency_cost_weight = workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT
 _original_judge_report_feedback = workflow.CPE_INCLUDE_JUDGE_REPORT_FEEDBACK
+_original_submitted_solution = workflow.CPE_INCLUDE_SUBMITTED_SOLUTION
 _original_min_rounds = workflow.MIN_CPE_EVOLUTION_ROUNDS
 _original_max_exchanges = workflow.MAX_WORKFLOW_EXCHANGES
 _original_collapse_initial_parents = workflow.CPE_COLLAPSE_INITIAL_PARENTS
@@ -351,6 +382,29 @@ def run_initial_draft_parent_evaluations(
             "start a new experiment directory instead of resuming it."
         )
     state["initialization_mode"] = initialization_mode
+    # A resumed experiment already owns its seed rounds, and the assignments at
+    # the end of this function are not neutral: `best_policy` and
+    # `training_elites` are rewritten from the round-0/round-1 seed, so a restart
+    # after an evolved round has won validation silently demotes the champion --
+    # and the training lineage -- back to the seed.  Measured in
+    # claude_fp8_scratch_r10: the 10:15:13 relaunch replaced a 0.8420 champion
+    # (round 3) with the seed's 0.8186, after which round 10's 0.8248 was
+    # accepted as champion against a bar it should have lost to.  The phases
+    # themselves are cheap on a resume -- their per-problem checkpoints reuse the
+    # finished runs -- so the damage costs no time and looks like ordinary resume
+    # bookkeeping in the log.  Stopping before the writes is the whole guard: the
+    # stored results are exactly what this would recompute, and deleting them
+    # (with their phase checkpoints) is how a caller asks for a re-measurement.
+    if (
+        state.get("initial_parent_validation_results")
+        and state.get("initial_parent_train_results")
+    ):
+        print(
+            "[resume] seed rounds 0-1 are already measured; keeping the stored "
+            "champion and training elites",
+            flush=True,
+        )
+        return None
     validation_problems = [str(item) for item in state["validation_problems"]]
 
     workflow.ensure_cpe_baseline_reports(
@@ -654,24 +708,17 @@ def interaction_workflow_block(workflow_value: dict, note: str = "") -> str:
             "When a step requests expert feedback:",
             "",
             "1. Set `N` to the exchange number, starting at 1 and increasing by one.",
-            "2. Head the question with the operator it applies, in the form "
-            "`# Expert Question N (Operator <k>: <name>)`. Every exchange carries "
-            "one: the header is how the round that evolves this policy learns "
-            "which operators the consultation actually reached for, and a question "
-            "without it cannot be attributed to an operator at all.",
-            "3. Write only the qualitative question to "
+            "2. Write only the qualitative question to "
             "`{{OPERATOR_FEEDBACK_DIR}}/expert_question_N.md`.",
-            "4. Run this command once in the foreground:",
+            "3. Run this command once in the foreground:",
             "",
             f'`python "{{{{OUTPUT_DIR}}}}/code/wait_for_expert_reply.py" '
             f'--request "{{{{OPERATOR_FEEDBACK_DIR}}}}/expert_request_N.json" '
             f'--reply "{{{{OPERATOR_FEEDBACK_DIR}}}}/expert_reply_N.json" '
             f'--timeout {workflow.substantive.EXPERT_REQUEST_TIMEOUT:.0f} '
-            f"--exchanges {max_exchanges}`. The command echoes a reminder of that "
-            "header with every reply, so the requirement is in front of you at "
-            "each exchange and not only here.",
+            f"--exchanges {max_exchanges}`.",
             "",
-            "5. Read the returned expert reply, apply it as required by the current "
+            "4. Read the returned expert reply, apply it as required by the current "
             "step, and then continue to the next step.",
             "",
             "The controller owns the request and reply files. Do not edit them, poll "
@@ -759,8 +806,10 @@ fences), matching the schema in §3.
 
 §1 Optimization goals. Evolve one executable human-expert interaction policy for
 a modeling agent that {solver_start} and otherwise solves autonomously. Under
-multi-round interaction, the policy settles what to ask, when to ask it, and
-which interaction operator carries each question.
+multi-round interaction, the policy guides the agent in what information to ask
+the expert for and when to ask for it -- each question built on what the
+consultation's earlier exchanges already established and what their replies left
+open, so nothing already settled is asked again.
 
 The agent must not request feedback for:
 
@@ -772,6 +821,7 @@ The evidence JSON holds the training parent and its rollouts on the current batc
 the validation champion, and every round already run. Each sampled task carries its
 problem statement, the expert dialogue, a short summary of what the reply changed,
 its scores, and `judge_report_feedback` (the Judge's per-criterion reasons).
+{submitted_solution_note}
 
 Use the parent's rollouts to identify communication failures and transferable
 successes, and treat the aggregate net utilities and the decision history as
@@ -800,19 +850,12 @@ Rewrite one section and nothing else: `## Interaction Strategy`, named by the
 parent's heading line verbatim -- that is how the patch finds it, and a heading
 that does not match the parent's is rejected before the round runs.
 
-State, in the parent's own order:
+{strategy_form}
 
-- **what to ask.** Name the kind of gap, not a topic: a value it has assumed and
-  cannot source, a choice the evidence leaves open, a mechanism it cannot reach
-  from the problem statement.
-- **when to ask it.** Which decision comes first, and what must be settled before
-  the next question is worth asking.
-- **which operator carries the question**, and why that one rather than another.
-  The roster under `## Operator Roster` is fixed and states what each number
-  means; this rule is what decides which situation calls for which of them.  Use
-  the roster's numbers as it gives them -- the exchange headings and every
-  earlier round's evidence are read back by number, so a number put to another
-  use makes the record say the wrong thing.
+End the rule with one short example of the interaction it produces: the gaps the
+question would name, phrased as a shape any task can fill. The example is part of
+the rule, so it must stay generic -- no task's facts, entities, parameters,
+numbers, or conclusions appear in it.
 
 The patch must differ from the parent and from every policy in
 `evolution_history`; rewording that leaves behaviour identical is rejected as
@@ -820,6 +863,99 @@ noise. Return `name` and the patch; the budget and the stopping rule are carried
 over from the parent. `changed_components` names only the sections the patch
 rewrites.
 """
+
+
+# §2's statement of what the rule must say.  The head carries the slot, so the
+# two forms are one substitution apart and everything around them -- §1, §3, §4,
+# §5 and the two arm-context sentences -- stays literally identical.  The linear
+# form is the default and is quoted here in its original wording, so a run that
+# selects nothing renders the prompt it always did.
+STRATEGY_FORM_LINEAR = """State, in the parent's own order:
+
+- **what information to ask for.** Name the kind of gap, not a topic: a value it
+  has assumed and cannot source, a choice the evidence leaves open, a mechanism it
+  cannot reach from the problem statement.
+- **when to ask it.** Which decision comes first, and what must be settled before
+  the next question is worth asking."""
+
+# The conditional form.  Same two concerns, asked for as branches: what makes a
+# branch fire comes first because that is what the linear form leaves implicit.
+STRATEGY_FORM_CONDITIONAL = """State the rule as conditional branches -- one per
+case the consultation can be in, written as ordinary prose with an explicit "if"
+for each.  Every branch states:
+
+- **the condition.** What must hold for this branch to fire: the kind of gap the
+  work has left open, or what the last reply settled and what it left unresolved.
+  Name the kind of situation, not a topic.
+- **what the branch asks.** Name the kind of gap, not a topic: a value it has
+  assumed and cannot source, a choice the evidence leaves open, a mechanism it
+  cannot reach from the problem statement.
+
+Say which branch wins where two conditions hold at once, and what the exchange
+asks when none of them does."""
+
+
+# The workflow form.  The conditional form asks for branches and the linear form
+# asks for an order, and a round given either one tends to produce only that
+# half: branches that describe the state and never say which exchange they belong
+# to, or stages with the branch logic left implicit in the prose.  This asks for
+# both in one shape -- the exchanges as stages, each stage carrying the condition
+# that decides what it asks -- which is what "a workflow with control conditions"
+# has to mean if the record is to say what happened at each exchange.
+STRATEGY_FORM_WORKFLOW = """State the rule as a workflow: the stages the three
+exchanges pass through, in order, and for each stage the condition that decides
+what it asks.
+
+- **the stages.** What each exchange has to settle that the one before it could
+  not, and what the reply to it makes possible next.  The first stage is what has
+  to be fixed before anything else can be.
+- **the condition on each stage.** What must hold for that stage to ask what it
+  asks, written as an explicit "if": the kind of gap left open, or what the last
+  reply settled and what it left unresolved.
+- **what the stage asks.** Name the kind of gap, not a topic: a value it has
+  assumed and cannot source, a choice the evidence leaves open, a mechanism it
+  cannot reach from the problem statement.
+
+Say which stage wins where two conditions hold at once, what the exchange asks
+when none does, and how the stages end."""
+
+
+# Named forms, and the default.  Unset is the linear form, so a run that names
+# nothing renders the prompt that was already in use.
+STRATEGY_FORMS = {
+    "conditional": STRATEGY_FORM_CONDITIONAL,
+    "workflow": STRATEGY_FORM_WORKFLOW,
+}
+
+
+def evolution_strategy_form() -> str:
+    """§2's statement of the rule, in the form this run asks for.
+
+    ``EVOLUTION_STRATEGY_FORM`` selects one of ``STRATEGY_FORMS`` by name;
+    anything else -- including unset -- is the linear form.
+    """
+    name = os.environ.get("EVOLUTION_STRATEGY_FORM", "").strip().lower()
+    return STRATEGY_FORMS.get(name, STRATEGY_FORM_LINEAR)
+
+
+def solution_evidence_note() -> str:
+    """The evidence guide's sentence about the submission, when this arm sends it.
+
+    ``submitted_solution`` travels only in the arms that ask for it
+    (``workflow.CPE_INCLUDE_SUBMITTED_SOLUTION``, set by the from-scratch
+    launcher's ``patch_sibling_launcher``), so the guide states it only there.
+    An arm that keeps the original evidence shape gets an empty string rather
+    than a description of a field it does not send.
+    """
+    if not workflow.CPE_INCLUDE_SUBMITTED_SOLUTION:
+        return ""
+    return (
+        "\nEach sampled task also carries `submitted_solution` -- the run's own\n"
+        "submission, clipped to the four fields the Judge scores. The Judge scores\n"
+        "that container rather than the report, so a patch aimed at a dimension the\n"
+        "run lost points on can be checked against what the run finally asserted,\n"
+        "not only against the dialogue that preceded it."
+    )
 
 
 EVOLUTION_OUTPUT_SCHEMA = """§3 Output JSON schema.
@@ -830,7 +966,7 @@ place a change counts. Return the sections you are rewriting -- not the policy.
 {
   "policy_patch": [
     {
-      "section": "<the heading line of a section you may rewrite, copied from the parent exactly, e.g. `## Interaction Strategy` or `### Operator 4: Refine / correct`>",
+      "section": "<the heading line of a section you may rewrite, copied from the parent exactly, e.g. `## Interaction Strategy`>",
       "body": "<the new text for that section: the heading line itself is not repeated, and no heading of any level may appear inside it>",
       "after": "<only when `section` is one the parent does not have: the heading line to insert the new section after>"
     }
@@ -845,11 +981,10 @@ place a change counts. Return the sections you are rewriting -- not the policy.
 EVOLUTION_EVIDENCE_GUIDE = """§4 Evidence
 
 The JSON object below is the input for this round. Its `net_utility` is the
-quantity §1 asks you to raise. Each training parent states
-`operators_the_rollouts_reached_for`: the operators its questions were headed
-with, which is what the consultation actually applied. The operator sections are
-frozen this round, so read it as context -- which operator carried which
-exchange -- rather than as a licence to edit them.
+quantity §1 asks you to raise. Each training parent carries the policy it is
+running, the dialogue its rollouts produced, their scores, and the Judge's
+per-criterion reasons; `## Interaction Strategy` is the only section a round may
+rewrite, so read the rest as context rather than as a licence to edit it.
 """
 
 
@@ -889,13 +1024,6 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
             "interaction_policy": policy_text_for_evolution(
                 parent.get("workflow", {})
             ),
-            # Stated, not left to be inferred from the dialogue: the engine
-            # rejects a patch that rewrites an operator these rollouts never
-            # reached for, and a rule the optimizer has to derive from question
-            # headings costs it a rejected round for each one it gets wrong.
-            "operators_the_rollouts_reached_for": sorted(
-                workflow.cpe_used_operator_headings([parent])
-            ),
             "net_utility_on_current_training_batch": parent.get(
                 "net_utility_on_current_training_batch"
             ),
@@ -916,13 +1044,17 @@ def build_initial_draft_cpe_workflow_evolution_prompt(
     return "\n".join(
         [
             # The similarity bound is enforced by the engine but no longer
-            # stated in the prompt, so only the two arm-context sentences are
-            # substituted here.  §2 still tells the round that a patch which
-            # splices back to the parent or to any policy in `evolution_history`
-            # is rejected; the numeric threshold it is rejected at is not named.
+            # stated in the prompt, so only the arm-context sentences and §2's
+            # statement of the rule are substituted here.  §2 still tells the
+            # round that a patch which splices back to the parent or to any
+            # policy in `evolution_history` is rejected; the numeric threshold it
+            # is rejected at is not named.
             EVOLUTION_PROMPT_HEAD.replace(
                 "{solver_source}", SOLVER_SOURCE_CONTEXT
-            ).replace("{solver_start}", SOLVER_START_CONTEXT),
+            )
+            .replace("{solver_start}", SOLVER_START_CONTEXT)
+            .replace("{strategy_form}", evolution_strategy_form())
+            .replace("{submitted_solution_note}", solution_evidence_note()),
             EVOLUTION_OUTPUT_SCHEMA,
             EVOLUTION_EVIDENCE_GUIDE,
             "",
@@ -1410,49 +1542,41 @@ def fixed_initial_workflow() -> dict:
     arms therefore start from different strengths of the same rule.  Everything
     downstream -- the gates, the utility, the evolution prompt -- is unchanged.
 
-    The seed's deliverable is the operator repertoire: four operators, each
-    stating when it applies and how it is executed, so a round can evolve one
-    operator's trigger, its execution, or add an operator the parent has not got.
-    The four is the seed's roster, not a ceiling -- nothing the solver reads may
-    state a count, or the fixed sections would contradict the first round that
-    adds one.
+    The seed's deliverable is the prose rule under ``## Interaction Strategy``:
+    what the agent must find out before spending an exchange.  That rule is the
+    seed's only mutable section, and nothing the solver reads may state how many
+    exchanges the rule has to account for, or the fixed sections would contradict
+    the first round that changes the rule's shape.
 
-    ``INTERACTION_SEED=routed`` starts the run from
-    ``OPERATOR_DRIVEN_CONSULTATION_ROUTED`` instead, which prepends a Router step
-    making the operator choice an explicit, stated decision.  Read once, at
-    startup, so the routing arm is a separate experiment rather than a switch a
-    running experiment can drift across.
+    The operator repertoire this seed used to state was removed on 2026-09-30 --
+    see ``interaction_policy``'s module docstring for the measurement behind it.
     """
-    routed = os.environ.get("INTERACTION_SEED", "").strip().lower() == "routed"
     selected = {
-        "name": (
-            "Routed interaction-operator policy"
-            if routed
-            else "Interaction-operator consultation policy"
-        ),
+        "name": "Interaction-consultation policy",
         "purpose": (
             "Solve the task autonomously by default and spend the fixed expert "
-            "budget through the interaction operator whose trigger condition the "
-            "current state meets -- resolving an open strategic uncertainty, "
-            "challenging a load-bearing line of reasoning, injecting missing "
-            "real-world knowledge, or correcting and deepening the model after an "
-            "earlier reply."
+            "budget only on the decision the current state leaves most open -- the "
+            "one whose answer would branch the work that follows and has somewhere "
+            "to land in the deliverable."
         ),
-        "policy_text": (
-            interaction_policy.routed_seed()
-            if routed
-            else OPERATOR_DRIVEN_CONSULTATION
-        ),
+        "policy_text": OPERATOR_DRIVEN_CONSULTATION,
         "max_exchanges": 3,
         "stop_condition": (
             "The consultation stops when its exchange budget is used: three "
-            "exchanges, one operator each, as the policy's Interaction Limits "
-            "section states. The policy states no other stop rule."
+            "exchanges, as the policy's Interaction Limits section states. The "
+            "policy states no other stop rule."
         ),
     }
-    # Test-only: replay an already-evolved policy in an isolated experiment, so
-    # one policy/problem combination can be re-run without replaying the whole
-    # evolution.  Unset in every production run.
+    # Seed override, read once at startup, in both of its uses.  A launch sets
+    # it to start from a policy file instead of the built-in
+    # ``OPERATOR_DRIVEN_CONSULTATION``: launch_claude_evolution_from_scratch.sh
+    # and launch_claude_coevolution.sh both default it to the information-gap
+    # policy, and an explicitly empty value falls back to the built-in seed.  It
+    # is also how an already-evolved policy is replayed in an isolated
+    # experiment, so one policy/problem combination can be re-run without
+    # replaying the whole evolution.  Only a *fresh* experiment reads it: a
+    # directory that already holds ``initial_interaction_workflows.json`` keeps
+    # that file, which is what makes a resume stay on its original seed.
     override = os.environ.get("INTERACTION_INITIAL_WORKFLOW_JSON")
     if override:
         saved = json.loads(Path(override).read_text())
@@ -2112,9 +2236,11 @@ def main() -> None:
     # with steps needs two to eight of them (one step is one action, and
     # `validate_workflow` requires two to eight actions).
     workflow.POLICY_PATCH_OPERATOR_LIMIT = 0
-    # Kept on: it is what gates the operator a round would be allowed to touch,
-    # and the seed asks the solver to head every question with the operator it
-    # applies so the record exists by the time a round may use it.
+    # Kept on as a belt to the braces above: with the limit at zero the engine
+    # already refuses any patch naming an operator section, and the seed states
+    # no operator section to name in the first place.  Left True so a policy that
+    # somehow grew one still cannot have it rewritten by a round whose rollouts
+    # never reached for it.
     workflow.POLICY_PATCH_ONLY_USED_OPERATORS = True
     workflow.ensure_cpe_original_report_scores = lambda *_args, **_kwargs: {}
     workflow.MIN_CPE_EVOLUTION_ROUNDS = None
@@ -2166,6 +2292,7 @@ def main() -> None:
         workflow.DEFAULT_CPE_COST_PENALTY_WEIGHT = _original_cost_weight
         workflow.DEFAULT_CPE_LATENCY_COST_WEIGHT = _original_latency_cost_weight
         workflow.CPE_INCLUDE_JUDGE_REPORT_FEEDBACK = _original_judge_report_feedback
+        workflow.CPE_INCLUDE_SUBMITTED_SOLUTION = _original_submitted_solution
         workflow.ensure_cpe_original_report_scores = _original_ensure_original_scores
         workflow.MIN_CPE_EVOLUTION_ROUNDS = _original_min_rounds
         workflow.MAX_WORKFLOW_EXCHANGES = _original_max_exchanges

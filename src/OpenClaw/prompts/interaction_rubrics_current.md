@@ -11,6 +11,8 @@
 - `src/OpenClaw/interaction_strategy_rubric_v3.md` — md5 `d013f07ffd1e0da0493da7ca7ab8dd25`，2026-09-23 18:57:20
 - `src/OpenClaw/interaction_strategy_rubric_v4.md` — md5 `8e8c2e4c66271bdf39b6eea72caf005c`，2026-09-23 21:17:55
 - `src/OpenClaw/interaction_strategy_rubric_v5.md` — md5 `cdff05667526f3b533a76abc992a2c70`，2026-09-24 17:58:58
+- `src/OpenClaw/interaction_strategy_rubric_v6.md` — md5 `a61e6577cc01b198311ef4b0a2d5781f`，2026-09-24 21:14:04
+- `src/OpenClaw/interaction_strategy_rubric_v7.md` — md5 `d867b465d861be1acc5191600e4ec71a`，2026-09-30 00:59:13
 - `src/OpenClaw/interaction_strategy_rubric_v1.json` — md5 `5a9659139ff737abe9a85cc48a0adc51`，2026-09-23 15:17:04
 
 ---
@@ -49,7 +51,7 @@ Removing the expert reply must remove at least one traceable post-reply analytic
 
 ## B. critic 分支的策略评审 rubric（v1 → v4，版本化迭代）
 
-`interaction_strategy_critic.py` 的 `DEFAULT_RUBRIC` 指向 v4（当前生效版本）；
+`interaction_strategy_critic.py` 的 `DEFAULT_RUBRIC` 指向 v7（当前生效版本；单条子项起步）；
 critic 启动脚本把 v1 称作其固定初始 rubric，之后逐版演化。
 这些是**评审策略**用的标准，不是给求解 agent 打分的标准，勿与 A 混用。
 
@@ -129,7 +131,7 @@ Interaction Strategy: Multi-Round Consultation
 Scores are summed and normalized by this rubric's theoretical maximum (100): normalized = total / 100. Score only the dialogue — the policy text, the questions, the replies, and the draft or plan they started from. Do not score what the run wrote about the exchange; a record of good practice is not good practice.
 ````
 
-### interaction_strategy_rubric_v5.md ← 当前默认
+### interaction_strategy_rubric_v5.md
 
 `md5 cdff05667526f3b533a76abc992a2c70`，修改时间 2026-09-24 17:58:58
 
@@ -147,6 +149,38 @@ Interaction Strategy: Single-Exchange Consultation
 [15] What the reply opens is settled inside the run: The expert's part ends with the reply, so anything the reply introduces — a new constraint, a variant, a failure mode — must be resolved by the agent itself and carried into the modeling work, rather than left unaddressed or sent back as another question. Deduct when a question the reply plainly opened is never taken up, when the agent asks the expert to settle something it could have decided from the reply and the supplied evidence, and when what the reply opened is recorded but not acted on.
 
 Scores are summed and normalized by this rubric's theoretical maximum (100): normalized = total / 100. Score only the dialogue — the policy text, the question, the reply, and the work they produced. Do not score what the run wrote about the exchange; a record of good practice is not good practice.
+````
+
+### interaction_strategy_rubric_v6.md
+
+`md5 a61e6577cc01b198311ef4b0a2d5781f`，修改时间 2026-09-24 21:14:04
+
+````markdown
+Interaction Strategy: Multi-Round Consultation
+
+[20] Decision-targeted opening, asked before the work: The first exchange isolates exactly one open decision that governs the modeling framework — an assumption, a decision criterion, a scope boundary, or a headline claim — and is put to the expert before the work it governs is done. Deduct when it bundles several decisions, when it targets implementation, parameters, data handling, or validation mechanics, or when it arrives after the affected work is already complete.
+
+[20] Options, not steering: The question puts candidates to the expert offering at least two alternatives a competent expert could actually choose between, each with its own tradeoff, and neither states nor implies which one the agent prefers. Deduct when only one real option is offered and the rest are strawmen, when tradeoffs are missing, or when the wording signals a preferred answer and asks the expert to endorse it.
+
+[25] Each further exchange asks something new: The policy fixes how many exchanges a consultation spends, so an exchange that repeats an earlier one buys nothing. Every exchange after the first must ask something the earlier ones did not — a different question about the same decision, or one the previous reply made available — and the difference must be in kind, not only in detail. Judge this on the questions themselves, whatever form they take. Deduct when a later exchange is an earlier one asked again in more detail, when it only asks the expert to confirm or elaborate, when it is spent on a question that could have been asked first, and when the consultation stops short of the exchanges its policy provides while the decision is still open.
+
+[20] Every reply moves or sharpens the decision: Each reply changes or sharpens something the work then depends on — rather than leaving the work it was asked about as it stood — and the run acts on what the reply established. Deduct when a reply only ratifies the existing default or the agent's own stated preference, however well argued, and when what it established is left unused.
+
+[15] The exchanges build one chain: Every exchange after the first depends on the reply before it, and the last one closes the decision the first opened — either tightening what the replies established or carrying it into the decision it bears on. Deduct when a later question could have come in the first exchange, when one decision is split arbitrarily across exchanges, and when what an earlier reply opened is left unaddressed.
+
+Scores are summed and normalized by this rubric's theoretical maximum (100): normalized = total / 100. Score only the dialogue — the policy text, the questions, the replies, and the work they produced. Do not score what the run wrote about the exchange; a record of good practice is not good practice.
+````
+
+### interaction_strategy_rubric_v7.md ← 当前默认
+
+`md5 d867b465d861be1acc5191600e4ec71a`，修改时间 2026-09-30 00:59:13
+
+````markdown
+Interaction Strategy: Multi-Round Consultation
+
+[100] Ask for information the work cannot derive and use the answer; deduct when the question was answerable already or the reply changed nothing. Example: a tidal range the model uses.
+
+Scores are summed and normalized by this rubric's theoretical maximum (100): normalized = total / 100. Score only the dialogue — the policy text, the questions, the replies, and the work they produced. Do not score what the run wrote about the exchange; a record of good practice is not good practice.
 ````
 
 ---

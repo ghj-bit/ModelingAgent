@@ -33,7 +33,7 @@ RUBRIC_DIR = REPO / "src" / "OpenClaw"
 FIXED_RUBRIC = RUBRIC_DIR / "interaction_initial_substantive_v1.json"
 CRITIC_RUBRICS = sorted(RUBRIC_DIR.glob("interaction_strategy_rubric_v*.md"))
 LEGACY_RUBRIC = RUBRIC_DIR / "interaction_strategy_rubric_v1.json"
-CRITIC_DEFAULT = RUBRIC_DIR / "interaction_strategy_rubric_v6.md"
+CRITIC_DEFAULT = RUBRIC_DIR / "interaction_strategy_rubric_v7.md"
 OUT = RUBRIC_DIR / "prompts" / "interaction_rubrics_current.md"
 
 
@@ -111,7 +111,7 @@ def build() -> str:
         "",
         "## B. critic 分支的策略评审 rubric（v1 → v4，版本化迭代）",
         "",
-        "`interaction_strategy_critic.py` 的 `DEFAULT_RUBRIC` 指向 v4（当前生效版本）；",
+        "`interaction_strategy_critic.py` 的 `DEFAULT_RUBRIC` 指向 v7（当前生效版本；单条子项起步）；",
         "critic 启动脚本把 v1 称作其固定初始 rubric，之后逐版演化。",
         "这些是**评审策略**用的标准，不是给求解 agent 打分的标准，勿与 A 混用。",
         "",

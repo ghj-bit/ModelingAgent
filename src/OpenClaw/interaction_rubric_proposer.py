@@ -6,17 +6,21 @@ rubric itself: in CPE mode the engine loads it once and passes it by value, so a
 rubric that mis-measures one round mis-measures every round after it.
 
 This module adds the missing step.  Every round whose parent and candidate both
-finished revises the rubric.  Which evidence the revision is made from is decided
+finished revises the rubric.  Which evidence the revision is made from is chosen
 here, in code, and never by the proposer:
 
 * the candidate beat its parent on the training batch, so validation ran -- the
-  revision is made from the parent's training record and the candidate's
-  held-out record;
+  revision is made from the parent's training record and the candidate's held-out
+  record;
 * the candidate did not beat its parent, so validation never ran -- the revision
   is made from the parent's and the candidate's training records alone, and the
   proposer is told there is no held-out evidence to lean on.
 
-Both branches activate the new version for the rounds that follow.
+Each version **appends one new criterion** -- a concise rule plus a short example
+-- and leaves every earlier line byte-identical.  The protocol that could reword,
+split and retire spent all five edits of the one run that used it on the same
+criterion, each version longer than the last; appending keeps the rubric monotone
+and two consecutive versions comparable.
 
 Three deliberate properties:
 
@@ -24,8 +28,8 @@ Three deliberate properties:
   shape ``interaction_strategy_critic`` can read (``rubric_criteria`` parses
   ``^\\[N\\] name:``).  The proposer answers in JSON, which is validated and then
   rendered into that markdown here, so a malformed reply cannot reach the critic.
-* **One structural change per version.**  That is the protocol the rubric files
-  themselves state, and it is what keeps consecutive versions comparable.
+* **One appended criterion per version.**  Nothing is reworded, split, retired or
+  reweighted, so every earlier criterion is byte-identical in the next version.
 * **Versions land in the experiment, not in ``src/``.**  A run's rubric lineage is
   part of that run's record; the hand-maintained ``v1..v4`` files stay the
   starting point.
@@ -50,18 +54,28 @@ except ImportError:  # pragma: no cover - direct-file invocation support
 
 
 RUBRIC_FILENAME = re.compile(r"^interaction_strategy_rubric_v(\d+)\.md$")
-MAX_CRITERIA = 6
 MAX_RUNS_IN_PROMPT = 8
 MAX_DIALOGUE_CHARS = 4000
 MAX_POLICY_CHARS = 6000
+# Per run, and per field of the submission: the four fields are what the Judge
+# reads, and the point of showing them is which numbers appear in them and
+# whether an exchange accounts for them -- not their full text.
+MAX_SOLUTION_CHARS = 1800
+SOLUTION_FIELDS = (
+    ("task_description", 300),
+    ("task_analysis", 400),
+    ("mathematical_modeling_process", 500),
+    ("subtask_outcome_analysis", 400),
+)
 
 SYSTEM_PROMPT = """\
 You are a methodologist who maintains the rubric that scores expert-consultation
-practice in a mathematical-modeling pipeline. You are given the rubric in force,
-the incumbent policy's record on the training batch, and the record of the policy
-this round produced. That record is held-out when the round reached validation and
-training-only when it did not; the evidence section says which. You return one
-revised rubric. Reply with one JSON object and nothing else."""
+practice in a mathematical-modeling pipeline. You are given the rubric in force
+together with the incumbent policy's and this round's candidate's records on the
+training batch: the consultation each produced, its questions and replies, and its
+scores. Each version of the rubric adds exactly one new criterion; a criterion
+already in the rubric is never reworded, split, retired or reweighted. Reply with
+one JSON object and nothing else."""
 
 
 def current_rubric_path() -> Path:
@@ -128,8 +142,38 @@ def dialogue_from_artifacts(run: dict) -> str:
     return "\n\n".join(part for part in parts if part.strip())
 
 
+def solution_block(run_dir: Path | None) -> str:
+    """The run's submitted ``solution.json``, showing the four fields the Judge scores.
+
+    The Judge scores that container, not the report: ``task_analysis`` carries the
+    rigor dimension, ``mathematical_modeling_process`` the practicality and
+    scientificity one, ``subtask_outcome_analysis`` the result-and-bias one.  A
+    criterion about what a consultation was worth cannot be written without seeing
+    what the work ended up asserting -- which numbers it used, and whether any of
+    them is traceable to an exchange or just appears.
+    """
+    if run_dir is None:
+        return ""
+    payload = workflow_evolution.read_json(
+        Path(run_dir) / "output" / "results" / "solution.json", {}
+    )
+    tasks = payload.get("tasks") if isinstance(payload, dict) else None
+    if not isinstance(tasks, list) or not tasks:
+        return ""
+    lines = ["  提交的 solution.json（MM-Bench 判分读的就是这四个字段）："]
+    for index, task in enumerate(tasks[:2], start=1):
+        if not isinstance(task, dict):
+            continue
+        lines.append(f"    Task {index}/{len(tasks)}：")
+        for field, limit in SOLUTION_FIELDS:
+            value = " ".join(str(task.get(field) or "").split())
+            if value:
+                lines.append(f"      {field}: {clip(value, limit)}")
+    return clip("\n".join(lines), MAX_SOLUTION_CHARS) if len(lines) > 1 else ""
+
+
 def run_record(run: dict, run_dir: Path | None = None) -> str:
-    """One run: its score, the questions asked, and the replies received.
+    """One run: its score, the questions asked, the replies, and the submission.
 
     A validation run carries a receipt and a run directory; a training-evidence
     run carries the dialogue inline.  Both shapes reach this function, so it
@@ -154,23 +198,52 @@ def run_record(run: dict, run_dir: Path | None = None) -> str:
             lines.append(f"  提问 {index}：\n{clip(question, MAX_DIALOGUE_CHARS)}")
         for index, answer in enumerate(answers, start=1):
             lines.append(f"  专家回复 {index}：{clip(answer, 1000)}")
-        return "\n".join(lines)
-    dialogue = dialogue_from_artifacts(run)
-    if not dialogue and run_dir is not None:
-        dialogue = dialogue_of(run_dir)
-    if dialogue:
-        lines.append(clip(dialogue, MAX_DIALOGUE_CHARS))
-    summary = str(run.get("interaction_report_change_summary") or "").strip()
-    if summary:
-        lines.append(f"  （该 run 自述回复带来的改动：{summary}）")
+    else:
+        dialogue = dialogue_from_artifacts(run)
+        if not dialogue and run_dir is not None:
+            dialogue = dialogue_of(run_dir)
+        if dialogue:
+            lines.append(clip(dialogue, MAX_DIALOGUE_CHARS))
+        summary = str(run.get("interaction_report_change_summary") or "").strip()
+        if summary:
+            lines.append(f"  （该 run 自述回复带来的改动：{summary}）")
+    solution = solution_block(run_dir)
+    if solution:
+        lines.append(solution)
     return "\n".join(lines)
+
+
+def parent_run_dirs(round_dir: Path) -> dict[tuple[int, str], Path]:
+    """``(parent rank, problem id)`` -> run directory, for this round's parents.
+
+    The evidence bundle inlines each parent's dialogue and carries no run
+    directory, so the submissions are resolved from the phase results on disk.
+    """
+    experiment = round_dir.parent.parent
+    round_name = round_dir.name
+    mapping: dict[tuple[int, str], Path] = {}
+    for phase_dir in sorted((experiment / "cpe_evaluations" / round_name).glob("train_parent_*")):
+        try:
+            rank = int(phase_dir.name.rsplit("_", 1)[-1])
+        except ValueError:
+            continue
+        payload = workflow_evolution.read_json(
+            phase_dir / "workflows" / round_name / "result.json", {}
+        ) or {}
+        for problem in payload.get("problem_results") or []:
+            repetitions = problem.get("repetitions") or [problem]
+            run_dir = str(repetitions[0].get("run_dir") or "")
+            if run_dir:
+                mapping[(rank, str(problem.get("problem_id")))] = Path(run_dir)
+    return mapping
 
 
 def training_evidence_block(round_dir: Path) -> str:
     """The incumbent's record on this round's training batch.
 
     Read from the evidence file the engine already wrote for the optimizer, so
-    the rubric sees the same rollouts the policy evolution saw.
+    the rubric sees the same rollouts the policy evolution saw; the submissions
+    come from the round's parent phase, which the bundle does not point at.
     """
     evidence = workflow_evolution.read_json(
         round_dir / "training_parent_evidence.json", []
@@ -178,9 +251,11 @@ def training_evidence_block(round_dir: Path) -> str:
     parents = evidence if isinstance(evidence, list) else evidence.get("training_parents") or []
     if not parents:
         return "（本轮没有母代训练证据）"
+    run_dirs = parent_run_dirs(round_dir)
     blocks = []
     for parent in parents:
         training = parent.get("training_evidence") or {}
+        rank = int(parent.get("parent_rank") or 1)
         blocks.append(
             "\n".join(
                 [
@@ -190,7 +265,7 @@ def training_evidence_block(round_dir: Path) -> str:
                     clip((parent.get("workflow") or {}).get("policy_text"), MAX_POLICY_CHARS),
                     "",
                     *(
-                        run_record(run)
+                        run_record(run, run_dirs.get((rank, str(run.get("problem_id")))))
                         for run in (training.get("training_runs") or [])[:MAX_RUNS_IN_PROMPT]
                     ),
                 ]
@@ -250,17 +325,28 @@ def build_prompt(
     *,
     validated: bool,
 ) -> str:
+    """One of two evidence variants, chosen from the round's gate outcome in code.
+
+    * the candidate beat its parent on the training batch, so validation ran --
+      the proposer sees the parent's training record and the candidate's
+      held-out record, the only record that says whether a policy generalises;
+    * it did not, so validation never ran -- both records come from the training
+      batch, and the prompt says there is no held-out evidence to lean on.
+
+    The protocol is the same in both variants: exactly one new criterion,
+    appended, with a rule and a short example.
+    """
     rubric_text = critic.rubric_text()
     if validated:
         task = [
-            "修订上面这份 rubric，使它更能分辨「这次咨询是否真的产生了价值」——",
+            "为上面这份 rubric **新增一条子项**，使它更能分辨「这次咨询是否真的产生了价值」——",
             "依据只能是上面的证据：母代在训练集上的表现，以及候选在验证集上的分数、策略与交互历史。",
             "验证集是 held-out，它的结果比训练集更能说明策略是否真的变好；如果验证没有通过，",
             "要考虑是否有一类「看起来成功、实际没有」的咨询没有被现行 rubric 罚到。",
         ]
     else:
         task = [
-            "修订上面这份 rubric，使它更能分辨「这次咨询是否真的产生了价值」——",
+            "为上面这份 rubric **新增一条子项**，使它更能分辨「这次咨询是否真的产生了价值」——",
             "依据只能是上面的证据：母代和候选在同一训练批次上的分数、策略与交互历史。",
             "本轮候选没有赢过母代，因此没有 held-out 证据：不要把「候选更差」当成前提，",
             "两个策略在训练批次上都没被现行 rubric 罚到的地方，才是要找的盲区。",
@@ -287,40 +373,36 @@ def build_prompt(
             "",
             *task,
             "",
+            "先在上面证据里定位一类**信息层面的交互失败**，再把它写成一条可判定的子项。要看的是：",
+            "",
+            "- **该问没问**：报告或结果依赖某个量、约束或读法，而三次交换都没为它问过。",
+            "- **问了没用**：答案本可从题面/数据/标准推导得到，或它没有落到任何计算、结构、假设、局限里。",
+            "- **问得不合理**：题头声明的算子类型与问题正文不符，或一次交换塞进多个独立决策，使回复无法被采用。",
+            "- **只有 held-out 才暴露**（有验证证据时）：训练集上分不低、验证掉下来的那类咨询 ——「看起来成功、实际没有」的形态。",
+            "",
+            "新子项要能用上面的证据**直接核对**（能判「符合/不符合」），并在 `predicted_effect` 里点名它在哪类题、哪一维上应把分压下来；",
+            "不要复述已有子项已经罚过的行为。",
+            "",
             "硬性要求：",
             "",
-            "- **只做一处结构性改动**：新增、拆分、改写或废止**一条**准则（这是这套 rubric 自己的演化协议）。",
-            "- 保持 `[N] 准则名: 规则` 的 markdown 形态与「Deduct when…」句式；权重合计必须为 100。",
-            "- 准则总数 2–6 条，彼此不重叠；每条都必须能在对话或产物里被观察到。",
-            "- 每条准则的规则要写成可判定的行为要求，不要写成对模型整体的评价。",
+            "- **只新增一条子项**：不改写、不废止、不拆分任何已有子项，也不调整任何已有子项的权重。",
+            "- 新子项自带权重 `max`（5–20 的整数）；已有子项那一行必须原样保留。",
+            "- 规则要**简洁**：一到两句、能判「符合/不符合」的行为要求（≤ 60 词），不要写成对模型的整体评价。",
+            "- **必须附一个短例子** `example`：一句话说明满足与不满足分别长什么样。",
             "- 不要针对某一轮的具体题目、数值或实体写规则。",
             "",
-            "只输出一个 JSON 对象，描述**一处**编辑即可（不要复述整份 rubric，其余准则保持原样）：",
+            "只输出一个 JSON 对象：",
             "",
-            '{"op": "reword | add | retire | split",',
-            ' "target": "被改动的准则名（add 时为 null）",',
-            ' "new_criteria": [{"name": "准则名", "max": 25, "rule": "规则文本，含 Deduct when…"}],',
-            ' "weights": {"需要调权的准则名": 20},',
-            ' "name": "新的 rubric 名称（可选，不要带 Interaction Strategy: 前缀）",',
-            ' "evolution_rationale": "为什么这样改（引用上面的证据，直接给结论，不要写推理过程）",',
-            ' "predicted_effect": "预期哪些准则的分数会移动、朝哪个方向、在哪一题上"}',
-            "",
-            "`op` 的含义：reword 改写 target（`new_criteria` 给 1 条改写后的）、"
-            "add 新增（`new_criteria` 给 1 条、`target` 为 null）、"
-            "retire 废止 target（`new_criteria` 留空）、"
-            "split 把 target 拆成两条（`new_criteria` 给 2 条）。",
-            "`weights` 只写你改动权重的准则；改动后所有准则权重合计必须恰好 100，不够或超出要在这里补平。",
+            '{"criterion": {"name": "<子项名，≤ 8 词>", "max": 10,',
+            '  "rule": "<简洁规则，含 Deduct when…>", "example": "<一句话例子>"},',
+            ' "evolution_rationale": "为什么新增这一条（引用上面的证据，直接给结论，不要写推理过程）",',
+            ' "predicted_effect": "预期哪些行为会被这条罚到、在哪类问题上"}',
             "",
         ]
     )
 
 
-# --------------------------------------------------------------------------- #
-# proposal
-
-
 CRITERION_LINE = re.compile(r"^\[([\d.]+)\]\s*([^:]+):\s*(.+)$")
-OPS = ("reword", "add", "retire", "split")
 
 
 def parse_criteria(rubric_text: str) -> list[dict[str, Any]]:
@@ -348,75 +430,49 @@ def find_criterion(criteria: list[dict], name: str) -> int:
     raise ValueError(f"target {name!r} is not a criterion in the rubric in force")
 
 
-def apply_edit(criteria: list[dict], payload: dict) -> list[dict]:
-    """Apply one edit to the criteria in force and return the new list.
+def append_criterion(criteria: list[dict], payload: dict) -> list[dict]:
+    """Append the one new criterion this proposal asks for.
 
-    The edit is applied here rather than accepted as a rewritten rubric so the
-    protocol holds by construction: exactly one criterion can move, and every
-    other line is the same characters it was before.  A proposer that has to
-    reproduce the whole rubric verbatim tends to hand back the rubric it was
-    shown, which is an evolution that silently did not happen.
+    Add-only is enforced by construction rather than by asking nicely: the
+    proposer returns a criterion, and this function is what turns it into the
+    next version.  Reword, split and retire are gone from the protocol because
+    the run that had them spent every edit on the same criterion -- five versions
+    of one rule, each longer than the last, none of them measuring anything new.
     """
-    op = str(payload.get("op") or "").strip().lower()
-    if op not in OPS:
-        raise ValueError(f"op must be one of {OPS}, got {payload.get('op')!r}")
-    replacements = [dict(item) for item in payload.get("new_criteria") or []]
-    expected = {"reword": 1, "add": 1, "split": 2, "retire": 0}[op]
-    if len(replacements) != expected:
-        raise ValueError(f"{op} needs {expected} new_criteria, got {len(replacements)}")
-    for item in replacements:
-        for key in ("name", "rule"):
-            text = str(item.get(key) or "").strip()
-            if len(text) < 12:
-                raise ValueError(f"new criterion {key} is too short to be a rule")
-            item[key] = " ".join(text.split())
-        try:
-            item["max"] = float(item["max"])
-        except (KeyError, TypeError, ValueError):
-            raise ValueError("new criterion needs a numeric max") from None
-
-    if op == "add":
-        updated = [*criteria, *replacements]
-    else:
-        index = find_criterion(criteria, payload.get("target"))
-        if op == "reword":
-            updated = [
-                *criteria[:index],
-                {**replacements[0], "max": replacements[0].get("max", criteria[index]["max"])},
-                *criteria[index + 1:],
-            ]
-        elif op == "retire":
-            updated = [*criteria[:index], *criteria[index + 1:]]
-        else:  # split
-            updated = [*criteria[:index], *replacements, *criteria[index + 1:]]
-
-    for name, weight in (payload.get("weights") or {}).items():
-        updated[find_criterion(updated, name)]["max"] = float(weight)
-    return updated
+    item = payload.get("criterion")
+    if not isinstance(item, dict):
+        raise ValueError("proposal needs exactly one `criterion` object")
+    name = " ".join(str(item.get("name") or "").split())
+    rule = " ".join(str(item.get("rule") or "").split())
+    example = " ".join(str(item.get("example") or "").split())
+    if len(name) < 8:
+        raise ValueError("criterion name is too short")
+    if len(rule) < 40:
+        raise ValueError("criterion rule is too short to be judgeable")
+    if len(example) < 20:
+        raise ValueError("criterion example is missing or too short")
+    if any(str(existing["name"]).lower() == name.lower() for existing in criteria):
+        raise ValueError(f"criterion {name!r} is already in the rubric")
+    try:
+        maximum = float(item["max"])
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("criterion needs a numeric max") from None
+    if not 1 <= maximum <= 25:
+        raise ValueError(f"criterion max must be between 1 and 25, got {maximum:g}")
+    return [*criteria, {"name": name, "max": maximum, "rule": rule, "example": example}]
 
 
 def proposal_errors(payload: Any, current: list[dict]) -> list[str]:
     """Everything that must hold before a proposal is allowed to reach the critic."""
-    errors: list[str] = []
     if not isinstance(payload, dict):
         return ["response is not a JSON object"]
     try:
-        updated = apply_edit(current, payload)
+        append_criterion(current, payload)
     except (TypeError, ValueError) as error:
         return [str(error)]
-    if not 2 <= len(updated) <= MAX_CRITERIA:
-        errors.append(f"the rubric must keep 2..{MAX_CRITERIA} criteria, got {len(updated)}")
-    total = sum(float(criterion["max"]) for criterion in updated)
-    if abs(total - 100.0) > 0.01:
-        errors.append(
-            f"weights would sum to {total:g}, not 100; adjust them with the "
-            "`weights` field"
-        )
-    if not payload.get("new_criteria") and not payload.get("weights"):
-        errors.append("the edit changes nothing (no new_criteria and no weights)")
     if len(str(payload.get("evolution_rationale") or "").strip()) < 24:
-        errors.append("evolution_rationale is missing or too short")
-    return errors
+        return ["evolution_rationale is missing or too short"]
+    return []
 
 
 def rubric_title(rubric_text: str) -> str:
@@ -424,31 +480,37 @@ def rubric_title(rubric_text: str) -> str:
     return match.group(1).strip() if match else "Expert Consultation"
 
 
-def render_rubric_markdown(
-    criteria: list[dict], payload: dict, template: str | None = None
-) -> str:
-    """Render the applied criteria into the ``[N] name: rule`` markdown the critic parses.
+def render_rubric_markdown(criteria: list[dict], template: str | None = None) -> str:
+    """Render the criteria into the ``[N] name: rule`` markdown the critic parses.
 
-    The scoring footer is carried over from the rubric being revised, because it
-    is the instruction the critic reads about how to apply the criteria; dropping
-    it on evolution would silently change a second thing per version.
+    Before the criteria the file into whose line they go, so only what changed is
+    the appended line; the title and the scoring footer are carried over, with the
+    footer's normalization basis restated as the criteria's actual total (an
+    appended criterion raises it above 100, and a footer that still said 100 would
+    misstate how a total is normalized).
     """
-    # The file already states the heading; a name that repeats it would render as
-    # "Interaction Strategy: Interaction Strategy: …".
-    given = re.sub(
-        r"(?i)^\s*interaction\s+strategy\s*:\s*", "", str(payload.get("name") or "").strip()
-    )
     source = template if template is not None else critic.rubric_text()
-    lines = [f"Interaction Strategy: {given or rubric_title(source)}", ""]
+    lines = [f"Interaction Strategy: {rubric_title(source)}", ""]
     for criterion in criteria:
         maximum = float(criterion["max"])
         weight = int(maximum) if maximum.is_integer() else maximum
-        lines.append(f"[{weight}] {criterion['name'].strip()}: {criterion['rule'].strip()}")
+        rule = str(criterion["rule"]).strip()
+        example = str(criterion.get("example") or "").strip()
+        if example:
+            rule = f"{rule} Example: {example}"
+        lines.append(f"[{weight}] {str(criterion['name']).strip()}: {rule}")
         lines.append("")
     footer = rubric_footer(source)
     if footer:
-        lines.append(footer)
+        lines.append(with_total(footer, sum(float(item["max"]) for item in criteria)))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def with_total(footer: str, total: float) -> str:
+    """Restate a scoring footer's normalization basis as ``total``."""
+    number = int(total) if float(total).is_integer() else total
+    text = re.sub(r"theoretical maximum \([\d.]+\)", f"theoretical maximum ({number})", footer)
+    return re.sub(r"total / [\d.]+", f"total / {number}", text)
 
 
 def rubric_footer(rubric_text: str) -> str:
@@ -488,38 +550,38 @@ def evolve_rubric(
     args: Any = None,
     retries: int = 2,
 ) -> Path | None:
-    """Write this round's rubric version, and point later rounds at it.
+    """Append this round's criterion, and point later rounds at the new version.
 
-    Every round whose parent and candidate both finished reaches this point, so
-    every such round produces a version.  The branch is chosen here, in code:
+    Every round whose parent and candidate both finished reaches this point, and
+    each of them produces a version.  Which evidence the criterion is proposed
+    from is chosen here, in code:
 
-    * the candidate beat its parent, so validation ran -- revise from the
-      candidate's held-out record;
-    * the candidate did not beat its parent, so validation never ran -- revise
-      from both training records and say so in the prompt.
+    * the candidate beat its parent, so validation ran -- the proposer sees the
+      parent's training record and the candidate's held-out record;
+    * the candidate did not beat its parent, so validation never ran -- both
+      records are the training batch's, and the prompt says so.
 
-    ``None`` only when no rubric could be produced (a proposal that never became
-    valid); the round itself is never lost.
+    ``None`` only when no proposal ever became valid; the round itself is never
+    lost.
     """
     held_out = held_out_result(result)
     validated = bool(result.get("train_accepted")) and bool(held_out)
     if result.get("train_accepted") and not held_out:
-        # The engine runs validation inside the round, so this means the file is
-        # missing rather than pending.  Fall through to the training-only
-        # evidence rather than skipping the round, but say so.
+        # Validation runs inside the round, so a missing file means it is absent
+        # rather than pending.  Fall through to the training-only evidence and
+        # say so, rather than losing the round.
         print(
             "[rubric] train-accepted round has no validation result on disk; "
-            "revising from training evidence only",
+            "appending from training evidence only",
             flush=True,
         )
     evidence = held_out if validated else result
     split_label = "验证集（held-out）" if validated else "训练集"
     print(
-        f"[rubric] round {round_number} revising from "
+        f"[rubric] round {round_number} appending one criterion from "
         f"{'held-out validation' if validated else 'training evidence only'}",
         flush=True,
     )
-
     out_path = next_rubric_path(experiment, round_number)
     if out_path.is_file():
         # The round-end hook also runs on the resume path, so a version that was
@@ -566,8 +628,6 @@ def evolve_rubric(
                 OptArgs(),
             )
         except Exception as error:  # noqa: BLE001 - a bad reply is a retryable attempt
-            # The endpoint occasionally answers without a JSON object at all;
-            # that is a rejected attempt, not a failed round.
             errors = [f"{type(error).__name__}: {error}"]
             print(f"[rubric] attempt {attempt} unusable: {errors[0]}", flush=True)
             continue
@@ -579,10 +639,9 @@ def evolve_rubric(
         return None
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    updated = apply_edit(current, payload)
+    updated = append_criterion(current, payload)
     out_path.write_text(
-        render_rubric_markdown(updated, payload, template=current_rubric_text),
-        encoding="utf-8",
+        render_rubric_markdown(updated, template=current_rubric_text), encoding="utf-8"
     )
     workflow_evolution.write_json(
         out_path.with_suffix(".json"), {**payload, "applied_criteria": updated}

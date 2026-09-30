@@ -48,6 +48,22 @@ except ImportError:  # pragma: no cover - direct-file invocation support
 # Arm-specific, not policy: the optimizer may rewrite the policy, so a rule that
 # must survive every round is stated outside it.  Kept short on purpose -- a
 # long reminder here competes with the task itself for the solver's attention.
+INTERACTION_NON_MODELER_NOTE = """\
+### Ask one short, common-sense question
+
+The expert is not a mathematical modeler, and no question may require them to
+become one. Each exchange puts **exactly one question** to them: never two,
+never a list, never a question with parts. Ask for common sense about the real
+world -- what something is like in practice, what happens in a case the expert
+has seen, what someone who does this for a living would avoid and why -- and give
+no modelling background for the question to sit in. Put no model structure,
+notation, formulation choice or modelling term to them. Every question must be
+answerable by someone who has never built a model, and answered without being
+taught one.
+
+Keep the question to twenty words or fewer."""
+
+
 INTERACTION_PROPORTIONALITY_NOTE = """\
 ### Keep the consultation proportionate
 
@@ -55,6 +71,13 @@ The expert settles at most one strategic decision. The model, the code, the
 results, the validation, and the submission container are yours to complete in
 full, to the same standard as any other run; a good reply discharges the
 interaction requirement and nothing else."""
+
+
+# The paragraphs every run of this arm carries, in the order the solver reads
+# them.  A tuple rather than one concatenated string so an arm laid on top of
+# this one can join them without restating either: the translation arm appends
+# its own paragraph in front of these.
+INTERACTION_NOTES = (INTERACTION_NON_MODELER_NOTE, INTERACTION_PROPORTIONALITY_NOTE)
 
 
 def stage_evidence(problem_id: str, output_dir: Path, args) -> str:
@@ -304,12 +327,12 @@ _ORIGINAL_FIXED_INITIAL_WORKFLOW = base.fixed_initial_workflow
 
 
 def build_from_scratch_solver_prompt(workflow_value: dict, include_interaction: bool = True) -> str:
-    """The sibling launcher's prompt, with no plan section, plus the note."""
+    """The sibling launcher's prompt, with no plan section, plus the notes."""
     return _ORIGINAL_SOLVER_PROMPT(
         workflow_value,
         include_interaction=include_interaction,
         include_draft=False,
-        interaction_note=INTERACTION_PROPORTIONALITY_NOTE,
+        interaction_note="\n\n".join(INTERACTION_NOTES),
     )
 
 
@@ -330,6 +353,19 @@ def patch_sibling_launcher() -> None:
     base.build_interactive_solver_prompt = build_from_scratch_solver_prompt
     base.write_planning_draft_added_content = write_added_content_without_baseline
     base.run_planning_draft_solution_check = run_solution_only_check
+    # Both arms that start from the problem statement hand the optimizer each
+    # training run's submitted ``solution.json``, and this function is the seam
+    # they share: the co-evolution arm calls it before laying its critic hook on
+    # top, while the draft arm never calls it.  Without the submission a round
+    # argues about the consultation from the dialogue and the 50-character change
+    # summary alone and never sees what the run finally asserted -- while the
+    # Judge scores exactly that container, whose four fields carry the rigor,
+    # practicality, and result-and-bias dimensions.  Training runs only: the
+    # validation champion travels as policy text plus a net utility, so nothing
+    # held-out is exposed.  Set here rather than in the base launcher's patch
+    # block so the draft arm keeps the original evidence shape; the launcher
+    # saves and restores the value around ``main``.
+    workflow.CPE_INCLUDE_SUBMITTED_SOLUTION = True
 
 
 def main() -> None:

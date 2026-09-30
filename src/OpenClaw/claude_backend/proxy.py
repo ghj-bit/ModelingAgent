@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -153,7 +154,7 @@ def convert_tool_choice(choice):
     return None
 
 
-def to_openai(body: dict, model: str) -> dict:
+def to_openai(body: dict, model: str, reasoning_effort: str = "") -> dict:
     """Rewrite an Anthropic Messages request as an OpenAI chat completion."""
     # A leading system turn belongs in the system prompt -- the endpoint rejects
     # it inside messages, and the OpenAI shape has a dedicated field for it.
@@ -242,10 +243,18 @@ def to_openai(body: dict, model: str) -> dict:
         "model": model,
         "messages": messages,
         "max_tokens": min(int(body.get("max_tokens") or 4096), MAX_OUTPUT_TOKENS),
+    }
+    if reasoning_effort:
+        # A reasoning upstream that is not vLLM: it takes the effort knob the
+        # OpenAI shape defines, and the vLLM-only kwargs below would either be
+        # ignored or ask for the opposite of what was requested.  Measured on
+        # rightapi's gpt-5.6-sol: it accepts the vLLM field without error, so
+        # the two are separated by intent rather than by a failure.
+        payload["reasoning_effort"] = reasoning_effort
+    else:
         # The only working switch for the template's thinking mode.  The
         # Anthropic request model has no field for it, so it is injected here.
-        "chat_template_kwargs": {"enable_thinking": False},
-    }
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
     for name in ("temperature", "top_p"):
         if isinstance(body.get(name), (int, float)):
             payload[name] = body[name]
@@ -485,6 +494,10 @@ class Handler(BaseHTTPRequestHandler):
     # this stays empty for it; an endpoint reached over the network (DeepSeek)
     # answers 401 without one.
     api_key = ""
+    # Empty for the local vLLM server (which takes the vLLM-specific thinking
+    # switch); set for a reasoning upstream like rightapi's gpt-5.6-sol, where
+    # the OpenAI `reasoning_effort` field is the one that means anything.
+    reasoning_effort = ""
     # One line per shim process recording what the client asked to generate.
     # It is the only way to see whether CLAUDE_CODE_MAX_OUTPUT_TOKENS is being
     # honoured, and the requested budget is what sets the prompt ceiling.
@@ -592,7 +605,7 @@ class Handler(BaseHTTPRequestHandler):
         Claude Code uses this for context accounting, so it only has to be
         close; the character estimate is the fallback if rendering fails.
         """
-        payload = to_openai(body, self.model)
+        payload = to_openai(body, self.model, self.reasoning_effort)
         count = self._prompt_tokens(payload)
         if not isinstance(count, int):
             count = sum(
@@ -685,7 +698,7 @@ class Handler(BaseHTTPRequestHandler):
                 ) from None
 
     def _complete(self, body: dict) -> None:
-        payload = to_openai(body, self.model)
+        payload = to_openai(body, self.model, self.reasoning_effort)
         try:
             with self._open_upstream(payload) as response:
                 result = json.loads(response.read().decode("utf-8"))
@@ -698,7 +711,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, from_openai(result, self.model))
 
     def _stream(self, body: dict) -> None:
-        payload = to_openai(body, self.model)
+        payload = to_openai(body, self.model, self.reasoning_effort)
         translator = StreamTranslator(self.model)
         try:
             response = self._open_upstream(payload)
@@ -759,8 +772,17 @@ def main() -> int:
     parser.add_argument("--model", required=True, help="model name to send upstream")
     parser.add_argument(
         "--api-key",
-        default="",
+        default=os.environ.get("OPENCLAW_UPSTREAM_API_KEY", ""),
         help="bearer token for the upstream; leave empty when it wants none",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        default="",
+        choices=("", "minimal", "low", "medium", "high"),
+        help=(
+            "forwarded as the OpenAI `reasoning_effort` field and replaces the "
+            "vLLM-only chat_template_kwargs switch; leave empty for vLLM"
+        ),
     )
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
@@ -768,7 +790,11 @@ def main() -> int:
     Handler.upstream = args.upstream.rstrip("/")
     Handler.model = args.model
     Handler.api_key = args.api_key
-    sys.stderr.write(f"[shim] {args.host}:{args.port} -> {Handler.upstream} model={args.model}\n")
+    Handler.reasoning_effort = args.reasoning_effort
+    sys.stderr.write(
+        f"[shim] {args.host}:{args.port} -> {Handler.upstream} model={args.model}"
+        f" reasoning_effort={args.reasoning_effort or 'vllm-default'}\n"
+    )
     sys.stderr.flush()
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()
     return 0

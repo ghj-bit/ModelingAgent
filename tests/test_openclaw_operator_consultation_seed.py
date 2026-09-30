@@ -1,31 +1,33 @@
-"""The Claude arm's seed is a repertoire of interaction operators, and stays evolvable.
+"""The Claude arm's seed is a prose rule, and the surface around it stays closed.
 
-The seed states the consultation as four operators -- resolve uncertainty,
-challenge reasoning, inject knowledge, refine/correct -- each with its own
-trigger (`When`) and execution rule (`How`).  The four is the seed's roster and
-not a ceiling: a round may add an operator, which is why nothing the solver reads
-may state a count.  A count written into a fixed section would survive every
-round and contradict the first one that adds an operator.
+The seed states the consultation as one rule under ``## Interaction Strategy``
+and nothing else: what the agent must find out before spending an exchange, with
+the prohibition list and the three-exchange budget outside it.
 
-Two properties make the experiment work, and both are mechanical rather than
-editorial, so they are asserted here:
+The operator roster this seed used to carry -- four operators, each with its own
+trigger and execution rule, labelled on every question and read back by number --
+was removed on 2026-09-30.  Across the 118 rollouts of ``claude_fp8_infogap_r15``
+every judgment exchange returned the single word the expert role prompt asked
+for, so the operator a question was headed with decided nothing about its
+content, and no scorer ever read it.  Most of the tests below now assert the
+absence of that surface, because a reintroduced roster would re-enter the solver
+prompt, the expert role prompt and the evolution prompt at once and nothing else
+in the suite would notice.
 
-* the operators sit inside the policy's operator section (headed ``# Interaction Operators``),
-  which is the only region ``assert_fixed_policy_sections_unchanged`` lets a round
-  rewrite.  An operator that drifted outside it could not be evolved, and a round
-  that rewrote the prohibition list outside it could weaken the ban on asking the
-  expert for parameters, computation or code while still looking like a valid
+Two properties still make the experiment work, and both are mechanical rather
+than editorial, so they are asserted here:
+
+* the rule sits inside the policy's one mutable heading, which is the only region
+  ``assert_fixed_policy_sections_unchanged`` lets a round rewrite.  A round that
+  rewrote the prohibition list outside it could weaken the ban on asking the
+  expert for code, derivations or computation while still looking like a valid
   candidate.  The heading is what marks that boundary, so the engine accepts more
   than one wording and both are asserted to still parse: a policy whose heading
-  stops matching loses the operator steps *and* silently loses the guard.
-* each operator is one step of the derived action graph, which is what
-  ``workflow_similarity`` compares.  A round that rewrites one operator of four
-  scores 0.75 against its parent; if the operators were not steps, the round
-  would score near 1.0 and be rejected as a duplicate before it ever ran.
-
-The last case pins the ceiling: the engine allows at most eight actions, and at
-eight operators a one-operator round still scores 0.875, below the 0.90 default.
-Adding a ninth would turn every subsequent round into a rejected duplicate.
+  stops matching is not an error anywhere, it is a policy with no mutable section
+  and therefore no fixed-section check at all.
+* the rule is the whole deliverable of a round, so anything the solver reads
+  outside it -- the heading requirement, the reply reminder, the request command
+  -- cannot be evolved away, and is asserted to still be rendered.
 """
 
 import inspect
@@ -58,13 +60,6 @@ WORKFLOW_HEADING = "## Interaction Strategy"
 # recognising is not an error anywhere, it is a policy with no mutable section
 # and therefore no fixed-section check.
 LEGACY_WORKFLOW_HEADING = "# Interaction Workflow"
-
-OPERATORS = [
-    "Operator 1: Resolve uncertainty",
-    "Operator 2: Challenge reasoning",
-    "Operator 3: Inject knowledge",
-    "Operator 4: Refine / correct",
-]
 
 # The prohibitions the rounds may not touch.  Each is a line of the fixed section.
 # The list is three items and stops there: parameter plausibility is not on it,
@@ -174,58 +169,53 @@ class OperatorSeedTests(unittest.TestCase):
                 self.assertNotIn(f"{count} {noun}", self.policy_text)
         self.assertNotRegex(self.policy_text, r"\b\d+\s+(interaction )?operators\b")
 
-    def test_the_seed_numbers_its_operators(self):
-        # "name it -- its number and its name" is only followable if the numbers
-        # are stated.  They used to be bullets in a fixed order and the solver
-        # had to infer the number from the position, which it got wrong: on
-        # 2020_F of claude_fp8_scratch_r10 round 0 it headed one question
-        # `Operator 2: refine a previously introduced modeling mechanism` and
-        # another `Operator 3: challenge a key assumption`, and
-        # `_USED_OPERATOR_PATTERN` read both back into the evidence by number.
-        for number, route in (
-            (1, "resolve ambiguity"),
-            (2, "challenge a key assumption"),
-            (3, "provide missing real-world knowledge"),
-            (4, "refine a previously introduced modeling mechanism"),
-        ):
-            # Punctuation is not pinned: the last item ends the list with a full
-            # stop where the others use semicolons.
-            self.assertIn(f"- Operator {number} -- {route}", self.policy_text)
+    def test_the_seed_states_no_operators(self):
+        # The seed used to carry an operator roster, and every question had to be
+        # headed with the operator it applied so the round could be attributed by
+        # number.  The roster was removed on 2026-09-30: across the 118 rollouts
+        # of claude_fp8_infogap_r15 every judgment exchange returned the single
+        # word the expert role prompt asked for, so the operator a question was
+        # headed with decided nothing about its content.  What the assertions
+        # below pin is that the surface stays gone -- a reintroduced roster would
+        # re-enter the solver prompt, the expert role prompt and the evolution
+        # prompt at once, and nothing else in the suite would notice.
+        self.assertNotIn("Operator", self.policy_text)
+        self.assertNotIn("operator", self.policy_text)
 
-        # And the numbering must not read as workflow *steps*: the step splitter
-        # takes leading `N.` items, so writing this list as `1.`/`2.`/… would
-        # derive a four-action graph where the fallback one belongs, changing the
-        # workflow the similarity guard compares rounds through.
+        # And no numbered list either: the step splitter takes leading `N.` items,
+        # so a roster written that way would derive an action graph where the
+        # fallback one belongs, changing the workflow the similarity guard
+        # compares rounds through.
         self.assertEqual(base._interaction_workflow_steps(self.policy_text), [])
 
-    def test_the_roster_is_frozen_and_the_strategy_around_it_is_not(self):
-        # The numbers the engine reads back are an interface, not strategy, so
-        # the roster sits outside the mutable section and a round cannot touch
-        # it.  This is the whole point of splitting it out: while the roster was
-        # a bulleted list inside `## Interaction Strategy`, a round replaced the
-        # section and took the definitions with it, leaving `Operator 2` in the
-        # rule meaning whatever the round felt like.
-        roster_start = self.policy_text.index("## Operator Roster")
-        roster_end = self.policy_text.index("## Prohibited Requests")
+    def test_the_fixed_sections_are_frozen_and_the_strategy_is_not(self):
+        # The rule under `## Interaction Strategy` is the round's to rewrite; the
+        # prohibition list and the exchange budget sit outside it and a round that
+        # weakens either is rejected rather than spliced.  That boundary is what
+        # keeps a round from buying expert feedback for code, derivation or
+        # computation while still looking like a valid candidate.
         self.assertNotIn("Operator Roster", workflow.MUTABLE_POLICY_HEADINGS)
         parent = [{"workflow": {"policy_text": self.policy_text, "workflow_id": "s"}}]
+        prohibitions_start = self.policy_text.index("## Prohibited Requests")
         for mutation in (
             self.policy_text.replace(
-                "- Operator 2 -- challenge a key assumption",
-                "- Operator 2 -- ask about parameters",
+                "- standard mathematical derivations;",
+                "- standard mathematical derivations, unless the derivation decides "
+                "which mechanism dominates;",
             ),
-            self.policy_text[:roster_start] + self.policy_text[roster_end:],
+            # The whole fixed tail, prohibition list included, removed.
+            self.policy_text[:prohibitions_start],
         ):
             with self.assertRaises(ValueError):
                 workflow.assert_fixed_policy_sections_unchanged(
                     {"policy_text": mutation}, parent
                 )
-        # And the rule around it is still the round's to rewrite.
+        # And the rule itself is still the round's to rewrite.
         workflow.assert_fixed_policy_sections_unchanged(
             {
                 "policy_text": self.policy_text.replace(
-                    "Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.",
-                    "Identify the decision this exchange must settle.",
+                    "you may ask any question you want to ask.",
+                    "you may ask any question the work needs answered.",
                 )
             },
             parent,
@@ -285,7 +275,7 @@ class OperatorSeedTests(unittest.TestCase):
         # move.  Judged on the operators alone every such candidate would score
         # 1.0 against its parent and be rejected as a duplicate before it ran.
         parent = as_workflow(self.policy_text)
-        start = self.policy_text.index("Before each exchange:")
+        start = self.policy_text.index("Given the problem statement and the attachments")
         end = self.policy_text.index("## Prohibited Requests")
         rewritten = (
             self.policy_text[:start]
@@ -310,8 +300,8 @@ class OperatorSeedTests(unittest.TestCase):
         # tell neither from the other.
         parent = as_workflow(self.policy_text)
         reworded = self.policy_text.replace(
-            "Identify the most important unresolved decision that could materially affect the modeling direction or conclusions.",
-            "Identify the most important unresolved decision that could materially affect the modeling direction or the conclusions.",
+            "you may ask any question you want to ask.",
+            "you may ask any question you wish to ask.",
             1,
         )
         self.assertNotEqual(reworded, self.policy_text)
@@ -350,8 +340,9 @@ class OperatorSeedTests(unittest.TestCase):
             # where the patch schema is defined rather than repeating it here.
             "Rewrite one section and nothing else",
             "`## Interaction Strategy`",
-            # What a round evolves is what the agent asks, when it asks it, and
-            # which operator carries it -- the three questions §1 opens with.
+            # What a round evolves is what the agent asks and when it asks it --
+            # the two questions §1 opens with, since the operator roster was
+            # removed on 2026-09-30.
             #
             # The "when" is back by request.  An earlier iteration had removed
             # the relation *between* exchanges as a thing to state, on the
@@ -360,9 +351,12 @@ class OperatorSeedTests(unittest.TestCase):
             # and that the rounds which wrote one spent the budget on the
             # ordering instead of on the questions.  If rounds start doing that
             # again, that is the trade this reinstates.
-            "what to ask",
+            # Wording note: §2's first bullet was "what to ask" and is now
+            # "what information to ask for", because the rule it asks for is
+            # about the information the consultation is meant to extract, not
+            # about the phrasing of the question.
+            "what information to ask for",
             "when to ask it",
-            "which operator carries the question",
             "Which decision comes first",
             # The answer is a patch, and the prompt has to say so where the
             # deliverable is defined -- §1, §2, §3 and §5 all name it, because a
@@ -588,7 +582,7 @@ class PolicyPatchTests(unittest.TestCase):
         self.assertNotIn("purpose", parent_copy)
         workflow.validate_workflow(dict(parent_copy, purpose=""))
 
-    def test_the_arm_is_wired_to_the_frozen_repertoire(self):
+    def test_the_arm_is_wired_and_the_prompt_names_the_one_section(self):
         prompt = base_prompt_for(self.seed)
         # The prompt no longer states the freeze: §2 names the one section a
         # round may rewrite and §3 gives the schema, and the freeze itself is
@@ -604,9 +598,11 @@ class PolicyPatchTests(unittest.TestCase):
         main_source = inspect.getsource(base.main)
         self.assertIn("workflow.POLICY_PATCH_OPERATOR_LIMIT = 0", main_source)
         self.assertIn("workflow.POLICY_PATCH_ONLY_USED_OPERATORS = True", main_source)
-        # The evidence still states what the consultation applied; frozen or not,
-        # it is the record of which operator carried which exchange.
-        self.assertIn("operators_the_rollouts_reached_for", prompt)
+        # The evidence no longer states which operator each question was headed
+        # with: the roster was removed on 2026-09-30 and the key went with it.
+        # Asserted as an absence so it cannot creep back into the prompt.
+        self.assertNotIn("operators_the_rollouts_reached_for", prompt)
+        self.assertNotIn("Operator Roster", prompt)
 
     def test_a_frozen_repertoire_rejects_every_operator_edit(self):
         workflow.POLICY_PATCH_OPERATOR_LIMIT = 0
@@ -680,34 +676,34 @@ class PolicyPatchTests(unittest.TestCase):
         )
         self.assertIn("Read the state first.", candidate["policy_text"])
 
-    def test_the_seed_asks_for_the_operator_label(self):
-        # The engine reads the label off the question heading; without the seed
-        # asking for it there is nothing to read, and the rule above degenerates
-        # to "no operator may ever change".
+    def test_the_seed_asks_for_no_operator_label(self):
+        # The seed used to require the solver to head each question with the
+        # operator it applied, because the engine read the label back by number.
+        # The roster was removed on 2026-09-30 and the requirement with it; the
+        # assertions are the reverse of the ones that pinned it, so a reworded
+        # version of the same demand cannot pass unnoticed.
         #
-        # The seed states no operators, so the requirement names no operator: the
-        # solver is told to pick the way that matches the need from the kinds
-        # listed above, and to label the question with what it picked.
-        # `test_solver_prompt_states_the_heading` covers the heading shape, which
-        # is rendered outside `policy_text` and so cannot be evolved away.
-        #
-        # Read against the unwrapped text: the requirement is the thing being
-        # asserted, and a needle that has to stay on one line breaks on any
-        # harmless reflow of the surrounding prose.
+        # Read against the unwrapped text: a needle that has to stay on one line
+        # breaks on any harmless reflow of the surrounding prose.
         unwrapped = " ".join(self.seed["policy_text"].split())
-        self.assertIn("name it -- its number and its name", unwrapped)
-        self.assertIn("Choose which operator in the roster below the exchange needs", unwrapped)
+        self.assertNotIn("name it -- its number and its name", unwrapped)
+        self.assertNotIn("Head each question with the number of the operator", unwrapped)
+        self.assertNotIn("Operator", unwrapped)
 
-    def test_the_solver_prompt_states_the_heading(self):
+    def test_the_solver_prompt_states_no_heading_requirement(self):
         # This block is rendered outside `policy_text`, so a round cannot evolve
-        # the labelling requirement away -- which is the point of putting it here
-        # as well as in the seed.
+        # it away; it is asserted here because that is exactly why the heading
+        # requirement had to be removed from both places at once.
         rendered = base.interaction_workflow_block(self.seed)
-        self.assertIn("(Operator <k>: <name>)", rendered)
+        self.assertNotIn("(Operator <k>: <name>)", rendered)
+        self.assertNotIn("Operator", rendered)
+        # The rest of the block still tells the solver how to request feedback.
+        self.assertIn("expert_question_N.md", rendered)
+        self.assertIn("--exchanges 3", rendered)
 
 
 class ExpertReplyReminderTests(unittest.TestCase):
-    """The operator heading is re-stated with every reply, not only in the policy."""
+    """The reply still owes the exchanges after it; the heading demand is gone."""
 
     SCRIPT = REPO_ROOT / "src/OpenClaw/wait_for_expert_reply.py"
 
@@ -748,14 +744,16 @@ class ExpertReplyReminderTests(unittest.TestCase):
         self.assertIn("the expert's answer", out)
         self.assertNotIn("[controller]", out)
 
-    def test_a_later_exchange_is_reminded_of_the_header(self):
+    def test_a_later_exchange_is_reminded_of_the_exchange_still_owed(self):
         out = self.reply(1, 3)
         self.assertIn("the expert's answer", out)
         self.assertIn("[controller]", out)
-        # The reminder has to name the exchange the agent is about to write, and
-        # the exact heading, or it is not actionable.
-        self.assertIn("Expert Question 2 (Operator <k>: <name>)", out)
+        # The reminder has to name the exchange the agent is about to write and
+        # where it goes, or it is not actionable.  It used to name the operator
+        # heading instead; the roster was removed on 2026-09-30.
         self.assertIn("Exchange 1 of 3", out)
+        self.assertIn("expert_question_2.md", out)
+        self.assertNotIn("Operator", out)
 
     def test_the_last_exchange_is_not_reminded(self):
         # A fourth question would exceed the budget, so the reminder would be
@@ -764,10 +762,15 @@ class ExpertReplyReminderTests(unittest.TestCase):
         self.assertIn("the expert's answer", out)
         self.assertNotIn("[controller]", out)
 
-    def test_the_solver_prompt_passes_the_budget_and_mentions_the_echo(self):
+    def test_the_solver_prompt_passes_the_budget_and_the_request_command(self):
         rendered = base.interaction_workflow_block(base.fixed_initial_workflow())
         self.assertIn("--exchanges 3", rendered)
-        self.assertIn("echoes a reminder of that header", rendered)
+        self.assertIn("--request", rendered)
+        self.assertIn("--reply", rendered)
+        # The paragraph that used to point at the echoed operator heading is gone
+        # with the roster; the block no longer promises anything about headers.
+        self.assertNotIn("echoes a reminder of that header", rendered)
+        self.assertNotIn("Operator", rendered)
 
 
 class ExpertReplyFailFastTests(unittest.TestCase):

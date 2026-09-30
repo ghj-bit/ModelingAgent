@@ -2,8 +2,9 @@
 
 The co-evolution launcher calls :func:`review_training_parents` immediately after
 a round's training-parent evaluation and before the candidate is evolved.  The
-critic reads the active rubric (``interaction_strategy_rubric_v6.md`` by
-default; override with ``CRITIC_RUBRIC``) and, for
+critic reads the active rubric (``interaction_strategy_rubric_v7.md`` by
+default -- one criterion to start, one appended per round; override with
+``CRITIC_RUBRIC``) and, for
 every training run of every parent, scores the interaction policy together with
 the consultation it produced: the policy text, the expert dialogue recorded in
 the run's evidence, and what the run reports the reply changed.
@@ -22,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_RUBRIC = Path(__file__).resolve().parent / "interaction_strategy_rubric_v6.md"
+DEFAULT_RUBRIC = Path(__file__).resolve().parent / "interaction_strategy_rubric_v7.md"
 CRITIC_REPEATS = 1
 CRITIC_MAX_TOKENS = 2600
 
@@ -150,13 +151,15 @@ def build_critic_prompt(
             "",
             (dialogue.strip() or "(no dialogue was recorded for this run)"),
             "",
-            "# The plan the consultation started from",
-            "",
-            "(The plan the agent had before the exchange, when the run had one; the"
-            " movement criterion compares the expert's answer against the default it"
-            " already had.)",
-            "",
-            (draft.strip()[:9000] or "(no plan was supplied)"),
+            # The plan the consultation started from used to be injected here.  It
+            # existed to make one criterion judgeable -- the movement criterion,
+            # which compared the reply against the default the run already had --
+            # and that criterion is not in the rubric any more: the rubric starts
+            # from a single criterion about the information an exchange adds and
+            # grows by appending, so nothing in it refers to a prior plan.
+            # Injecting it anyway invited the critic to score the plan rather than
+            # the exchange, which the system prompt forbids.  The `draft` argument
+            # is still accepted so callers need not change; it is not rendered.
             "",
             "## What the run says the reply changed (self-reported — context only)",
             "",

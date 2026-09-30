@@ -25,6 +25,7 @@ IGNORED_FILES = {
     "results/refinement_changed_files.json",
     "results/interaction_added_content.md",
     "results/interaction_evidence.md",
+    "results/interaction_translation.md",
     "results/interaction_receipt.json",
     "results/refinement_validation.json",
 }

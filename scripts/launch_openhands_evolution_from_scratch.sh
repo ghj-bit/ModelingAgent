@@ -1,8 +1,15 @@
 #!/bin/bash
-# Launch one Claude Code-backed interaction-workflow evolution whose solver
-# starts from the problem statement alone.
+# Launch one OpenHands-backed interaction-workflow evolution whose solver starts
+# from the problem statement alone.
 #
-#   bash scripts/launch_claude_evolution_from_scratch.sh <experiment-name> [max-rounds]
+# The Claude from-scratch arm (launch_claude_evolution_from_scratch.sh) with one
+# change: every Solver runs as an OpenHands conversation instead of a Claude Code
+# session.  Same seed, prompts, pools, gates, judge and endpoints, so the two arms
+# are comparable run for run.  Thinking is off -- the OpenHands backend pins
+# enable_thinking=False in the chat template and ignores --thinking, so the flag
+# below records the intent rather than switching anything.
+#
+#   bash scripts/launch_openhands_evolution_from_scratch.sh <experiment-name> [max-rounds]
 #
 # Same engine, gates, utility, judge and evolution prompt as
 # launch_claude_evolution.sh, with two differences:
@@ -198,12 +205,12 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 cd "$REPO"
-echo "[launch] $(date)  (evolution from scratch)" | tee -a "$LOG"
+echo "[launch] $(date)  (OpenHands evolution from scratch)" | tee -a "$LOG"
 
 # TRAIN_BATCH_SIZE and TRAIN_REPETITIONS override the two training defaults
 # (3 problems, each run twice); both are read by the launcher, the second from
 # the environment.
-setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolution_from_scratch_claude \
+setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolution_from_scratch_openhands \
   --exp "$EXP" \
   --benchmark mmbench \
   --mmbench-root "$REPO/data/MMBench" \

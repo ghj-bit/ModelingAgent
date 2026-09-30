@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -171,14 +172,29 @@ def main() -> None:
     launcher.disable_thinking_for_direct_api_calls()
 
     class OptArgs:
-        opt_model = "qwen3.8-27b"
-        opt_base_url = "http://gpu6:18763/v1"
-        opt_api_key = "EMPTY"
+        # Read from the environment with the FP8 server as the default: this
+        # used to hardcode the bf16 endpoint on 18763, which is no longer
+        # served, so the dry run could not reach a model at all.
+        opt_model = os.environ.get("OPT_MODEL") or "qwen3.8-27b-fp8"
+        opt_base_url = os.environ.get("OPT_BASE_URL") or "http://gpu6:18764/v1"
+        opt_api_key = os.environ.get("OPT_API_KEY") or "EMPTY"
 
     # The engine rejects a candidate whose solver-visible text reproduces the
     # parent's and re-asks, so the dry run does the same: keep the first response
     # that actually carries a different policy.
+    #
+    # The round answers with `policy_patch` -- the sections it rewrites -- not
+    # with a whole policy, so the response is spliced through the engine's own
+    # applier, under the same freeze the launcher sets.  A patch the engine would
+    # refuse is a discarded attempt here too, rather than a policy this script
+    # invents a reading of.
     parent_text = str(seed.get("policy_text") or "").strip()
+    parent_workflow = {
+        "policy_text": parent_text,
+        "max_exchanges": seed.get("max_exchanges", 3),
+        "stop_condition": seed.get("stop_condition"),
+    }
+    shared.POLICY_PATCH_OPERATOR_LIMIT = 0
     candidate = None
     for attempt in range(1, args.attempts + 1):
         response = shared.interaction.local.optimizer_response(
@@ -197,6 +213,14 @@ def main() -> None:
         (round_dir / f"evolution_response_attempt_{attempt}.json").write_text(
             json.dumps(response, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
+        if response.get(shared.POLICY_PATCH_FIELD):
+            try:
+                response = shared.apply_policy_patch(
+                    dict(response), parent_workflow, None
+                )
+            except ValueError as error:
+                print(f"[attempt {attempt}] patch rejected: {error}")
+                continue
         text = str(
             response.get("interaction_policy") or response.get("policy_text") or ""
         ).strip()

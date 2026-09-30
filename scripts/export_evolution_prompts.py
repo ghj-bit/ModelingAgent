@@ -123,13 +123,21 @@ def evolver_prompt() -> str:
     # substituted straight into the template; rendering the draft arm's values
     # would show the wrong sentence for this arm.
     scratch.patch_sibling_launcher()
-    # The same two substitutions the launcher makes, and only those: the
-    # similarity bound is enforced by the engine but no longer stated in the
-    # prompt, so a `{similarity_threshold}` pass here would render a placeholder
-    # the real prompt does not carry and hide the difference.
-    head = base.EVOLUTION_PROMPT_HEAD.replace(
-        "{solver_source}", base.SOLVER_SOURCE_CONTEXT
-    ).replace("{solver_start}", base.SOLVER_START_CONTEXT)
+    # The same substitutions the launcher makes, and only those: the similarity
+    # bound is enforced by the engine but no longer stated in the prompt, so a
+    # `{similarity_threshold}` pass here would render a placeholder the real
+    # prompt does not carry and hide the difference.  `{strategy_form}` renders
+    # the default form -- the linear one -- because that is what a run gets
+    # unless it names another: EVOLUTION_STRATEGY_FORM picks conditional or
+    # workflow out of base.STRATEGY_FORMS.
+    head = (
+        base.EVOLUTION_PROMPT_HEAD.replace(
+            "{solver_source}", base.SOLVER_SOURCE_CONTEXT
+        )
+        .replace("{solver_start}", base.SOLVER_START_CONTEXT)
+        .replace("{strategy_form}", base.STRATEGY_FORM_LINEAR)
+        .replace("{submitted_solution_note}", base.solution_evidence_note())
+    )
     return "\n".join(
         [
             head,
@@ -193,8 +201,9 @@ def rubric_evolution_prompt() -> str:
             "interaction_report_change_summary": "«what the run says the reply changed»",
         }
 
-    # One stub serves both branches: the held-out result carries the same keys as
-    # the training one, and only these keys are read.
+    # The stub carries the keys the prompt renders.  Validation keys stay in
+    # because the round result has them and variant A renders them; the two
+    # variants differ only in the candidate section and the task paragraph.
     result = {
         "utility": "«candidate utility on this split»",
         "average_dimension_scores": {"«dimension»": "«score»"},
@@ -220,16 +229,53 @@ def rubric_evolution_prompt() -> str:
         (round_dir / "training_parent_evidence.json").write_text(
             json.dumps([incumbent], ensure_ascii=False), encoding="utf-8"
         )
+        # The submission is rendered from disk, so the stub needs the two places
+        # a run directory is resolved from: the candidate's own repetition, and
+        # the parent phase result the parent submissions are read through.
+        run_dir = pathlib.Path(scratch) / "cpe_evaluations" / "round_«N»" / "runs" / "«stamp»"
+        (run_dir / "output" / "results").mkdir(parents=True)
+        (run_dir / "output" / "results" / "solution.json").write_text(
+            json.dumps(
+                {
+                    "tasks": [
+                        {
+                            field: f"«{field} as the run submitted it»"
+                            for field, _ in proposer.SOLUTION_FIELDS
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        result["problem_results"][0]["repetitions"][0]["run_dir"] = str(run_dir)
+        phase_dir = (
+            pathlib.Path(scratch) / "cpe_evaluations" / "round_«N»"
+            / "train_parent_1" / "workflows" / "round_«N»"
+        )
+        phase_dir.mkdir(parents=True)
+        (phase_dir / "result.json").write_text(
+            json.dumps(
+                {
+                    "problem_results": [
+                        {
+                            "problem_id": "«problem id»",
+                            "repetitions": [{"run_dir": str(run_dir)}],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
         for validated, heading in (
             (
                 True,
-                "变体 A：候选通过训练门，验证集跑过 —— "
-                "「候选」一段是 held-out 记录",
+                "变体 A：候选通过训练门，验证集跑过 ——「候选」一节是 held-out 记录",
             ),
             (
                 False,
-                "变体 B：候选未通过训练门，只有训练证据 —— "
-                "prompt 会明说没有 held-out 可用",
+                "变体 B：候选未通过训练门，只有训练证据 —— prompt 会明说没有 held-out 可用",
             ),
         ):
             user = proposer.build_prompt(
@@ -244,6 +290,8 @@ def rubric_evolution_prompt() -> str:
         "# system 消息\n\n"
         + block(proposer.SYSTEM_PROMPT)
         + "\n# user 消息\n\n"
+        + "两个变体只在「候选」一节与「你的任务」一段不同；协议相同：**只追加一条子项**（简洁规则 + 一个短例子），"
+        "不改写/废止/拆分/调权已有子项。\n\n"
         + "\n".join(rendered)
     )
 
@@ -544,9 +592,11 @@ def build() -> dict[str, str]:
             "system 为静态常量；user 为运行时拼装（本文件为渲染结果）",
             "仅协同演化臂（`launch_claude_coevolution.sh`）",
         )
-        + "注意：`# The plan the consultation started from` 一节在 from-scratch 臂恒为空——"
-        "该臂没有起始计划，而证据过滤器 `optimizer_interaction_artifacts` 也只放行 "
-        "`expert_interaction` 一种工件，draft 永远不会出现在 critic 的输入里。\n\n"
+        + "注意：原先还有一节 `# The plan the consultation started from`（注入 agent 的起始计划），"
+        "已删除——它只为旧 rubric 里的 movement 准则服务（把回复与 agent 原有默认做法对比），"
+        "而现行 rubric 从一条「这次交换加了多少可用信息」起步、只增不改，没有任何准则引用起始计划；"
+        "继续注入只会让 critic 去评计划而非评交换。`build_critic_prompt()` 仍接受 `draft` 参数（调用方无需改），"
+        "但不再渲染它。\n\n"
         "## system\n\n"
         + block(critic_system)
         + "\n## user（渲染结果）\n\n"
@@ -578,8 +628,9 @@ def build() -> dict[str, str]:
             "仅协同演化臂（`launch_claude_coevolution.sh`）",
         )
         + "用哪一段证据由**代码**决定、不由 proposer 选：候选赢过母代则用它的 held-out 记录，"
-        "没赢则只用两边训练记录、并在 prompt 里明说没有 held-out。两个分支都渲染在下面"
-        "（`# 你的任务` 一节随分支不同）。\n\n"
+        "没赢则只用两边训练记录、并在 prompt 里明说没有 held-out。两个变体都渲染在下面"
+        "（`# 你的任务` 一节随分支不同）。协议两版相同：**只追加一条子项**（简洁规则 + 一个短例子），"
+        "不改写/废止/拆分/调权已有子项。\n\n"
         + rubric_evolution_prompt()
     )
 
@@ -666,10 +717,11 @@ ROWS = (
     (
         "rubric_evolution.md",
         "rubric 演化器",
-        "产出下一版 rubric 的 prompt（system + 两个证据分支变体）",
+        "产出下一版 rubric 的 prompt（system + 两个证据分支；协议为只追加一条子项）",
     ),
     ("judge_mmbench.md", "MM-Bench judge", "四个评分维度的打分 prompt"),
-    ("human_expert_role.md", "人类专家", "扮演建模专家的角色设定"),
+    ("human_expert_role.md", "人类专家", "扮演建模专家的角色设定（静态常量 + 运行时追加说明）"),
+
     ("interaction_policy_seed.md", "交互策略种子", "注入 solver prompt 的初始策略文本（本臂实际用的那份）"),
     ("planner_draft.md", "planner", "上游证据预取用的规划 prompt（本臂只复用其产物）"),
 )
@@ -689,6 +741,41 @@ EXTRA_ROWS = (
     ("policy_patch_cross_exchange.json", "早期 patch（对照）", "目标改为跨轮后：「单一累积论证 + 第一轮确立约束性框架」，但组织骨架未变"),
     ("policy_patch_wholesale_rewrite.json", "早期 patch（对照）", "「改动要明显」指令下的整段重写：seed 的 8 项内容全丢，骨架未变"),
     ("policy_patch_skeleton_broken.json", "早期 patch（对照）", "「父本组织不是模板」指令下骨架被换：改为按位置索引，seed 指令 0/14 保留"),
+    # Rendered rubric-evolution prompts are the exception to "rendered instances
+    # stay in the experiment": what that proposer sees is the whole question of
+    # whether the evolution has a usable feedback signal, and the evidence branch
+    # it is handed changes with the round's verdict.  Kept next to the template
+    # so the two can be read together; the audit beside them lists what the
+    # prompt carries and what it withholds.
+    ("rubric_evolution_rendered_round5.md", "rubric 演化实例（当前）", "round 5 收尾时真实发出的 rubric 演化 prompt，产出 patch_v11"),
+    ("rubric_evolution_rendered_round4.md", "rubric 演化实例（上一版）", "round 4 的实例，产出 patch_v10，用于对照证据分支与准则措辞的变化"),
+    ("rubric_evolution_patch_v11.json", "rubric patch 原文", "当前实例返回的 patch：op/target/weights/rationale/predicted_effect"),
+    ("rubric_evolution_signal_audit.md", "rubric 演化信号审计", "该 prompt 给了哪些反馈信号、缺哪些（judge 分维理由、critic 逐准则分），以及由此导致的演化方向"),
+    # The expert role is the one prompt every arm shares, so a change to it
+    # silently re-baselines every collected run.  The record of what changed and
+    # the same-question/same-model before-and-after travels with the template.
+    ("human_expert_role_refinement.md", "人类专家 prompt 精化记录", "把「隐性约束 + 常识」写进专家角色的那次改写：真实对话里的根据、逐条改法、同模型同题的新旧对照、可比性代价"),
+    # The information-first seed: a hand-written alternative to the arm's seed,
+    # kept here so the two can be diffed paragraph by paragraph.  Its roster,
+    # prohibited-requests and termination sentence are byte-identical to the
+    # seed's on purpose -- the engine reads operators back by number and the
+    # patch machinery rewrites `## Interaction Strategy` only.
+    ("interaction_policy_info_first.md", "信息交互策略（初始）", "把准入三测写进策略段：不可推导/会分叉/有落点，否则不花这次交换"),
+    ("initial_interaction_workflow_info_first.json", "信息策略 workflow", "可直接当 initial_interaction_workflows.json 用的完整 workflow（字段与种子同构）"),
+    ("interaction_policy_info_first_design.md", "信息策略设计说明", "逐段对照种子、与 info_gain 三项的映射、落地步骤与验收指标"),
+    # The rendered expert call: what the expert actually receives, assembled from a
+    # real run's artifacts the way `call_direct_human_expert` assembles it -- system
+    # wrapper + role + problem statement, then the user message carrying the question
+    # whose first line is the operator heading.  Kept because "does the expert see
+    # which operator it was asked under" is a question the template cannot answer on
+    # its own.
+    ("human_expert_prompt_rendered.md", "人类专家（完整渲染）", "专家实际收到的 system+user 全文：历史实况版 + 当前角色常量版"),
+    # The rubric the co-evolution arm's critic starts from.  The template for the
+    # rubric that evolves it lives here as rubric_evolution.md; this is the content
+    # that chain starts from, copied in because the initial version is a choice --
+    # CRITIC_RUBRIC can point elsewhere -- and the file that holds it is one of six
+    # static versions.
+    ("rubric_initial_coevolve_v7.md", "协同臂初始 rubric（单条）", "critic 起步用的 v7 本体：一段注释 + 1 条子项，可直接当 CRITIC_RUBRIC 用；每轮追加一条"),
 )
 
 
@@ -727,7 +814,7 @@ def readme(prompts: dict[str, str], output: pathlib.Path) -> str:
 ## 不放在本目录的两类内容
 
 - **评分标准（rubric）**：固定 rubric `src/OpenClaw/interaction_initial_substantive_v1.json` 与
-  critic 用的 `interaction_strategy_rubric_v6.md` 已由 `scripts/export_interaction_rubrics.py`
+  critic 用的 `interaction_strategy_rubric_v7.md` 已由 `scripts/export_interaction_rubrics.py`
   导出到 `src/OpenClaw/prompts/interaction_rubrics_current.md`。它们是注入 prompt 的**内容**而非模板，
   不在这里再存一份，免得两处漂移。
 - **单次运行的真实渲染件**（想看实际拼装效果时从这里取）：

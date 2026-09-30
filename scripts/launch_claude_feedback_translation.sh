@@ -1,32 +1,33 @@
 #!/bin/bash
-# Launch one Claude Code-backed interaction-workflow evolution whose solver
-# starts from the problem statement alone.
+# One round of the feedback-translation arm: every expert reply is decomposed
+# into categorised entries before the work may read it.
 #
-#   bash scripts/launch_claude_evolution_from_scratch.sh <experiment-name> [max-rounds]
+#   bash scripts/launch_claude_feedback_translation.sh <experiment-name>
 #
-# Same engine, gates, utility, judge and evolution prompt as
-# launch_claude_evolution.sh, with two differences:
+# The from-scratch arm (launch_claude_evolution_from_scratch.sh) with one
+# paragraph added to the solver's interaction section, and pinned to round 0:
 #
-#   * Nothing precedes the run.  The solver is handed the problem statement and
-#     the task's pre-gathered data/external_data.md, and owns the modeling plan
-#     itself; no prompt section, step or policy line refers to a prior plan.
-#   * The initial interaction policy is the arm's own seed,
-#     interaction_policy.OPERATOR_DRIVEN_CONSULTATION, plus one paragraph
-#     telling the solver to keep the consultation proportionate: the expert
-#     settles at most one strategic decision and the modeling work is still
-#     owed in full.  The paragraph lives in the from-scratch module, not in the
-#     policy text, so the optimizer cannot rewrite it away.
+#   * The added paragraph is the mechanism.  After every expert reply, and
+#     before the next question or any further modelling, the solver decomposes
+#     the reply into the statements it makes, sorts each into fixed categories
+#     (Assumption, Objective, Variable, Constraint, Parameter, Data
+#     interpretation, Validation, Conclusion -- an entry may carry more than
+#     one), and rewrites `results/interaction_translation.md` so it carries the
+#     whole consultation so far.  That file, not the reply, is then the only
+#     source the rest of the work reads and cites.
+#   * Round 0 only, unconditionally.  The mechanism lives in the solver prompt,
+#     so its effect is measurable on the seed policy alone; running it beside
+#     the plain arm's round 0 is the whole comparison.  Evolution would add a
+#     second variable (the policy a round rewrites) to a measurement that is
+#     already noisy.  `--max-rounds 1` is passed only because the shared parser
+#     rejects a value below 1.
 #
-# The evidence is read out of the planner runs' directories -- that is where it
-# was collected -- and the engine's own flag for those directories is
-# --planning-draft-root, so that flag carries the evidence pools below.  Nothing
-# reads a plan file: only <pool>/<run>/output/data/external_data.md is copied.
-#
-# Everything downstream -- training/validation split, acceptance margins,
-# judge repeats, the evolution prompt -- is the other arm's default.  Override
-# the pools with MMBENCH_TRAIN_POOL / MMBENCH_PIN_VALIDATION, and note that
-# MMBENCH_PIN_VALIDATION must be paired with --validation-size equal to its
-# length (the engine checks the two).
+# Everything else -- engine, seed, gates, utility, judge, pools, batch sizes --
+# is the from-scratch arm's default, and deliberately so: the numbers this
+# produces are meant to sit beside that arm's round 0 for the same 8-problem
+# validation pool.  Override the pools with MMBENCH_TRAIN_POOL /
+# MMBENCH_PIN_VALIDATION, and note that MMBENCH_PIN_VALIDATION must be paired
+# with --validation-size equal to its length (the engine checks the two).
 set -euo pipefail
 
 REPO=/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent
@@ -155,17 +156,15 @@ TRAIN_EVIDENCE_ROOT="${TRAIN_EVIDENCE_ROOT:-$REPO/openclaw_experiments/evolve_ex
 EVIDENCE_ROOTS="$EVIDENCE_ROOT $TRAIN_EVIDENCE_ROOT"
 EXPECTED_EVIDENCE="${EXPECTED_EVIDENCE:-35}"
 
-NAME="${1:?usage: launch_claude_evolution_from_scratch.sh <experiment-name> [max-rounds]}"
-ROUNDS="${2:-5}"
-# 0 means "round 0 only": the launcher's private --round0-only stops the run once
-# the round-0 initial-parent validation is done, before the initial training
-# parents and every evolved round.  --max-rounds is pinned to 1 alongside it
-# purely because the shared parser rejects a value below 1.
-ROUND0_ONLY=""
-if [ "$ROUNDS" -eq 0 ]; then
-  ROUND0_ONLY="--round0-only"
-  ROUNDS=1
-fi
+NAME="${1:?usage: launch_claude_feedback_translation.sh <experiment-name>}"
+# Round 0 only, always.  --round0-only stops the run once the round-0
+# initial-parent validation is done, before the initial training parents and
+# every evolved round; --max-rounds is pinned to 1 alongside it purely because
+# the shared parser rejects a value below 1.  A second argument is not accepted:
+# this script exists to measure the mechanism on the seed policy, and letting it
+# evolve would put the policy back in the comparison.
+ROUNDS=1
+ROUND0_ONLY="--round0-only"
 
 # Score each problem three times and average: CPE compares candidates against an
 # incumbent by a margin, and that comparison is meaningless without knowing how
@@ -198,12 +197,12 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 cd "$REPO"
-echo "[launch] $(date)  (evolution from scratch)" | tee -a "$LOG"
+echo "[launch] $(date)  (feedback translation, round 0 only)" | tee -a "$LOG"
 
 # TRAIN_BATCH_SIZE and TRAIN_REPETITIONS override the two training defaults
 # (3 problems, each run twice); both are read by the launcher, the second from
 # the environment.
-setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolution_from_scratch_claude \
+setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolution_feedback_translation_claude \
   --exp "$EXP" \
   --benchmark mmbench \
   --mmbench-root "$REPO/data/MMBench" \

@@ -125,20 +125,19 @@ def exchange_number(request_path: Path) -> int:
 def next_exchange_reminder(number: int, total: int) -> str:
     """The line appended to a reply that still has an exchange after it.
 
-    The policy states the heading rule once, at the top; by the third exchange
-    that is a long way up the context.  The reply is the last thing read before
-    the next question is written, so it is where the reminder has to be for the
-    record to come out complete -- and the round that evolves the policy reads
-    the headings to learn which operators the consultation reached for.
+    The reply is the last thing read before the next question is written, so it
+    is where the reminder that an exchange is still owed has to sit; the policy
+    states the budget once, at the top, and by the third exchange that is a long
+    way up the context.
     """
     return (
         "\n---\n"
         f"[controller] Exchange {number} of {total} recorded. "
         f"Has this conversation ended?  Ignore the rest.\n"
-        f"If you are about to ask again: write the question's first line as "
-        f"`# Expert Question {number + 1} (Operator <k>: <name>)`, naming the "
-        f"operator you selected. The header is mandatory and is how the "
-        f"consultation is attributed.\n"
+        f"If you are about to ask again: write the next question to "
+        f"`expert_question_{number + 1}.md` and run the same command against "
+        f"`expert_request_{number + 1}.json` and `expert_reply_{number + 1}.json`. "
+        f"Build it on the reply above.\n"
     )
 
 

@@ -132,8 +132,8 @@ setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolutio
   --mmbench-judge-model "$JUDGE_MODEL" --mmbench-judge-base-url "$JUDGE_BASE_URL" --mmbench-judge-api-key "$JUDGE_API_KEY" \
   --max-rounds "$ROUNDS" $ROUND0_ONLY $SAMPLING_SEED_ARG \
   --judge-repeats "$JUDGE_REPEATS" \
-  --train-batch-size 2 \
-  --validation-size "${VALIDATION_SIZE:-4}" \
+  --train-batch-size 3 \
+  --validation-size "${VALIDATION_SIZE:-8}" \
   --thinking off \
   >> "$LOG" 2>&1 &
 

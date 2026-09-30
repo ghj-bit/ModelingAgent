@@ -9,7 +9,8 @@
 # addition: after a round's training-parent runs finish and before the candidate
 # is evolved, an LLM critic scores each parent's interaction (policy text +
 # recorded expert consultation + recorded post-reply change) against the active
-# rubric (src/OpenClaw/interaction_strategy_rubric_v6.md by default; override
+# rubric (src/OpenClaw/interaction_strategy_rubric_v7.md by default -- one
+# criterion to start, one appended per round; override
 # with CRITIC_RUBRIC), and that review is appended to the workflow-evolution
 # prompt as one extra evidence node.  Nothing else the optimizer receives
 # changes, and the critic never touches the utility or a gate.
@@ -131,6 +132,17 @@ fi
 # drop that paragraph from the prompt.
 export INTERACTION_RUNAWAY_GUARD="${INTERACTION_RUNAWAY_GUARD:-1}"
 
+# The arm's seed, as a policy file rather than the built-in seed the launcher
+# carries.  Both claude arms read this one knob, so this script and
+# launch_claude_evolution_from_scratch.sh can start from the same policy; the
+# file here is the information-gap policy, whose strategy section admits a gap
+# only if it cannot be derived, would branch the work, and has a landing place.
+# Point it at another workflow JSON to seed from that, or set it explicitly
+# empty to fall back to the built-in OPERATOR_DRIVEN_CONSULTATION seed.  A
+# resumed experiment ignores it: the seed already written into the experiment
+# directory wins.
+export INTERACTION_INITIAL_WORKFLOW_JSON="${INTERACTION_INITIAL_WORKFLOW_JSON-$REPO/openclaw_experiments/exp_prompt/initial_interaction_workflow_info_first.json}"
+
 # Foreground command budget, lowered from the 30 minutes run_claude_task.py
 # defaults to.  Trial, not a settled setting -- the value it replaces was itself
 # chosen against evidence: run_claude_task.py records that a 5-minute default
@@ -220,8 +232,8 @@ setsid nohup "$PY" -m src.OpenClaw.run_substantive_interaction_workflow_evolutio
   --mmbench-judge-model "$JUDGE_MODEL" --mmbench-judge-base-url "$JUDGE_BASE_URL" --mmbench-judge-api-key "$JUDGE_API_KEY" \
   --max-rounds "$ROUNDS" $ROUND0_ONLY $SAMPLING_SEED_ARG \
   --judge-repeats "$JUDGE_REPEATS" \
-  --train-batch-size 2 \
-  --validation-size "${VALIDATION_SIZE:-4}" \
+  --train-batch-size 3 \
+  --validation-size "${VALIDATION_SIZE:-8}" \
   --validation-repetitions "${VALIDATION_REPETITIONS:-1}" \
   --thinking off \
   >> "$LOG" 2>&1 &

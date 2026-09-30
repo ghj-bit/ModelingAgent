@@ -1,0 +1,655 @@
+{
+  "round": 11,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7840584415583832,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8583333333333333,
+    "modeling_rigorousness_evaluation": 0.8166666666666667,
+    "practicality_and_scientificity_evaluation": 0.7916666666666667,
+    "result_and_bias_analysis_evaluation": 0.8416666666666667
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_B",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nWe are designing the fan-in area after a barrier toll plaza: vehicles pass from B tollbooth\negress lanes (B > L) into L travel lanes. Before we parameterize the geometry and the\nqueuing models, the problem statement leaves three structural/definitional boundaries\nunsettled that determine what the optimization problem actually is:\n\n1. **Objective interpretation.** The problem lists accident prevention, throughput, and\n   cost as \"important considerations\" but does not state how they combine. Should the\n   design objective be read as a lexicographic problem — minimize fan-in length (and\n   hence land/pavement cost) *subject to* hard constraints that (a) exit throughput at\n   the plaza end meets the L-lane capacity demand and (b) a safety metric (conflict\n   point count / criticality-weighted merge conflicts) stays below a threshold — or is\n   the intended reading a weighted scalar sum in which the weights themselves are to be\n   chosen by the model? This decides whether the deliverable is a constrained\n   optimization (length-minimizing geometry) or an unconstrained trade-off surface.\n\n2. **Domain of the geometric and operational variables.** (a) Is the fan-in area\n   confined to a bounded corridor — i.e., its lateral width may not grow beyond\n   roughly the barrier-width plus a small flare, so all lane reductions must be achieved\n   through lane-end/merges within a fixed envelope — or is the fan-in length free and\n   only the cost penalizes it? (b) Is a vehicle allowed to merge more than once during\n   the fan-in (successive merges across several stages), or is the pattern required to\n   be a single merge per vehicle? (c) Are merge points required to be staggered\n   longitudinally (no two lane ends at the same x-position), and if so is that a\n   design rule of the model or merely a common practice we may relax in exchange for\n   shorter length?\n\n3. **Valid domain of the state/traffic variables.** For the light/heavy traffic\n   comparison and the autonomous-vehicle (AV) mix, are we to treat arrivals at the\n   barrier as a deterministic uniform flow (demand only), or must the model retain\n   stochastic arrivals with platoon/saturation effects (i.e., a queuing model with\n   random arrivals and possible queue spillback into the fan-in)? And is the AV\n   subpopulation defined as a fraction that behaves as an ETC-class (non-stop) service\n   with smaller time-headway, or as a separate flow class that may use the fan-in\n   differently (e.g., connected coordination permitting tighter merge spacing)?\n\nWe are not asking for magnitudes or empirical constants — those we carry from the\nsupplied data file. We are asking for the logical boundaries and the interpretation of\nthe objective that the text does not settle, so the model we build is parameterized\nagainst the right ground truth.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven the boundary findings from Exchange 1, I propose the following single structural\nconfiguration for the fan-in model. Please accept or reject it as a whole.\n\n**Proposed structure:**\n\n1. **Objective (lexicographic, not weighted sum).** Minimize total paved fan-in area\n   (equivalently fan-in length times mean width, proxying land + pavement cost)\n   *subject to* two hard constraints:\n   - (T) exit throughput at x = L_fanin equals min(demand, L × 2,200 pc/h/ln) with zero\n     residual queue (no spillback into the fan-in at design demand);\n   - (S) a criticality-weighted conflict count per hour, C = Σ_i w_i λ_i over all\n     merge/diverge conflict points i (weights w_i from criticality classes: simple\n     merge < weaved merge < double merge), stays at or below a threshold C_max set so\n     that accident-prevention is enforced as a constraint, not traded off.\n\n2. **Geometry: staged single-merge pattern within a bounded corridor.** The fan-in is\n   organized into K = B − L merge *stages*. In stage k, exactly one lane ends (its\n   vehicles merge into the adjacent surviving lane), so each vehicle merges **at most\n   once** total. All stage k lane-ends are staggered longitudinally by at least one\n   minimum gap Δx_min (a hard rule, not relaxable), and laterally offset so no two\n   lane-ends share the same x-position. The corridor half-width is fixed at the\n   barrier egress width; only its length is free. This yields a \"tapered fan\" where\n   stage positions x_k are design variables chosen to satisfy (T) and (S) at minimum\n   total length. Rationale: single-merge-per-vehicle removes weaves — the dominant\n   accident mechanism in fan-ins — and is the dominant transformation mechanism of this\n   system (lane-count reduction is the loss mechanism; weaves are the safety cost).\n\n3. **Traffic/queuing: M/M/c per booth cluster feeding a deterministic-arrival merge\n   network.** Booths are grouped into L clusters (cluster l serves lane l); each\n   cluster is an M/M/c queue with service rate μ by booth type (manual 350, exact-change\n   500, ETC 1,200–1,800 veh/h from the data file), and cluster outflow feeds the merge\n   network as a *stochastic* arrival process. At heavy traffic (utilization ρ → 1),\n   queue spillback into the fan-in is modeled as an explicit state: if a cluster's\n   queue exceeds its egress lane length, the constraint (T) is violated and the design\n   is infeasible. AVs form a subpopulation that uses ETC-class non-stop service with\n   reduced headway (time headway scales by the AV fraction, reducing ρ linearly in the\n   queue model).\n\n4. **Light vs. heavy traffic** are two demand loadings of the same geometry: light at\n   40% of capacity (free-flow), heavy at 95% of capacity (near-saturation), and the\n   design is feasible if both are satisfied; the AV scenario re-runs both with the\n   headway reduction.\n\nDoes this structural configuration — lexicographic objective, staged single-merge\nstaggered taper, bounded corridor, M/M/c cluster feeds with spillback as infeasibility,\nAV as headway-reduction subpopulation — hold as a coherent mechanism for this problem?\nIf rejected, please identify the specific structural flaw.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe staged single-merge pattern (Exchange 2) was rejected. The most plausible structural\nflaw I identify: merging lanes one at a time forces each merging vehicle to weave across\nall surviving lane lines, creating a long weaving zone and concentrating merge conflicts\nmid-fan — the accident mechanism the design is meant to eliminate. The minimal revision:\n\n**Revised structure — simultaneous staged taper (fan taper):** at each of K = B − L\nstages, several lanes end *simultaneously at the same x-position* (staggered only in the\nlateral direction), so each vehicle merges at most once, into the nearest surviving lane,\nand no merge path crosses another lane-end. Stages are staggered longitudinally by\nΔx_min. Everything else is unchanged: lexicographic objective (min paved area subject to\nthroughput and criticality-weighted conflict-count constraints), bounded corridor at\nbarrier width, M/M/c booth clusters feeding stochastic arrivals with spillback as\ninfeasibility, AVs as a headway-reduction subpopulation, light/heavy demand loadings.\n\nAssuming this revised structure is the working mechanism, what is the specific case,\nboundary condition, or failure mode that would break it? In particular: which parameter\nor condition — the number of simultaneous merges at one x-position, the minimum\nlongitudinal stage spacing Δx_min, the demand loading near capacity, the booth-mix\nutilization, or the AV headway assumption — triggers the first failure, and at what\nstructural limit? Please name the parameter or boundary that the final bias/sensitivity\nanalysis must pivot on."
+        ],
+        "expert_answers": [
+          "The text does not settle whether the three considerations are lexicographic or a weighted sum, nor who chooses the weights; it does not fix the fan-in envelope (bounded corridor vs. length-only cost), whether multiple successive merges per vehicle are admissible, or whether longitudinal staggering of merge points is a hard rule or relaxable practice; and it does not state whether arrivals are deterministic demand or stochastic with queue spillback, nor whether the AV fraction is an ETC-like headway class or a distinct coordinated flow class. These are the boundaries the model must be parameterized against.",
+          "reject",
+          "The first failure is triggered by the number of simultaneous merges at one x-position. When several lanes end at the same x, the surviving lane must absorb their combined flow at a single point; the merge capacity of one lane is bounded, so once the simultaneous-merge count exceeds what that point can accept at the local demand loading, a shockwave forms and queues back into the fan. The structural limit is the merge point's capacity, not Δx_min or the AV headway. The sensitivity analysis must pivot on simultaneous merges per stage versus per-point merge capacity."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_d7ce34ef565a",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.7979166666666666,
+      "dimension_scores": {
+        "analysis_evaluation": 0.825,
+        "modeling_rigorousness_evaluation": 0.7583333333333333,
+        "practicality_and_scientificity_evaluation": 0.8166666666666667,
+        "result_and_bias_analysis_evaluation": 0.7916666666666667
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately identifies the core objective: determining the optimal shape, size, and merging pattern for the fan-in area. It correctly lists the three main constraints (accident prevention, throughput, cost) and explicitly notes the requirement for an optimal design rather than an analysis of existing ones. However, the analysis is presented as a single consolidated task rather than a decomposition, and it lacks explicit definition of specific success metrics or boundary conditions for the \"optimal\" solution, making the goals clear but not completely detailed.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The analysis covers all key aspects of the problem requirements, including the physical design parameters and the specific performance scenarios (light/heavy traffic, autonomous vehicle mix, and tollbooth types). It ensures that the sub-components (design, performance, AV impact, toll type impact) are all addressed. However, by grouping everything into a single \"Task 1\" without breaking it down into distinct, interrelated sub-problems (e.g., separating the geometric optimization from the traffic flow simulation), it fails to demonstrate a clear decomposition structure, though the scope itself is fully covered.",
+            "score": 7
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are clear, quantitative, and well-structured, effectively explaining the impact of traffic volume and AV adoption on feasibility and geometry, though the cost analysis is slightly underdeveloped.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough in identifying key modeling assumptions and their potential to skew results (e.g., safety optimism, service time variability), but it lacks quantitative corrections or sensitivity tests to measure the magnitude of these biases.",
+            "score": 7
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are clear and grounded in standards, but the single-merge constraint is a restrictive simplification, and the AV behavioral model lacks depth regarding merge dynamics.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (M/M/c, staged taper) and correctly prioritizes constraints, but the geometric optimization is limited to length, and the safety bound derivation is not fully detailed.",
+            "score": 7
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, directly addressing shape, size, and merging patterns with realistic engineering constraints, queueing theory for throughput, and cost calculations. It provides clear, actionable insights for decision-making regarding AV integration and booth mix, tailored specifically to the toll plaza problem.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, utilizing established traffic engineering principles such as M/M/c queueing theory, Erlang-C formulas, and geometric flow constraints. It correctly applies these theories to model the interaction between toll booth service rates, traffic demand, and physical merging limits, demonstrating a strong theoretical basis.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 1,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2017_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260930_110713",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260930_110713/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating the post-barrier fan-in area of a toll plaza (B booth egress lanes merging down to L travel lanes, B > L), with accident prevention, throughput at the plaza exit, and construction cost as the three considerations. Before I parameterize any mechanism, I need the structural boundaries the problem statement leaves ambiguous:\n\n1. Interpretation of throughput: is the design objective to sustain the full L-lane basic-segment capacity at the plaza exit point under heavy traffic (i.e., the fan-in must be a non-bottleneck that never binds the highway), or to maximize throughput subject to a cost ceiling, so that fan-in geometry legitimately trades some capacity for length and cost?\n\n2. Valid domain of (L, B) and their ratio: are the fan-in findings expected to hold for any ratio B/L > 1, or does the mechanism only make sense within a bounded ratio range (e.g., B up to about twice L), beyond which the problem's \"fan-in\" picture breaks down into a different facility type?\n\n3. Accident prevention: should this enter the model as a constraint (the design must meet a maximum allowable merge conflict rate / conflict-point count) or as a weighted objective combined with throughput and cost, and if a constraint, what is the logical form of the boundary condition — a per-vehicle conflict-count ceiling, a rate, or a geometric condition on merge angles?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on the confirmed ambiguities, I propose the following structural organization of the fan-in model. Please accept or reject it as a whole.\n\nThe model treats the fan-in as a constrained bi-objective design: (i) a hard feasibility constraint that the fan-in section, under heavy traffic, sustains at least the full L-lane basic-segment capacity (L x 2,200 pc/h) at the plaza-exit point, so the plaza is never the highway's binding bottleneck; and (ii) a secondary objective minimizing total cost (pavement area plus right-of-way width, weighted). Accident prevention enters as a hard geometric constraint on the merge mechanism itself: the design admits no weaving, i.e., each booth-egress lane merges into the L-lane stream in a single, strictly upstream-to-downstream ordered merge sequence (inner lanes merge first), and each merge is a single diverge-merge with a merge angle theta bounded by an upper bound theta_max and a length satisfying the minimum merge-influence length. Throughput and cost then trade off only in the scalar fan-in length, which is the single structural degree of freedom: longer fan-in relaxes merge angles and conflict exposure at higher land/construction cost. Within this fixed mechanism, the booth mix (conventional / exact-change / ETC) and the autonomous-vehicle share enter only as per-booth service rates and driver-response (headway-variance) parameters in a queue-at-booth submodel that sets arrival headways into the fan-in — they do not change the merge structure. The valid domain is restricted to B/L between 2 and 3, where this ordered-merge mechanism is claimed to remain a well-posed fan-in.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nRevised structure: the fan-in is a single structural degree of freedom — its length — with the merge mechanism fixed as ordered, weave-free single merges (inner booth lanes merge first), each merge subject to a geometric merge-angle cap. The three considerations enter as a weighted objective only: minimize w_c*Cost + w_a*AccidentExposure − w_t*Throughput, where Cost scales with pavement area and right-of-way width, AccidentExposure is the conflict exposure integrated over the merge sequence (a geometric measure of conflict points and merge angle), and Throughput is the plaza-exit flow computed from the ordered-merge merge-capacity formulas. No exit point is required to carry the full L-lane highway capacity; heavy-traffic performance is reported as a characteristic of the chosen length, not a feasibility gate. Booth-type mix and the autonomous-vehicle share enter as per-booth service rates and headway-variance parameters in the booth-queue submodel.\n\nAgainst this revised structure: which specific case, boundary condition, or failure mode would break it — i.e., what parameter or condition at which value would invalidate the ordered-merge, single-length-degree-of-freedom mechanism, or flip which fan-in length is recommended by the weighted objective?"
+            ],
+            "expert_answers": [
+              "1. Throughput: the statement fixes the exit point as where the plaza joins the L outgoing lanes, and asks for throughput there — but it never states whether that point must carry the highway's full L-lane capacity or may be a deliberate bottleneck traded against cost. That is a reading the text cannot settle; you must declare it.\n\n2. Domain: no bound on B/L is given. Whether the fan-in picture holds for all B/L > 1 or only within some ratio range is not carried by the text.\n\n3. Accident prevention: the statement lists it alongside throughput and cost without saying whether it is a constraint or a weighted objective, and gives no conflict-rate, conflict-count, or merge-angle threshold. The boundary form is undetermined.",
+              "reject",
+              "The case that breaks it: when the booth-egress arrival stream is not lane-ordered — i.e., when the booth-queue submodel lets a downstream (outer) booth discharge into a gap that an upstream (inner) booth lane has not yet vacated, so the required merge order inverts. This occurs when per-booth service-rate dispersion across booth types (conventional vs exact-change vs ETC) exceeds the headway spacing that the ordered sequence assumes, at which point inner-first merging is infeasible and the single-length degree of freedom cannot restore order. A second flip: when the weighted objective's cost weight dominates, the optimum drives length to its minimum, where the merge-angle cap binds and AccidentExposure is non-monotone in length — the objective then recommends a length that violates the geometric cap, invalidating the fixed-mechanism premise."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_d7ce34ef565a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8208333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.8166666666666668,
+            "practicality_and_scientificity_evaluation": 0.75,
+            "result_and_bias_analysis_evaluation": 0.8166666666666668
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260930_110713/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly identifying core design variables, constraints, and out-of-scope elements. The goals for performance analysis and sensitivity to vehicle/booth types are also clearly stated, directly addressing the problem requirements with high precision.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured with clear dependencies, covering all aspects of the problem: baseline design, performance under different traffic volumes, impact of autonomous vehicles, and impact of booth types. The coverage is comprehensive, with no significant deviations or missing key components, directly supporting the final goal.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing quantitative evidence for the optimal design and transparently discussing the model's limitations and inference logic.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies key data and structural biases (e.g., even demand split, normalized costs) and discusses their qualitative impact, but lacks quantitative correction or sensitivity analysis to fully mitigate their effect on results.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear and mostly reasonable, but the restriction on B/L ratio and the specific impact of AVs on merge dynamics could be better justified with more detailed rationale or data support.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (HCM standards, constrained optimization) and a rational structure that effectively captures the trade-offs between safety, throughput, and cost, with a clear distinction between geometric and operational parameters.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical as it directly solves for the required geometric parameters (size, shape) while balancing cost, safety, and throughput. It incorporates realistic engineering constraints and provides actionable design outputs for various traffic and technology scenarios.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically grounded in traffic engineering principles and geometric logic. While some empirical formulas and simplifications (like the accident proxy) limit its theoretical depth, the overall approach is rigorous, justified, and appropriately applies mathematical optimization to the physical problem.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2017_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are designing the fan-in area after a barrier toll plaza: vehicles pass from B tollbooth\negress lanes (B > L) into L travel lanes. Before we parameterize the geometry and the\nqueuing models, the problem statement leaves three structural/definitional boundaries\nunsettled that determine what the optimization problem actually is:\n\n1. **Objective interpretation.** The problem lists accident prevention, throughput, and\n   cost as \"important considerations\" but does not state how they combine. Should the\n   design objective be read as a lexicographic problem — minimize fan-in length (and\n   hence land/pavement cost) *subject to* hard constraints that (a) exit throughput at\n   the plaza end meets the L-lane capacity demand and (b) a safety metric (conflict\n   point count / criticality-weighted merge conflicts) stays below a threshold — or is\n   the intended reading a weighted scalar sum in which the weights themselves are to be\n   chosen by the model? This decides whether the deliverable is a constrained\n   optimization (length-minimizing geometry) or an unconstrained trade-off surface.\n\n2. **Domain of the geometric and operational variables.** (a) Is the fan-in area\n   confined to a bounded corridor — i.e., its lateral width may not grow beyond\n   roughly the barrier-width plus a small flare, so all lane reductions must be achieved\n   through lane-end/merges within a fixed envelope — or is the fan-in length free and\n   only the cost penalizes it? (b) Is a vehicle allowed to merge more than once during\n   the fan-in (successive merges across several stages), or is the pattern required to\n   be a single merge per vehicle? (c) Are merge points required to be staggered\n   longitudinally (no two lane ends at the same x-position), and if so is that a\n   design rule of the model or merely a common practice we may relax in exchange for\n   shorter length?\n\n3. **Valid domain of the state/traffic variables.** For the light/heavy traffic\n   comparison and the autonomous-vehicle (AV) mix, are we to treat arrivals at the\n   barrier as a deterministic uniform flow (demand only), or must the model retain\n   stochastic arrivals with platoon/saturation effects (i.e., a queuing model with\n   random arrivals and possible queue spillback into the fan-in)? And is the AV\n   subpopulation defined as a fraction that behaves as an ETC-class (non-stop) service\n   with smaller time-headway, or as a separate flow class that may use the fan-in\n   differently (e.g., connected coordination permitting tighter merge spacing)?\n\nWe are not asking for magnitudes or empirical constants — those we carry from the\nsupplied data file. We are asking for the logical boundaries and the interpretation of\nthe objective that the text does not settle, so the model we build is parameterized\nagainst the right ground truth.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven the boundary findings from Exchange 1, I propose the following single structural\nconfiguration for the fan-in model. Please accept or reject it as a whole.\n\n**Proposed structure:**\n\n1. **Objective (lexicographic, not weighted sum).** Minimize total paved fan-in area\n   (equivalently fan-in length times mean width, proxying land + pavement cost)\n   *subject to* two hard constraints:\n   - (T) exit throughput at x = L_fanin equals min(demand, L × 2,200 pc/h/ln) with zero\n     residual queue (no spillback into the fan-in at design demand);\n   - (S) a criticality-weighted conflict count per hour, C = Σ_i w_i λ_i over all\n     merge/diverge conflict points i (weights w_i from criticality classes: simple\n     merge < weaved merge < double merge), stays at or below a threshold C_max set so\n     that accident-prevention is enforced as a constraint, not traded off.\n\n2. **Geometry: staged single-merge pattern within a bounded corridor.** The fan-in is\n   organized into K = B − L merge *stages*. In stage k, exactly one lane ends (its\n   vehicles merge into the adjacent surviving lane), so each vehicle merges **at most\n   once** total. All stage k lane-ends are staggered longitudinally by at least one\n   minimum gap Δx_min (a hard rule, not relaxable), and laterally offset so no two\n   lane-ends share the same x-position. The corridor half-width is fixed at the\n   barrier egress width; only its length is free. This yields a \"tapered fan\" where\n   stage positions x_k are design variables chosen to satisfy (T) and (S) at minimum\n   total length. Rationale: single-merge-per-vehicle removes weaves — the dominant\n   accident mechanism in fan-ins — and is the dominant transformation mechanism of this\n   system (lane-count reduction is the loss mechanism; weaves are the safety cost).\n\n3. **Traffic/queuing: M/M/c per booth cluster feeding a deterministic-arrival merge\n   network.** Booths are grouped into L clusters (cluster l serves lane l); each\n   cluster is an M/M/c queue with service rate μ by booth type (manual 350, exact-change\n   500, ETC 1,200–1,800 veh/h from the data file), and cluster outflow feeds the merge\n   network as a *stochastic* arrival process. At heavy traffic (utilization ρ → 1),\n   queue spillback into the fan-in is modeled as an explicit state: if a cluster's\n   queue exceeds its egress lane length, the constraint (T) is violated and the design\n   is infeasible. AVs form a subpopulation that uses ETC-class non-stop service with\n   reduced headway (time headway scales by the AV fraction, reducing ρ linearly in the\n   queue model).\n\n4. **Light vs. heavy traffic** are two demand loadings of the same geometry: light at\n   40% of capacity (free-flow), heavy at 95% of capacity (near-saturation), and the\n   design is feasible if both are satisfied; the AV scenario re-runs both with the\n   headway reduction.\n\nDoes this structural configuration — lexicographic objective, staged single-merge\nstaggered taper, bounded corridor, M/M/c cluster feeds with spillback as infeasibility,\nAV as headway-reduction subpopulation — hold as a coherent mechanism for this problem?\nIf rejected, please identify the specific structural flaw.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe staged single-merge pattern (Exchange 2) was rejected. The most plausible structural\nflaw I identify: merging lanes one at a time forces each merging vehicle to weave across\nall surviving lane lines, creating a long weaving zone and concentrating merge conflicts\nmid-fan — the accident mechanism the design is meant to eliminate. The minimal revision:\n\n**Revised structure — simultaneous staged taper (fan taper):** at each of K = B − L\nstages, several lanes end *simultaneously at the same x-position* (staggered only in the\nlateral direction), so each vehicle merges at most once, into the nearest surviving lane,\nand no merge path crosses another lane-end. Stages are staggered longitudinally by\nΔx_min. Everything else is unchanged: lexicographic objective (min paved area subject to\nthroughput and criticality-weighted conflict-count constraints), bounded corridor at\nbarrier width, M/M/c booth clusters feeding stochastic arrivals with spillback as\ninfeasibility, AVs as a headway-reduction subpopulation, light/heavy demand loadings.\n\nAssuming this revised structure is the working mechanism, what is the specific case,\nboundary condition, or failure mode that would break it? In particular: which parameter\nor condition — the number of simultaneous merges at one x-position, the minimum\nlongitudinal stage spacing Δx_min, the demand loading near capacity, the booth-mix\nutilization, or the AV headway assumption — triggers the first failure, and at what\nstructural limit? Please name the parameter or boundary that the final bias/sensitivity\nanalysis must pivot on."
+            ],
+            "expert_answers": [
+              "The text does not settle whether the three considerations are lexicographic or a weighted sum, nor who chooses the weights; it does not fix the fan-in envelope (bounded corridor vs. length-only cost), whether multiple successive merges per vehicle are admissible, or whether longitudinal staggering of merge points is a hard rule or relaxable practice; and it does not state whether arrivals are deterministic demand or stochastic with queue spillback, nor whether the AV fraction is an ETC-like headway class or a distinct coordinated flow class. These are the boundaries the model must be parameterized against.",
+              "reject",
+              "The first failure is triggered by the number of simultaneous merges at one x-position. When several lanes end at the same x, the surviving lane must absorb their combined flow at a single point; the merge capacity of one lane is bounded, so once the simultaneous-merge count exceeds what that point can accept at the local demand loading, a shockwave forms and queues back into the fan. The structural limit is the merge point's capacity, not Δx_min or the AV headway. The sensitivity analysis must pivot on simultaneous merges per stage versus per-point merge capacity."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_d7ce34ef565a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7749999999999999,
+          "dimension_scores": {
+            "analysis_evaluation": 0.75,
+            "modeling_rigorousness_evaluation": 0.6999999999999998,
+            "practicality_and_scientificity_evaluation": 0.8833333333333333,
+            "result_and_bias_analysis_evaluation": 0.7666666666666666
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260930_110713/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the core objective: determining the optimal shape, size, and merging pattern for the fan-in area. It correctly lists the three main constraints (accident prevention, throughput, cost) and explicitly notes the requirement for an optimal design rather than an analysis of existing ones. However, the analysis is presented as a single consolidated task rather than a decomposition, and it lacks explicit definition of specific success metrics or boundary conditions for the \"optimal\" solution, making the goals clear but not completely detailed.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The analysis covers all key aspects of the problem requirements, including the physical design parameters and the specific performance scenarios (light/heavy traffic, autonomous vehicle mix, and tollbooth types). It ensures that the sub-components (design, performance, AV impact, toll type impact) are all addressed. However, by grouping everything into a single \"Task 1\" without breaking it down into distinct, interrelated sub-problems (e.g., separating the geometric optimization from the traffic flow simulation), it fails to demonstrate a clear decomposition structure, though the scope itself is fully covered.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are clear, quantitative, and well-structured, effectively explaining the impact of traffic volume and AV adoption on feasibility and geometry, though the cost analysis is slightly underdeveloped.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough in identifying key modeling assumptions and their potential to skew results (e.g., safety optimism, service time variability), but it lacks quantitative corrections or sensitivity tests to measure the magnitude of these biases.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear and grounded in standards, but the single-merge constraint is a restrictive simplification, and the AV behavioral model lacks depth regarding merge dynamics.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (M/M/c, staged taper) and correctly prioritizes constraints, but the geometric optimization is limited to length, and the safety bound derivation is not fully detailed.",
+                "score": 7
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, directly addressing shape, size, and merging patterns with realistic engineering constraints, queueing theory for throughput, and cost calculations. It provides clear, actionable insights for decision-making regarding AV integration and booth mix, tailored specifically to the toll plaza problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing established traffic engineering principles such as M/M/c queueing theory, Erlang-C formulas, and geometric flow constraints. It correctly applies these theories to model the interaction between toll booth service rates, traffic demand, and physical merging limits, demonstrating a strong theoretical basis.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        }
+      ],
+      "refined_report_utility": 0.7979166666666666,
+      "interaction_cost": 0.8531412054086459,
+      "interaction_penalty": 0.0426570602704323,
+      "net_utility": 0.7552596063962344,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1510,
+          "total_expert_latency_seconds": 3.81,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8594797510155587,
+          "latency_cost_component": 0.24957769608599195,
+          "interaction_cost": 0.8437919004062235,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2249,
+          "total_expert_latency_seconds": 4.04,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9062262760276708,
+          "latency_cost_component": 0.2569995753373246,
+          "interaction_cost": 0.8624905104110683,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2016_B",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nContext: We are building a time-dependent model to judge whether a private firm\nhas an economically attractive commercial opportunity in removing LEO space\ndebris (MCM 2016 B). Our data anchors are: (i) the 2009 Iridium-33/Kosmos-2251\ncollision at ~790 km, hypervelocity ~10-11.7 km/s, producing >1,400 cataloged\nfragments (>10 cm); (ii) the current catalog of ~31,000 trackable objects\n(>= ~10 cm) in Earth orbit, with untracked smaller objects above that.\n\nBefore we parameterize anything, we need the logical/structural reading of the\nproblem that the text leaves ambiguous. We are NOT asking for magnitudes,\nprices, or empirical constants. Three structural questions:\n\n1. **Domain of the state space.** The debris population is inherently a\n   size/altitude distribution. At what granularity must the model's state\n   space be defined for the commercial assessment to be meaningful — e.g. how\n   many size bins and which altitude bands, and which altitude band should be\n   the primary removal target? What is the valid domain (upper/lower bounds on\n   altitude, size range) within which a removal business case is even defined?\n\n2. **Interpretation of the objective function.** The problem asks to \"determine\n   whether an economically attractive opportunity exists.\" How should that\n   objective be read structurally: (a) maximize net present value of the\n   removal firm, (b) maximize expected avoided damage (collision-risk\n   reduction) net of cost, or (c) some combination? And over what decision\n   horizon should it be evaluated? In particular: is the *benefit* of removing\n   a single object best read as (i) avoided expected collision damage to\n   high-value assets, (ii) preserved orbital-slot accessibility / reduced\n   cascading (Kessler) risk, or (iii) both — and which reading changes the\n   structure of the model most?\n\n3. **Boundary conditions on the dynamics.** The time-dependent population\n   dynamics have four flows: natural decay, collisional growth, new satellite\n   launches (source term), and removal (the firm's action). Which of these is\n   logically mandatory to include for a *fair* 20-30 year commercial\n   assessment, and which may be treated as a fixed exogenous parameter rather\n   than a state variable? Specifically: should the collisional-growth (Kessler\n   cascade) feedback be a first-order mechanism in the dynamics, or is it\n   acceptable to treat the population as approximately static over the service\n   horizon?\n\nWe want the logical ground truth that pins down the model skeleton (state\nvariables, horizon, objective reading, which dynamics are first-order) so that\nevery later number we attach to it is placed on a defensible structure.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange-1 structure (size x altitude state space, 20-30 year\nhorizon, firm NPV as objective, all four population flows first-order,\ncollisional growth dominant in the 700-1000 km band), we have assembled one\ncoherent structural hypothesis for the core mechanism. We are asking you to\naccept or reject this specific configuration as a whole:\n\n**Proposed model structure:**\n\n1. **Dynamics.** The population N(i,j,t) over size bin i and altitude band j\n   evolves as:\n   dN/dt = -lambda_decay(i,j)·N  +  Sigma_ij C_ij·N_i·N_j  +  L_j(t)  -  R_j(t)\n   where C_ij is the collisional-growth (Kessler) kernel — the *dominant\n   nonlinearity* that turns the benefit of removal from linear into a\n   horizon-dependent, path-dependent function; lambda_decay is ballistic drag\n   (altitude-dependent, ~years at 700-1000 km, months below 500 km); L_j is the\n   exogenous launch source; R_j is the removal rate (the firm's decision\n   variable).\n\n2. **Risk/benefit mechanism.** Collision probability for high-value assets is\n   modeled as proportional to N_cataloged in the relevant band; each avoided\n   collision carries an expected damage value (insured value of the target\n   asset x conditional probability of severe impact). The firm's benefit =\n   (a) avoided expected collision damage to a defined fleet of high-value\n   assets, PLUS (b) a monetized reduction in future collisional-growth\n   (Kessler feedback): the value of objects that would have been *created* by\n   the collisions we prevent, discounted to present value. Term (b) is what\n   makes the NPV nonlinear in R_j.\n\n3. **Cost structure.** Removal cost per object is a decreasing function of\n   altitude (lower = cheaper to reach, but higher decay = less needed) and\n   depends on the capture technology (direct-retrieval vs. passive deorbit vs.\n   area clearance). We parameterize three alternatives: (i) active\n   direct-retrieval of large defunct objects (rocket bodies, dead sats), (ii)\n   passive drag-augmentation (tether/bag) for mid-size objects, (iii) area\n   clearance service (reduce local conjunction rate for all assets in a band).\n   Combination = firm allocates its removal budget across the three.\n\n4. **Decision variable and solution.** The firm chooses R_j(t) over the 20-30\n   year horizon to maximize NPV = sum_t [Benefit(t) - Cost(t)]/(1+r)^t,\n   subject to a capture-rate ceiling (how many objects per year the technology\n   can actually remove). We solve this as a dynamic allocation: for each\n   altitude band, removal is economically justified where marginal avoided\n   expected damage + marginal avoided cascade value exceeds marginal removal\n   cost.\n\n**The specific structural choice we are putting to you:** Is the\n**collisional-growth term as the dominant benefit driver** (i.e., the\ncommercial case rests primarily on *preventing cascade*, not on *avoiding\nsingle-asset collision damage*) the correct first-order reading, or is the\ndominant benefit better read as direct avoided damage to high-value assets,\nwith cascade as a second-order correction? And: is the three-alternative\ndecomposition (direct-retrieval / drag-augmentation / area-clearance) the\nright structural partition of the solution space, or should it be organized\ndifferently (e.g. by altitude band, or by technology maturity phase)?\n\nWe are NOT asking for magnitudes. We are asking whether this skeleton —\nKessler-dominant benefit, three-alternative cost structure, R_j(t) as the\ndecision variable — is the correct structure to fill in numbers into, or\nwhether a specific term is mis-ordered or the partition is wrong.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange-2 structure. We read the rejection as: *treating\nthe collisional-growth (Kessler) term as the dominant, first-order benefit\ndriver over-monetizes a highly nonlinear, poorly-pinned feedback loop, and\nthat the three-alternative cost partition (direct-retrieval / drag-augmentation\n/ area-clearance) is the wrong axis for the solution space.*\n\n**Minimal revision we are proposing (accept/reject implied by your answer to\nthe counterexample):**\n\n- **Re-order the benefit.** The *primary, first-order* commercial benefit is\n  direct avoided expected collision damage to a defined fleet of high-value\n  in-orbit assets (insurance-value x impact-probability x conjunction rate).\n  The Kessler/cascade term is retained but **demoted to a second-order\n  sensitivity term**: it is reported as a range (low/base/high) that bounds\n  the NPV, not as the central case. This makes the central NPV linear in the\n  removal rate and the cascade a bounded correction, so the commercial verdict\n  does not hinge on the least-defensible coefficient.\n\n- **Re-partition the solution space by altitude band, not by technology.**\n  The decision variable becomes removal intensity by altitude band, R_j(t),\n  j = 1..J (J ≈ 4-6 bands across 300-1000 km). Within each band, the firm\n  picks the *cheapest feasible* capture technology as a cost function\n  c_j (altitude-dependent, technology-chosen to minimize c_j), rather than\n  treating the three technologies as parallel strategic alternatives.\n  Technology becomes a cost-curve input per band, not a top-level branch.\n\n- **Keep:** the dN/dt dynamics with all four flows, the 20-30 year horizon,\n  NPV objective, and the capture-rate ceiling constraint.\n\n**Now the counterexample.** Against *this revised structure* (direct-damage\nfirst-order, cascade as bounded second-order, altitude-band decision variable,\ntechnology as per-band cost curve): **what specific boundary condition,\nparameter regime, or failure mode would break it?** In particular:\n\n- Is there a value of the cascade coefficient (or of the capture-rate ceiling,\n  or of the discount rate) at which the demotion of cascade to second-order\n  is wrong — i.e., where cascade actually does dominate the NPV and the\n  revised structure under-states the opportunity (or over-states it)?\n- Or: is there an altitude-band regime where partitioning by band and\n  letting technology be a per-band cost curve mis-represents the real\n  constraint (e.g., a technology that only works above some altitude, or a\n  band where the cheapest technology has a hard capacity floor)?\n\nWe want the specific parameter value or boundary condition that is the\nmodel's weakest point, so that the final report's bias section runs a\nbreak-even / threshold analysis on exactly that axis."
+        ],
+        "expert_answers": [
+          "1. **State space.** Two dimensions are mandatory: size (log-spaced bins, roughly 1 cm–1 m, with the ~10 cm catalog threshold as a break) and altitude (bands of ~50–100 km). The primary target band is the congested LEO shell near 700–1000 km (sun-synchronous/Iridium region); the valid domain is roughly 200–2000 km, since below that decay is too fast and above it removal economics collapse. Sub-cm debris is not a removal target.\n\n2. **Objective.** Read it as (c): firm NPV constrained by, and partly monetized through, avoided expected collision damage to high-value assets. The benefit of one removal is best read as (iii) both, but the Kessler/cascading reading is what changes model structure most — it makes the benefit nonlinear and horizon-dependent. Horizon: 20–30 years.\n\n3. **Dynamics.** All four flows are mandatory for fairness; only launches may be exogenous. Collisional growth must be first-order, not static — treating the population as fixed over 20–30 years is the single assumption that most biases the commercial verdict.",
+          "reject",
+          "The break case: a band where the cheapest feasible technology has a hard capacity floor below the band's conjunction-driven removal demand — e.g. drag-augmentation only works below ~600 km, so in the 700–1000 km band the \"cheapest feasible\" technology is direct-retrieval, whose per-object cost is high enough that marginal avoided direct damage alone never covers it. There, the NPV verdict flips sign unless the cascade term is first-order. Threshold axis: the cascade coefficient at which discounted avoided-cascade value equals the gap between retrieval cost and direct-damage benefit in that band."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_d7ce34ef565a",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.85625,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8916666666666666,
+        "modeling_rigorousness_evaluation": 0.875,
+        "practicality_and_scientificity_evaluation": 0.7666666666666667,
+        "result_and_bias_analysis_evaluation": 0.8916666666666666
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified, particularly in handling the uncertainty of the Kessler effect and the logical partitioning of the state space.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate mathematical methods (bang-bang control, Euler integration) that are well-suited to the problem's structure, ensuring a realistic and efficient assessment of commercial viability.",
+            "score": 9
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for both sub-tasks, directly aligning them with the specific requirements of the problem statement (time-dependent model, economic viability, alternative comparison, and scenario analysis). The goals are explicit and well-structured.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically dependent and comprehensively cover the problem requirements. Task 1 provides the necessary foundation (model and viability check) for Task 2 (comparison and scenarios), ensuring all key aspects of the problem are addressed without deviation.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing a transparent inference path, interpretable thresholds, and a nuanced conclusion that effectively highlights the model's strengths and limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key uncertainties like the CASCADE coefficient and model structural limitations. It effectively mitigates bias impact by using threshold-based conclusions and bounding uncertainties, rather than relying on single-point estimates.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a clear economic framework (NPV) tailored to the specific physical constraints of debris removal. It provides actionable insights through scenario sweeps and clearly identifies profitable altitude bands, directly supporting the commercial decision-making process required by the problem.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically grounded in orbital dynamics (drag, Kessler effect) but relies on significant simplifications, such as linear cost-benefit assumptions and simplified collision kernels. While the theoretical basis is sound, the quantification of cascade benefits and the resulting bang-bang control logic reduce the scientific depth compared to a fully coupled physical-economic simulation.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 2,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2016_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nContext: We are building a time-dependent model to judge whether a private firm\nhas an economically attractive commercial opportunity in removing LEO space\ndebris (MCM 2016 B). Our data anchors are: (i) the 2009 Iridium-33/Kosmos-2251\ncollision at ~790 km, hypervelocity ~10-11.7 km/s, producing >1,400 cataloged\nfragments (>10 cm); (ii) the current catalog of ~31,000 trackable objects\n(>= ~10 cm) in Earth orbit, with untracked smaller objects above that.\n\nBefore we parameterize anything, we need the logical/structural reading of the\nproblem that the text leaves ambiguous. We are NOT asking for magnitudes,\nprices, or empirical constants. Three structural questions:\n\n1. **Domain of the state space.** The debris population is inherently a\n   size/altitude distribution. At what granularity must the model's state\n   space be defined for the commercial assessment to be meaningful — e.g. how\n   many size bins and which altitude bands, and which altitude band should be\n   the primary removal target? What is the valid domain (upper/lower bounds on\n   altitude, size range) within which a removal business case is even defined?\n\n2. **Interpretation of the objective function.** The problem asks to \"determine\n   whether an economically attractive opportunity exists.\" How should that\n   objective be read structurally: (a) maximize net present value of the\n   removal firm, (b) maximize expected avoided damage (collision-risk\n   reduction) net of cost, or (c) some combination? And over what decision\n   horizon should it be evaluated? In particular: is the *benefit* of removing\n   a single object best read as (i) avoided expected collision damage to\n   high-value assets, (ii) preserved orbital-slot accessibility / reduced\n   cascading (Kessler) risk, or (iii) both — and which reading changes the\n   structure of the model most?\n\n3. **Boundary conditions on the dynamics.** The time-dependent population\n   dynamics have four flows: natural decay, collisional growth, new satellite\n   launches (source term), and removal (the firm's action). Which of these is\n   logically mandatory to include for a *fair* 20-30 year commercial\n   assessment, and which may be treated as a fixed exogenous parameter rather\n   than a state variable? Specifically: should the collisional-growth (Kessler\n   cascade) feedback be a first-order mechanism in the dynamics, or is it\n   acceptable to treat the population as approximately static over the service\n   horizon?\n\nWe want the logical ground truth that pins down the model skeleton (state\nvariables, horizon, objective reading, which dynamics are first-order) so that\nevery later number we attach to it is placed on a defensible structure.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange-1 structure (size x altitude state space, 20-30 year\nhorizon, firm NPV as objective, all four population flows first-order,\ncollisional growth dominant in the 700-1000 km band), we have assembled one\ncoherent structural hypothesis for the core mechanism. We are asking you to\naccept or reject this specific configuration as a whole:\n\n**Proposed model structure:**\n\n1. **Dynamics.** The population N(i,j,t) over size bin i and altitude band j\n   evolves as:\n   dN/dt = -lambda_decay(i,j)·N  +  Sigma_ij C_ij·N_i·N_j  +  L_j(t)  -  R_j(t)\n   where C_ij is the collisional-growth (Kessler) kernel — the *dominant\n   nonlinearity* that turns the benefit of removal from linear into a\n   horizon-dependent, path-dependent function; lambda_decay is ballistic drag\n   (altitude-dependent, ~years at 700-1000 km, months below 500 km); L_j is the\n   exogenous launch source; R_j is the removal rate (the firm's decision\n   variable).\n\n2. **Risk/benefit mechanism.** Collision probability for high-value assets is\n   modeled as proportional to N_cataloged in the relevant band; each avoided\n   collision carries an expected damage value (insured value of the target\n   asset x conditional probability of severe impact). The firm's benefit =\n   (a) avoided expected collision damage to a defined fleet of high-value\n   assets, PLUS (b) a monetized reduction in future collisional-growth\n   (Kessler feedback): the value of objects that would have been *created* by\n   the collisions we prevent, discounted to present value. Term (b) is what\n   makes the NPV nonlinear in R_j.\n\n3. **Cost structure.** Removal cost per object is a decreasing function of\n   altitude (lower = cheaper to reach, but higher decay = less needed) and\n   depends on the capture technology (direct-retrieval vs. passive deorbit vs.\n   area clearance). We parameterize three alternatives: (i) active\n   direct-retrieval of large defunct objects (rocket bodies, dead sats), (ii)\n   passive drag-augmentation (tether/bag) for mid-size objects, (iii) area\n   clearance service (reduce local conjunction rate for all assets in a band).\n   Combination = firm allocates its removal budget across the three.\n\n4. **Decision variable and solution.** The firm chooses R_j(t) over the 20-30\n   year horizon to maximize NPV = sum_t [Benefit(t) - Cost(t)]/(1+r)^t,\n   subject to a capture-rate ceiling (how many objects per year the technology\n   can actually remove). We solve this as a dynamic allocation: for each\n   altitude band, removal is economically justified where marginal avoided\n   expected damage + marginal avoided cascade value exceeds marginal removal\n   cost.\n\n**The specific structural choice we are putting to you:** Is the\n**collisional-growth term as the dominant benefit driver** (i.e., the\ncommercial case rests primarily on *preventing cascade*, not on *avoiding\nsingle-asset collision damage*) the correct first-order reading, or is the\ndominant benefit better read as direct avoided damage to high-value assets,\nwith cascade as a second-order correction? And: is the three-alternative\ndecomposition (direct-retrieval / drag-augmentation / area-clearance) the\nright structural partition of the solution space, or should it be organized\ndifferently (e.g. by altitude band, or by technology maturity phase)?\n\nWe are NOT asking for magnitudes. We are asking whether this skeleton —\nKessler-dominant benefit, three-alternative cost structure, R_j(t) as the\ndecision variable — is the correct structure to fill in numbers into, or\nwhether a specific term is mis-ordered or the partition is wrong.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange-2 structure. We read the rejection as: *treating\nthe collisional-growth (Kessler) term as the dominant, first-order benefit\ndriver over-monetizes a highly nonlinear, poorly-pinned feedback loop, and\nthat the three-alternative cost partition (direct-retrieval / drag-augmentation\n/ area-clearance) is the wrong axis for the solution space.*\n\n**Minimal revision we are proposing (accept/reject implied by your answer to\nthe counterexample):**\n\n- **Re-order the benefit.** The *primary, first-order* commercial benefit is\n  direct avoided expected collision damage to a defined fleet of high-value\n  in-orbit assets (insurance-value x impact-probability x conjunction rate).\n  The Kessler/cascade term is retained but **demoted to a second-order\n  sensitivity term**: it is reported as a range (low/base/high) that bounds\n  the NPV, not as the central case. This makes the central NPV linear in the\n  removal rate and the cascade a bounded correction, so the commercial verdict\n  does not hinge on the least-defensible coefficient.\n\n- **Re-partition the solution space by altitude band, not by technology.**\n  The decision variable becomes removal intensity by altitude band, R_j(t),\n  j = 1..J (J ≈ 4-6 bands across 300-1000 km). Within each band, the firm\n  picks the *cheapest feasible* capture technology as a cost function\n  c_j (altitude-dependent, technology-chosen to minimize c_j), rather than\n  treating the three technologies as parallel strategic alternatives.\n  Technology becomes a cost-curve input per band, not a top-level branch.\n\n- **Keep:** the dN/dt dynamics with all four flows, the 20-30 year horizon,\n  NPV objective, and the capture-rate ceiling constraint.\n\n**Now the counterexample.** Against *this revised structure* (direct-damage\nfirst-order, cascade as bounded second-order, altitude-band decision variable,\ntechnology as per-band cost curve): **what specific boundary condition,\nparameter regime, or failure mode would break it?** In particular:\n\n- Is there a value of the cascade coefficient (or of the capture-rate ceiling,\n  or of the discount rate) at which the demotion of cascade to second-order\n  is wrong — i.e., where cascade actually does dominate the NPV and the\n  revised structure under-states the opportunity (or over-states it)?\n- Or: is there an altitude-band regime where partitioning by band and\n  letting technology be a per-band cost curve mis-represents the real\n  constraint (e.g., a technology that only works above some altitude, or a\n  band where the cheapest technology has a hard capacity floor)?\n\nWe want the specific parameter value or boundary condition that is the\nmodel's weakest point, so that the final report's bias section runs a\nbreak-even / threshold analysis on exactly that axis."
+            ],
+            "expert_answers": [
+              "1. **State space.** Two dimensions are mandatory: size (log-spaced bins, roughly 1 cm–1 m, with the ~10 cm catalog threshold as a break) and altitude (bands of ~50–100 km). The primary target band is the congested LEO shell near 700–1000 km (sun-synchronous/Iridium region); the valid domain is roughly 200–2000 km, since below that decay is too fast and above it removal economics collapse. Sub-cm debris is not a removal target.\n\n2. **Objective.** Read it as (c): firm NPV constrained by, and partly monetized through, avoided expected collision damage to high-value assets. The benefit of one removal is best read as (iii) both, but the Kessler/cascading reading is what changes model structure most — it makes the benefit nonlinear and horizon-dependent. Horizon: 20–30 years.\n\n3. **Dynamics.** All four flows are mandatory for fairness; only launches may be exogenous. Collisional growth must be first-order, not static — treating the population as fixed over 20–30 years is the single assumption that most biases the commercial verdict.",
+              "reject",
+              "The break case: a band where the cheapest feasible technology has a hard capacity floor below the band's conjunction-driven removal demand — e.g. drag-augmentation only works below ~600 km, so in the 700–1000 km band the \"cheapest feasible\" technology is direct-retrieval, whose per-object cost is high enough that marginal avoided direct damage alone never covers it. There, the NPV verdict flips sign unless the cascade term is first-order. Threshold axis: the cascade coefficient at which discounted avoided-cascade value equals the gap between retrieval cost and direct-damage benefit in that band."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_d7ce34ef565a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8375,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.7166666666666667,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260930_110713/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified, particularly in handling the uncertainty of the Kessler effect and the logical partitioning of the state space.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate mathematical methods (bang-bang control, Euler integration) that are well-suited to the problem's structure, ensuring a realistic and efficient assessment of commercial viability.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for both sub-tasks, directly aligning them with the specific requirements of the problem statement (time-dependent model, economic viability, alternative comparison, and scenario analysis). The goals are explicit and well-structured.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically dependent and comprehensively cover the problem requirements. Task 1 provides the necessary foundation (model and viability check) for Task 2 (comparison and scenarios), ensuring all key aspects of the problem are addressed without deviation.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing a transparent inference path, interpretable thresholds, and a nuanced conclusion that effectively highlights the model's strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key uncertainties like the CASCADE coefficient and model structural limitations. It effectively mitigates bias impact by using threshold-based conclusions and bounding uncertainties, rather than relying on single-point estimates.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear economic framework (NPV) tailored to the specific physical constraints of debris removal. It provides actionable insights through scenario sweeps and clearly identifies profitable altitude bands, directly supporting the commercial decision-making process required by the problem.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically grounded in orbital dynamics (drag, Kessler effect) but relies on significant simplifications, such as linear cost-benefit assumptions and simplified collision kernels. While the theoretical basis is sound, the quantification of cascade benefits and the resulting bang-bang control logic reduce the scientific depth compared to a fully coupled physical-economic simulation.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2016_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260930_110713",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260930_110713/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a time-dependent commercial model for a private firm entering space\ndebris remediation. The model will have three coupled blocks: (a) a debris\npopulation dynamics block — size-binned LEO population with natural drag decay,\ngrowth from collisions (calibrated on the 2009 Iridium-33/Kosmos-2251 event),\nand depletion by removal; (b) a cost block for each removal alternative (water\njet, high-energy laser, capture-and-deorbit service) as a function of debris\nsize, altitude, and service rate; and (c) a benefit block whose structure the\nproblem statement does not settle.\n\nThe problem text says the firm should compare \"costs, risks, benefits\" but\nleaves undefined what actually *is* the benefit to the private firm, and the\nvalid domain of the state variables. Before I can parameterize the objective,\nI need the following structural interpretations (not magnitudes — no prices,\nrates, or constants; only the logical structure):\n\n1. What is the correct reading of the *objective function*: is the firm's\n   decision criterion net present value of an explicitly priced revenue stream\n   (debris-removal-as-a-service, with a named buyer), or the present value of\n   avoided losses (collision-risk externalities internalized through insurance\n   premiums, liability relief, or launch-window protection), or a blend? The\n   problem asks for a \"commercial opportunity,\" which suggests the former, but\n   the text never says who the customer is or what the transaction is. Which\n   interpretation is required for the model to answer \"does an economically\n   attractive opportunity exist\"?\n\n2. What are the logical boundaries of the state space: should the model treat\n   the debris population as a single LEO aggregate, or is a size-by-altitude\n   binned state (debris above a re-entry altitude versus below it) required for\n   the model's conclusions to be meaningful? In other words, is the valid\n   domain of the state variables defined by which bins a removal technology can\n   actually act on?\n\n3. How should \"risk\" enter the model — as a cost (expected liability/insurance\n   premium per operation), as a probability-weighted constraint, or as a\n   discount-rate adjustment — so that costs, risks, and benefits are\n   commensurable in a single objective?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange-1 answer, the model will close the objective as follows.\nI put this single structural hypothesis to you for acceptance or rejection.\n\n**Proposed structure — three-state population, risk-reduction objective.**\n\n(a) *State space.* The LEO debris population is binned by altitude into two\nremoval-relevant states, S1 = \"operational band\" (roughly 400–1000 km, where\nactive satellites and long decay times put both value at risk and debris out of\nrapid drag decay) and S2 = \"degrading band\" (below ~400 km, where natural\natmospheric drag removes objects on years-to-decades timescales and where the\nhazard is small). A third state, S0 = \"removed/deorbited,\" is the absorbing\nsink. Binning by altitude is the valid domain because it is the variable that\nboth (i) determines the per-object collision-relevant lifetime (hence the\nper-object hazard contribution) and (ii) determines the cost of a removal\ntechnique (propellant/energy rises steeply with altitude). Mass/size enter\nonly as per-bin removal-cost multipliers and per-bin collision cross-section\nweights, not as additional population states.\n\n(b) *Population dynamics.* Each bin i has population N_i(t). dN_i/dt =\n(inflows from collisions creating fragments in bin i) − (natural drag decay\nout of bin i, proportional to N_i) − (removal out of bin i, proportional to\nthe firm's removal capacity allocated to bin i, bounded by the technology's\naction range). Collision growth is calibrated so that the Iridium-33/Kosmos-\n2251 event's energy and mass reproduce its observed fragment yield (~1400\ncatalogable fragments for ~1590 kg parent mass at ~11 km/s), scaled to the\ncurrent collision rate. This is the dominant transformation mechanism: without\nthe collision-growth term the model is only a decay problem and cannot answer\nthe \"is removal worthwhile\" question.\n\n(c) *Objective (the closed benefit term you identified).* The private firm's\nobjective is net present value over a 30-year horizon:\nNPV = Σ_t [B(t) − C(t) − R(t)]/(1+r)^t,\nwhere C(t) is the removal cost (per-object cost × removal rate × technology\nmix), B(t) is the benefit, and R(t) is the risk cost. The benefit B(t) is\ndefined as **the risk-reduction revenue**: the firm sells collision-risk\nreduction, with the per-unit price of risk reduction (e.g., per unit of\nexpected annual collision probability removed, or per protected-asset-year of\nreduced risk) as a single parameter P that the model sweeps. The baseline\nexpected loss avoided is computed from the population dynamics (expected\ncollision rate × damage per collision), so the benefit is endogenous to the\nremoval decisions rather than an exogenous price list. The risk cost R(t) is\nthe firm's own operational liability exposure, modeled as a probability-weighted\ncost of its own operations causing or being in a conjunction with debris.\n\n(d) *Comparison and recommendation rule.* Each technology (water jet,\nhigh-energy laser, capture-and-deorbit) has a cost function C_tech(size bin,\naltitude band, rate) and an effectiveness range (which bins it can act on and\nat what per-object rate). The model evaluates each technology alone and in\nfixed combinations, and recommends the mix that maximizes NPV subject to a\ncapital constraint. A \"what-if\" mode re-runs the model with P, removal cost,\ndiscount rate, and collision-rate scaling varied.\n\nDo you accept or reject this structure?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the proposed structure. The specific structural flaw I identify in\nthe rejection is this: the altitude-binned state space with collision growth\nscaled from a single satellite-satellite event treats the debris population's\ncollision-growth term as if it were driven only by the *removed* objects and a\nfixed background. The dominant transformation mechanism in LEO debris is the\nKessler cascade — the collision rate at any time is proportional to the\n**entire** population's integrated collision cross-section times the active\nspacecraft flux, so removing a small number of objects changes the growth\nterm only second-order, and the cascade can outpace any bounded removal rate.\nMy structure did not make the collision-growth term explicitly depend on the\ncurrent total population state, and it did not distinguish the cataloged\npopulation (which removal can act on) from the untracked mid-size population\n(which drives most of the collision cross-section but which no listed removal\ntechnology can target).\n\n**Minimal revised structure.** I keep the altitude binning and the\nrisk-reduction objective. I change only the population-dynamics block:\n\n- The state is now two populations per altitude band: N_cat,i(t) = cataloged\n  (≥10 cm) objects in band i, which removal technologies can act on, and\n  N_untr,i(t) = untracked (1–10 cm) objects in band i, which no listed\n  technology can target directly but which contribute to the collision\n  cross-section and are produced by collisions of cataloged objects.\n- The collision-growth term into each (band, tracked/untracked) cell is\n  proportional to the product of the **total** collision cross-section\n  (N_cat,i × σ_cat + N_untr,i × σ_untr, summed over all bands i weighted by\n  relative flux) and the active-spacecraft flux. This makes the cascade\n  explicit: growth feeds on itself through the untracked channel that removal\n  cannot address.\n- Removal depletes only N_cat. The question \"does a commercial opportunity\n  exist\" then becomes: is the NPV of risk-reduction revenue positive when the\n  cascade term is driven by the full population, not just the removable\n  subset?\n\nAgainst this revised structure, what is the specific case, boundary condition,\nor failure mode that would break the mechanism — i.e., the parameter value or\nboundary at which the conclusion about a viable commercial opportunity flips?"
+            ],
+            "expert_answers": [
+              "The benefit block is the unsettled term: the text names no customer, no contract, and no revenue mechanism, so the objective cannot be closed as a priced service. What the problem leaves undefined is the identity of the payer and the transaction — whether the firm sells removal to an operator, an insurer, a launch provider, or a state, and whether payment is per object, per risk reduction, or per protected asset. That missing payer/transaction structure, not any magnitude, is what determines whether \"commercial opportunity\" is even well-posed.",
+              "reject",
+              "The case that breaks it: when the untracked (1–10 cm) cross-section dominates the total, so removal of cataloged objects leaves the cascade growth term essentially unchanged. At that boundary the firm's risk-reduction revenue is decoupled from its own action — it pays removal cost while the collision rate it sells against keeps rising, so NPV is negative for every removal rate and the \"viable opportunity\" conclusion flips to none. The mechanism fails precisely where σ_untr·N_untr exceeds σ_cat·N_cat."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_d7ce34ef565a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8833333333333333,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260930_110713/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as a time-dependent commercial model for a private firm. The goals are explicitly stated, covering the evolution of the debris population, the comparison of specific removal alternatives (water jet, laser, capture), and the assessment of economic viability. The distinction between providing a removal recommendation or innovative avoidance strategies if no opportunity exists is accurately captured, aligning perfectly with the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The task analysis effectively covers all core components: time-dependence, cost/risk/benefit analysis, individual vs. combination assessment, and what-if scenarios. It correctly identifies the three main removal methods mentioned in the background. The sub-tasks are logically interrelated, supporting the final goal of determining economic attractiveness. There is no significant deviation or missing key part; the coverage is comprehensive and directly supports the final decision-making process required by the problem.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, logically sound, and provides a definitive conclusion supported by quantitative evidence, effectively guiding the decision-making process.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is comprehensive, identifying key uncertainties and demonstrating through sensitivity analysis that the conclusions are robust against these potential biases.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, empirically grounded (calibrated to real events), and logically address the problem's ambiguities regarding commercial viability and physical constraints.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (NPV, population dynamics) and a rational structure (distinguishing removable/unremovable debris) that effectively reflects the physical and economic complexities of the problem.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively translates the complex space debris problem into a solvable economic optimization framework. It uses NPV to assess commercial viability, includes realistic operational constraints (technology limits, band-specific actions), and employs sensitivity analysis to handle uncertainty. This approach provides clear decision-making support for a private firm, making it highly practical for the stated problem.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing differential equations to model debris population dynamics based on orbital mechanics (drag, collision cross-sections, fragmentation). It correctly incorporates physical constraints and uses standard economic principles for the commercial assessment. The integration of these two domains is scientifically justified and demonstrates a deep understanding of the problem's unique characteristics.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        }
+      ],
+      "refined_report_utility": 0.85625,
+      "interaction_cost": 0.8678544655893579,
+      "interaction_penalty": 0.043392723279467894,
+      "net_utility": 0.8128572767205321,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2727,
+          "total_expert_latency_seconds": 4.61,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.928843351450619,
+          "latency_cost_component": 0.27402444412549887,
+          "interaction_cost": 0.8715373405802476,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2331,
+          "total_expert_latency_seconds": 3.47,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9104289764961703,
+          "latency_cost_component": 0.2379292308806626,
+          "interaction_cost": 0.8641715905984682,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T11:16:49.610969",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_d7ce34ef565a",
+  "workflow": {
+    "name": "Bias-Quantified Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 11) achieved high scores on analysis and modeling rigor but received lower scores on 'result_and_bias_analysis' (specifically lacking detailed correction measures or sensitivity analyses to quantify bias impact). Rounds 3, 4, 5, 6, 10 were rejected for proposing generic rejection handling or deliverable mapping that did not sufficiently differentiate from the parent or failed to address the specific weakness in bias quantification. Round 9 was accepted and is the current parent. This patch departs from the 'Deliverable Alignment Rule' of Round 9 (which focused on mapping gaps to sub-tasks) by introducing a 'Bias Quantification Rule'. This new rule explicitly links the Exchange 3 counterexample to the quantitative sensitivity analysis required in the final report's bias section, directly addressing the judge's criticism of the parent's rollouts where bias analysis was thorough qualitatively but lacked quantitative correction measures or sensitivity analyses. This change is targeted, does not repeat the rejected directions of Rounds 3-6 (which focused on structural revision mechanics) or Round 10 (which focused on deliverable mapping), and is sufficiently distinct from Round 9 to avoid similarity rejection while building on its successful structural foundation.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Bias Quantification Rule:** The counterexample identified in Exchange 3 must be treated not merely as a qualitative limitation but as the primary axis for quantitative sensitivity analysis in the final report. The agent must explicitly design the report's bias section to test the robustness of the core conclusions against variations in the specific parameter or boundary condition that the expert identified as the failure point. If the expert's counterexample involves an unpinned external parameter (such as a market price, regulatory threshold, or unobserved rate), the report must include a break-even analysis or threshold determination showing the value at which the model's primary recommendation or conclusion flips. This ensures the bias analysis moves beyond stating limitations to quantifying the fragility of the results against the specific structural weakness identified by the expert.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a system process but leaves the boundary conditions for the state variables undefined. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific structural configuration that includes the dominant transformation mechanism as a first-order effect. Operator 2 asks the expert to accept or reject this specific structural inclusion.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction, the agent revises the structure to include that term and asks which specific boundary condition would cause this *revised* structure to fail. Operator 3 asks for the counterexample against the updated structure, specifically identifying the parameter or condition that triggers the failure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Bias Quantification Rule:** The counterexample identified in Exchange 3 must be treated not merely as a qualitative limitation but as the primary axis for quantitative sensitivity analysis in the final report. The agent must explicitly design the report's bias section to test the robustness of the core conclusions against variations in the specific parameter or boundary condition that the expert identified as the failure point. If the expert's counterexample involves an unpinned external parameter (such as a market price, regulatory threshold, or unobserved rate), the report must include a break-even analysis or threshold determination showing the value at which the model's primary recommendation or conclusion flips. This ensures the bias analysis moves beyond stating limitations to quantifying the fragility of the results against the specific structural weakness identified by the expert.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a system process but leaves the boundary conditions for the state variables undefined. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific structural configuration that includes the dominant transformation mechanism as a first-order effect. Operator 2 asks the expert to accept or reject this specific structural inclusion.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction, the agent revises the structure to include that term and asks which specific boundary condition would cause this *revised* structure to fail. Operator 3 asks for the counterexample against the updated structure, specifically identifying the parameter or condition that triggers the failure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Bias Quantification Rule:** The counterexample identified in Exchange 3 must be treated not merely as a qualitative limitation but as the primary axis for quantitative sensitivity analysis in the final report. The agent must explicitly design the report's bias section to test the robustness of the core conclusions against variations in the specific parameter or boundary condition that the expert identified as the failure point. If the expert's counterexample involves an unpinned external parameter (such as a market price, regulatory threshold, or unobserved rate), the report must include a break-even analysis or threshold determination showing the value at which the model's primary recommendation or conclusion flips. This ensures the bias analysis moves beyond stating limitations to quantifying the fragility of the results against the specific structural weakness identified by the expert.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a system process but leaves the boundary conditions for the state variables undefined. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific structural configuration that includes the dominant transformation mechanism as a first-order effect. Operator 2 asks the expert to accept or reject this specific structural inclusion.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction, the agent revises the structure to include that term and asks which specific boundary condition would cause this *revised* structure to fail. Operator 3 asks for the counterexample against the updated structure, specifically identifying the parameter or condition that triggers the failure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_d7ce34ef565a",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 11,
+    "parent_workflow_ids": [
+      "interaction_workflow_bc49a013c7df"
+    ],
+    "training_batch": [
+      "2017_B",
+      "2016_B"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_B",
+    "2016_B"
+  ],
+  "absolute_utility": 0.8270833333333333,
+  "interaction_cost": 0.8604978354990018,
+  "interaction_penalty": 0.0430248917749501,
+  "net_utility": 0.7840584415583832,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

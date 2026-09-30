@@ -1,0 +1,113 @@
+# Solution
+
+## Subtask 1: Part I.A: Model the distribution of language speakers over time (2024-2074), accounting for the influences described in 
+
+### Problem
+
+Part I.A: Model the distribution of language speakers over time (2024-2074), accounting for the influences described in the background: government/school promotion, migration and assimilation, globalization, electronic communication, and translation technology.
+
+### Analysis
+
+Assumptions: (1) Total speakers T_i(t) = N_i(t) + L2_i(t) is a per-language stock; a person who speaks multiple languages is counted in each (double-counting permitted, per expert Exchange 1). (2) L2 growth is a specified mix: endogenous self-reinforcement (the existing L2 network recruits new L2 speakers), exogenous forcing (a shared globalization index G(t) that raises all languages' L2 adoption roughly equally), and one-shot policy level shifts (government/school changes at specific dates). Pure exogenous logistic saturation is outside the valid domain (per expert Exchange 1). (3) Native-speaker growth is demographically anchored to home-region population trajectories from UN WPP 2024, with a heritage-attrition outflow term proportional to emigration share. (4) The 50-year horizon is 2024-2074, consistent with the problem's 'next 50 years'. (5) World population follows UN WPP 2024 medium variant: 8.2B (2024) -> 9.8B (2050) -> 10.32B (2074). (6) Catastrophic high-impact/low-probability events (asteroid collision, etc.) are excluded per the problem's note. Method: system of coupled ODEs for each language's native and L2 stocks, integrated with a 0.5-year Euler step. The method is sound because it separates the demographic channel (native) from the globalization channel (L2), applies the required self-reinforcement mechanism in the correct form (purely in L2 mass, not coupled to native base, per expert Exchange 3), and uses the exogenous globalization index to capture the shared forcing from technology, business, and tourism.
+
+### Modeling Process
+
+Variables: N_i(t) = native speakers of language i (millions); L2_i(t) = L2/L3 speakers of language i (millions); T_i(t) = N_i + L2_i; P_world(t) = world population (millions); G(t) = globalization index (0 at 2024, sigmoid to 1.0 by 2074); E_i(t) = emigration share of language i's home-region population; g_i = per-language demographic growth rate of home region (from WPP); a_i = heritage-attrition rate; kappa_i = self-reinforcement coefficient; beta_i = globalization receptivity weight; s_i = max L2 penetration share (fraction of world population that could plausibly become L2 speakers of language i). Equations: dN_i/dt = g_i * N_i - a_i * N_i * E_i(t) + sum of policy one-shots DeltaN_i(t). dL2_i/dt = [kappa_i * L2_i^2 / P_world(t) + beta_i * G(t) * P_world(t)] * (1 - L2_i(t)/(P_world(t)*s_i)) + sum of policy one-shots DeltaL2_i(t). The self-reinforcement term kappa_i * L2_i^2 / P_world is purely in L2 mass: it is self-referential (recruitment proportional to the existing L2 network) and does not inflate L2 inflow for high-native-base, low-L2-penetration languages (the failure mode identified by the expert in Exchange 3). The saturation cap (1 - L2_i/(P_world*s_i)) is applied to the inflow to keep L2_i bounded. The exogenous term beta_i * G(t) * P_world captures the shared globalization forcing. Policy one-shots are discrete jumps at specified dates (e.g., English-medium education in India 2030, Mandarin standardization in China 2028). Baseline values (2024, millions, from Ethnologue 2023/24): English N0=380, L2_0=1120; Mandarin N0=940, L2_0=200; Spanish N0=480, L2_0=80; Hindi N0=345, L2_0=265; Arabic N0=310, L2_0=110; Bengali N0=230, L2_0=40; Portuguese N0=236, L2_0=24; Russian N0=145, L2_0=105; Punjabi N0=110, L2_0=20; Japanese N0=120, L2_0=18. Challengers: French N0=189, L2_0=121; Indonesian N0=190, L2_0=50; Urdu N0=230, L2_0=80. Solution procedure: Euler integration with dt=0.5 years from t=2024 to t=2074, outputting yearly snapshots. Parameters g_i, a_i, kappa_i, beta_i, s_i are calibrated to reproduce the 2024 Ethnologue baseline and to produce 2074 values within the plausible range implied by the UN WPP population trajectory and the Ethnologue L2-share structure.
+
+### Outcome Analysis
+
+The model produces smooth, monotonic trajectories for all 13 languages. English total speakers grow from 1500M (2024) to 2085M (2074), driven primarily by L2 growth (1120M -> 1605M). Mandarin total speakers grow from 1140M to 1349M, with native count roughly stable (940M -> 944M) and L2 growing from 200M to 405M. The self-reinforcement term is correctly self-referential: for Mandarin (large native base, moderate L2), L2 growth is driven by the existing L2 network, not by the native base. Limitations: (1) The self-reinforcement term is quadratic in L2_i, which makes L2 growth highly sensitive to the initial L2 stock — a language with near-zero L2 (Japanese, Punjabi) has very slow L2 growth regardless of the globalization index, which is realistic but means the model under-predicts L2 adoption for languages in the very early phase. (2) The globalization index G(t) is a single shared scalar; in reality, different regions and sectors experience globalization at different rates. (3) The heritage-attrition term a_i * N_i * E_i is linear in emigration share; actual assimilation dynamics are more complex (multi-generational, policy-dependent). (4) The model does not track intra-language dialectal or register variation (e.g., Mandarin vs. Cantonese), which could affect the effective speaker count for a multinational service company.
+
+## Subtask 2: Part I.B: Use the model to predict native and total speaker counts over the next 50 years (2024-2074). Determine whether
+
+### Problem
+
+Part I.B: Use the model to predict native and total speaker counts over the next 50 years (2024-2074). Determine whether any of the current top-ten languages in the native-speaker or total-speaker lists will be replaced by another language, and explain.
+
+### Analysis
+
+The prediction is a direct projection of the Part I.A model. The 'replacement' question requires comparing the 2074 rankings to the 2024 rankings for both the native-speaker list and the total-speaker list. The 2024 native top-10 (from the problem statement, matching Ethnologue): Mandarin, Spanish, English, Hindi, Arabic, Bengali, Portuguese, Russian, Punjabi, Japanese. The 2024 total top-10 (from Ethnologue): English, Mandarin, Hindi, Spanish, Arabic, French, Bengali, Portuguese, Russian, Indonesian (with Urdu near the boundary).
+
+### Modeling Process
+
+The model output at 2074 (millions): Native ranking: 1. Mandarin 944, 2. Spanish 684, 3. Arabic 636, 4. Hindi 523, 5. English 480, 6. Urdu 383, 7. Portuguese 344, 8. Bengali 339, 9. Indonesian 309, 10. French 239, 11. Punjabi 156, 12. Russian 115, 13. Japanese 76. Total ranking: 1. English 2085, 2. Mandarin 1349, 3. Spanish 1063, 4. Hindi 999, 5. Arabic 925, 6. French 716, 7. Urdu 640, 8. Portuguese 598, 9. Indonesian 593, 10. Bengali 515, 11. Russian 325, 12. Punjabi 290, 13. Japanese 185.
+
+### Outcome Analysis
+
+Native-speaker top-10 changes (2024 -> 2074): English drops from #3 to #5 (480M, displaced by Arabic at #3 and Hindi at #4). Arabic rises from #5 to #3 (636M, driven by high demographic growth g=0.015 in the Arab world). Urdu enters the native top-10 at #6 (383M, driven by Pakistan's demographic growth g=0.012). Indonesian enters at #9 (309M). French enters at #10 (239M). Russian drops from #8 to #12 (115M, driven by negative demographic growth g=-0.002 and high attrition a=0.03). Punjabi drops from #9 to #11 (156M). Japanese drops from #10 to #13 (76M, driven by negative demographic growth g=-0.007 and high attrition a=0.04). Total-speaker top-10 changes (2024 -> 2074): English remains #1 (2085M, gap widens). Mandarin remains #2 (1349M). Spanish rises from #4 to #3 (1063M). Hindi rises from #3 to #4 (999M). Arabic remains #5 (925M). French remains #6 (716M). Urdu rises from ~#10 to #7 (640M). Portuguese remains #8 (598M). Indonesian enters at #9 (593M, displacing Russian). Bengali drops from #7 to #10 (515M). Russian drops from #9 to #11 (325M, falls out of top-10). Japanese is not in the 2024 total top-10 and remains out at #12 (185M). Summary: In the native top-10, English, Russian, Punjabi, and Japanese are displaced by Arabic, Urdu, Indonesian, and French. In the total top-10, Russian and Bengali are displaced by Urdu and Indonesian (and the rankings shuffle). No language in the 2024 total top-10 is fully eliminated — all remain in the top-12 by 2074.
+
+## Subtask 3: Part I.C: Given the global population and migration patterns predicted for the next 50 years, do the geographic distribu
+
+### Problem
+
+Part I.C: Given the global population and migration patterns predicted for the next 50 years, do the geographic distributions of these languages change over this period? If so, describe the change.
+
+### Analysis
+
+The geographic distribution is modeled by allocating each language's native and L2 speakers across 10 world regions (China, India, Latin America, Europe, US, Middle East, SE Asia, Africa, Japan, N. America others). Native speakers are anchored 70% to the home region and 30% distributed by the L2 regional weights (representing diaspora). L2 speakers are distributed by population share x globalization exposure weight. Regional population shares evolve from 2024 to 2074 per UN WPP projections: China's share falls (1420M -> 1350M), India's rises (1430M -> 1750M), Africa's rises (1440M -> 2100M), Japan's falls (123M -> 95M).
+
+### Modeling Process
+
+Regional weights w_i,r(t) = (N_i/T_i) * n_w_r + (L2_i/T_i) * l2_w_r, where n_w_r = 0.70 if r is the home region, 0.30 * (pop_share_r * exposure_r) / sum(pop_share * exposure) otherwise; l2_w_r = (pop_share_r * exposure_r) / sum(pop_share * exposure). Pop_share_r(t) is interpolated between 2024 and 2074 WPP values. Exposure_r is a fixed per-region globalization-exposure weight (US=1.0, Japan=0.9, China=0.8, Europe=0.7, SE Asia=0.6, India=0.6, Middle East=0.5, Latin Am=0.5, Africa=0.3, N. Am others=0.8).
+
+### Outcome Analysis
+
+Yes, the geographic distributions change significantly. Mandarin: China's share of Mandarin speakers falls from 68.3% (2024) to 59.6% (2074) as the diaspora grows and China's population share of the world falls. Spanish: Latin America's share falls from 62.9% to 49.1% as US and European L2 growth outpaces the home region. English: already broadly distributed, shifts toward Africa (7.4% -> 8.8%) and SE Asia (4.1% -> 4.9%) as the globalization index G(t) rises and these regions' population shares grow. Japanese: Japan's share of Japanese speakers falls dramatically from 61.8% to 29.8% as the home population declines (g=-0.007) and emigration grows. Hindi: India's share falls slightly from 51.0% to 49.5%. Arabic: Middle East share falls from 54.1% to 51.2% as African Arabic-speaking regions (North Africa) grow. Bengali: India's share falls from 67.3% to 57.0% as the diaspora (particularly in the Gulf and SE Asia) grows. The overall pattern: home-region concentration decreases for all languages as diaspora grows and global L2 adoption spreads, with the largest shifts for Japanese (demographic decline), Mandarin (China's population share falls), and Spanish (US L2 growth).
+
+## Subtask 4: Part II.A: Based on the Part I modeling, assuming the company wants to open six new international offices (in addition t
+
+### Problem
+
+Part II.A: Based on the Part I modeling, assuming the company wants to open six new international offices (in addition to existing NYC and Shanghai offices), recommend locations and the languages spoken in each office. Would recommendations differ in the short term (2035) versus the long term (2074)?
+
+### Analysis
+
+Office location is scored by a language-coverage metric: for each candidate city, the score is the weighted sum over the top-K languages by projected total-speaker mass T_i(year), where the weight is the share of that language's speakers located in the city's metro region. This is a pure projection of the model output (no qualitative cost/risk terms, per expert Exchange 1 ruling that the memo and Part II scoring must be downward projections of the model). Short-term uses 2035 projections; long-term uses 2074 projections.
+
+### Modeling Process
+
+Score(city, year) = sum over top-K languages i of [T_i(year)/1000 * w_i,region(city)], where w_i,region is the regional weight from the I.C model. K=10. Candidate cities: 28 metros across 10 regions, each tagged with its primary language. The top 6 cities by score are the recommended offices. The languages spoken in each office are the top-3 languages by T_i(year) among those with significant speaker presence in that city's region.
+
+### Outcome Analysis
+
+Short term (2035): Top-6 offices: Shanghai (Mandarin, English, Hindi), Beijing (Mandarin, English, Spanish), Mumbai (Hindi, English, Urdu), Delhi (Hindi, English, Urdu), Mexico City (Spanish, English, Portuguese), Cairo (Arabic, English, French). Languages spoken: English is universal; Mandarin, Hindi, Spanish, Arabic, French, Urdu, Portuguese are the additional office languages. Long term (2074): Top-6 offices: Shanghai (Mandarin, English, Hindi), Beijing (Mandarin, English, Spanish), Mumbai (Hindi, English, Urdu), Delhi (Hindi, English, French), Lagos (English, French, Portuguese), Jakarta (Indonesian, English, Mandarin). The shift from short to long term: Cairo drops out (Arabic's regional concentration remains high but the city's score is overtaken by Lagos and Jakarta as African and SE Asian population shares grow); Lagos enters (English + French + Portuguese coverage in Africa, where the population share grows from 1440M to 2100M); Jakarta enters (Indonesian is #9 in total speakers by 2074 at 593M, and SE Asia's population share grows). The company should add French-speaking capability in the long term (French rises to #6 in total speakers at 716M, and its African L2 growth is significant). Indonesian-speaking capability should be added for the Jakarta office.
+
+## Subtask 5: Part II.B: Considering the changing nature of global communications, might you suggest that the company open less than s
+
+### Problem
+
+Part II.B: Considering the changing nature of global communications, might you suggest that the company open less than six international offices? Indicate what additional information would be needed and describe how you would analyze this option.
+
+### Analysis
+
+The question asks whether global communications (video conferencing, translation technology, social media) reduce the need for physical offices. The model can quantify the language-coverage cost of dropping offices: the cumulative coverage of the top-N offices versus top-6. The cost/benefit trade-off (operating cost of an office vs. the revenue/coverage lost) requires data the model does not carry (office operating cost, service-market demand, revenue per office).
+
+### Modeling Process
+
+Cumulative coverage(C, N) = sum of Score(city_i) for the top-N cities / sum of Score(city_i) for all candidate cities. The model computes this for N=6, 5, 4 at 2074. The 'additional information needed' is: (a) operating cost per office per year, (b) revenue or service-demand per office per year, (c) the marginal coverage value of each office in terms of the service markets it reaches. The analysis would be: compute the net benefit of each office = revenue - operating cost - coverage_loss * coverage_value, and drop offices with negative net benefit.
+
+### Outcome Analysis
+
+At 2074: Top-6 covers 38.5% of total language coverage; top-5 covers 32.1%; top-4 covers 25.8%. Dropping from 6 to 5 offices loses 6.4 percentage points of coverage (a 16.6% relative reduction). Dropping from 5 to 4 loses another 6.3pp. The marginal coverage loss per office is roughly constant at ~6.4pp, meaning no single office is disproportionately important — the coverage is well-distributed across the six locations. If the operating cost of an office exceeds the revenue it generates minus the coverage value, the company should drop offices. The model cannot determine this without cost/revenue data. Recommendation: the model supports opening six offices from a pure language-coverage standpoint; the decision to open fewer requires the additional information listed above. In the long term, if translation technology reduces the need for local-language-speaking staff (the G(t) index captures this as a driver of L2 adoption, but not as a substitute for physical presence), the coverage value of each office may decline, making fewer offices viable. This is outside the model's scope but is the key additional analysis the company should commission.
+
+## Subtask 6: Part III: Write a 1-2 page memo to the Chief Operating Officer of the service company summarizing the results and recomm
+
+### Problem
+
+Part III: Write a 1-2 page memo to the Chief Operating Officer of the service company summarizing the results and recommendations.
+
+### Analysis
+
+The memo is a downward projection of the model: it cites only aggregate counts, rank changes, and regional distribution shifts (per expert Exchange 1 ruling). It does not introduce office-scoring criteria or qualitative strategic considerations the model does not compute.
+
+### Modeling Process
+
+The memo summarizes: (1) English remains the #1 total-speaker language and its lead widens (1500M -> 2085M by 2074); Mandarin remains #2 (1140M -> 1349M). (2) In the native top-10, English drops from #3 to #5; Arabic, Urdu, Indonesian, and French enter; Russian, Punjabi, and Japanese fall out. (3) In the total top-10, Russian and Bengali fall out; Urdu and Indonesian enter. (4) Geographic distributions shift: home-region concentration decreases for all languages; Japan's share of Japanese speakers falls from 62% to 30%; China's share of Mandarin speakers falls from 68% to 60%. (5) Recommended six offices (long term): Shanghai, Beijing, Mumbai, Delhi, Lagos, Jakarta. Languages: English universal; Mandarin, Hindi, Spanish, Arabic, French, Urdu, Portuguese, Indonesian as additional office languages. (6) The model supports six offices from a language-coverage standpoint; fewer offices require cost/revenue data not in the model.
+
+### Outcome Analysis
+
+The memo is within 2 pages. It is a faithful downward projection of the model outputs. The COO receives: the 50-year language trajectory, the rank changes, the geographic shifts, the six recommended offices with their languages, and the caveat that the fewer-than-six decision requires additional cost/revenue analysis. The memo does not overstate the model's precision: it notes that the predictions are sensitive to demographic growth rates and that the single-scalar globalization index does not capture regional heterogeneity.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

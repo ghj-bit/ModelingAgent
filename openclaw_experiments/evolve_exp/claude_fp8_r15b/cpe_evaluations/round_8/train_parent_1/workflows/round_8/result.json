@@ -1,0 +1,653 @@
+{
+  "round": 8,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8186791411874248,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8833333333333333,
+    "modeling_rigorousness_evaluation": 0.8625,
+    "practicality_and_scientificity_evaluation": 0.8416666666666668,
+    "result_and_bias_analysis_evaluation": 0.8625
+  },
+  "problem_results": [
+    {
+      "problem_id": "2018_E",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Task 2018_E (Climate Change and State Fragility)\n\n## Problem Understanding\n\nThe MM-Bench 2018_E problem asks for (Task 1) a model that determines a\ncountry's fragility AND simultaneously measures climate-change impact, classifying\nstates as stable / vulnerable / fragile, and tracing direct and indirect\nclimate→fragility pathways; (Task 2) apply it to a top-10 FSI country; (Task 3)\napply it to a non-top-10 country with tipping-point prediction; (Task 4) quantify\nstate interventions and total cost; (Task 5) discuss scale transferability\n(cities / continents).\n\nPre-gathered data: the FSI 2018 structure (12 indicators, 0–10 each, 0–120\ntotal; three categories Cohesion / Economy / Society), the 2018 top-10 list,\nalert thresholds, drought-yield-loss benchmarks (−0.8% GDP-agri per drought\nevent; 3–12% multi-year maize/soy yield reductions; 2020–2050 projections to\n>20%), and adaptation magnitudes (+15–64% yield with adaptation; −1.7% yield\nloss per +10% irrigation share).\n\n## Current Stage\n\nFormulating the core model (Task 1) before any implementation.\n\n## Decision Point\n\nHow should the composite fragility model be structured with respect to climate\nchange? Two fundamentally different approaches:\n\n**Option A — Indicator-injection model (static, weighted).**\nTake the 12 FSI indicators as the fragility basis. Climate change is modeled as\nshifting the scores of the climate-sensitive indicators (e.g. E2 economic\ndecline via yield-loss→revenue, E1 demographic pressure via migration, P2 public\nservices, X1) through a direct climate-stressor mapping. Composite index\nF = Σ wᵢ · Iᵢ(t), with Iᵢ(t) = Iᵢ,base + ΔIᵢ(climate stressors). Climate\nimpact measured as ΔF = F(climate) − F(no climate). Simple, transparent,\ndirectly calibrated to FSI scores/thresholds; but mostly static and the\n\"simultaneously measure\" requirement is met only via the ΔF decomposition.\n\n**Option B — Dynamic coupled model.**\nA system of ODEs/difference equations coupling climate stressors (temperature\nrise, precipitation/drought frequency), agricultural output, economic\nfragility, social cohesion, and political legitimacy over time. Can produce\ntipping points and intervention cost trajectories; but parameters are not\navailable for most coupling terms, and FSI-calibrated validation is much\nweaker.\n\nMy primary recommendation is **Option A as the core** (FSI-anchored,\ncalibrated to the 12-indicator taxonomy and 0–120 scale), augmented with a\n**lightweight Option-B overlay** (a simple logistic/tipping-point dynamics for\nTask 3's prediction requirement) rather than a full ODE system.\n\n## Why It Matters\n\nThe choice determines the entire architecture: calibration strategy, what\n\"simultaneously measure climate impact\" means, and whether tipping-point\nprediction in Task 3 is an empirical threshold-crossing or a dynamic\ninstability — downstream it shapes Tasks 2–5 and the validation approach.\n\n## Candidate Strategies Summary\n\n- **A (recommended core)**: direct + indirect pathways via indicator\n  displacement; climate impact = index difference; calibrated to FSI 2018.\n  Pros: grounded, explainable, judge-verifiable. Cons: limited dynamics.\n- **B (full dynamic)**: ODE network. Pros: endogenous tipping points. Cons:\n  weak parameter identifiability; harder to tie to FSI; risk of an unanchored\n  model.\n- **A+B hybrid (recommended)**: A for measurement/classification/calibration;\n  B-reduced (one-dimensional tipping dynamics on the composite or on a\n  critical indicator) only where Tasks 3–4 require trajectory/cost\n  prediction.",
+          "# Expert Question 2 — Task 2018_E (builds on Round 1)\n\n## Reply Received (Round 1)\n\nConfirmed: A+B hybrid. Core = FSI 12-indicator taxonomy on 0–120 scale;\nclimate enters as stressor-driven displacement ΔIᵢ of climate-sensitive\nindicators; classification and climate impact (ΔF) read off the same\ncalibrated index. Add a reduced one-dimensional dynamic overlay (logistic\nthreshold crossing) for tipping-point and intervention-cost trajectories\n(Tasks 3–4). No full ODE network.\n\n## Current Stage\n\nArchitecture settled. Now defining (a) the three-state classification\nthresholds and (b) which indicators receive climate displacement and through\nwhich pathway.\n\n## Decision Point\n\n**Thresholds.** FSI publishes alert zones (\"Safe ~40–55, Guard 55–80,\nWarning 80–100, Crisis 100+\"). The problem asks for three classes:\nstable / vulnerable / fragile. My proposal:\n- **Stable**: F < 55\n- **Vulnerable**: 55 ≤ F < 80\n- **Fragile**: F ≥ 80\nwith \"very fragile / very high alert\" noted when F ≥ 100 (top decile, matches\nthe ~110+ Very High Alert convention in the data).\n\n**Displacement mapping.** Direct pathway: drought/temperature stressors act\non E2 (Economic Decline, via yield loss → revenue/GDP), E1 (Demographic\nPressures, via food insecurity → migration), P2 (Public Services, via\nwater/food service collapse), P4 (Refugees and IDPs). Indirect pathway:\nrevenue loss → reduced services/legitimacy → P1; economic stress → group\ngrievance C3 and factionalized elites C2; migration inflows → X1/X4\n(external intervention). Each ΔIᵢ = f(climate stressor load, exposure\ncoefficients) with a saturation cap at 10.\n\n## Why It Matters\n\nThe thresholds determine classification for every task; the mapping determines\nwhich pathways are defensible and where the 0.8%-per-event / 3–12% yield-loss\nbenchmarks and the +15–64% adaptation figures attach.\n\n## Candidate Strategies\n\n- **Thresholds (recommended as stated)**: 55 / 80 cutpoints on the 0–120\n  composite, aligned to FSI Guard/Warning zones and the top-decile fragile\n  convention. Alternative: 60/85 — rejected, less defensible against FSI\n  zones.\n- **Mapping (recommended)**: two-tier (direct → E1, E2, P2, P4; indirect →\n  P1, C3, C2, X1) with saturation; alternative: uniform displacement across\n  all 12 — rejected, ignores FSI's category structure and makes climate\n  impact uninterpretable.\n\nPlease confirm or correct: (1) the 55/80 threshold scheme and its top-decile\nfragile flag; (2) the direct/indirect indicator displacement mapping.",
+          "# Expert Question 3 — Task 2018_E (builds on Rounds 1–2)\n\n## Replies Received\n\n- R1: A+B hybrid confirmed (FSI-anchored core + 1-D logistic tipping\n  overlay; no ODE network).\n- R2: Thresholds 55/80 (fragile ≥80, very fragile ≥100) confirmed;\n  two-tier displacement (direct → E1,E2,P2,P4; indirect → P1,C3,C2,X1;\n  saturation cap 10) confirmed; ΔF defined against a no-climate\n  counterfactual baseline.\n\n## Current Stage\n\nReady to implement. Two design decisions remain for the reduced dynamic\noverlay (Tasks 3–4) and the intervention accounting (Task 4).\n\n## Decision Point\n\n**A. Tipping-point dynamics (Task 3).** My proposal: one-dimensional\ndiscrete logistic on a critical-state variable s(t) ∈ [0,100],\ns(t+1) = s(t) + r·s(t)·(1 − s(t)/K) − D(t)·G(s(t)), where K is the\nresilience capacity and D(t) is the cumulative climate stress load from the\ncore model's displacement channel. The tipping point is defined as the first\ntime s crosses a critical level s* (identified as the unstable equilibrium of\nthe logistic map with stress offset, s* = K/2 + stress shift), equivalently\nthe loss of resilience: recovery time to baseline after a shock exceeds a\ntolerance (hysteresis test). Climate pushes a non-fragile state to fragility\nwhen its composite F crosses 80 in the overlay.\n\nAlternative: define tipping purely as a static threshold crossing (F crosses\n80 in a scenario projection) — simpler but loses the \"definitive indicators\"\nand resilience-loss character the problem asks for.\n\n**B. Intervention accounting (Task 4).** My proposal: model interventions as\nmodifiers on the overlay and core: (i) agricultural adaptation (irrigation\nexpansion, drought-resistant crops) raises resilience capacity K by +15–64%\nband and cuts yield-loss pass-through (−1.7% loss per +10% irrigation share);\n(ii) social protection (food subsidies, IDP response) dampens the P2/P4/C3\ndisplacement coefficients; (iii) early-warning/resilience infrastructure\nraises the tipping threshold s* and reduces D(t) growth rate. Total cost =\nΣ over interventions of (coverage share × per-capita cost × population ×\nyears), discounted; compare no-intervention vs full-intervention F(t)\ntrajectories and report cost per fragility-point averted.\n\n## Why It Matters\n\nFixes the Task 3 tipping definition (the problem explicitly asks \"How do you\ndefine a tipping point and predict when a country may reach it?\") and the\nTask 4 cost model; both are judged deliverables.\n\n## Candidates\n\n- **A1 (recommended)**: logistic overlay + resilience-loss (hysteresis)\n  criterion; tipping time = first crossing of s* or, if none, when recovery\n  time tolerance is exceeded.\n- **A2**: static threshold crossing only. Rejected as primary; retained as\n  a cross-check.\n- **B1 (recommended)**: three intervention levers with quantified pass-through\n  from the provided benchmarks, cost = coverage × unit cost × pop × years,\n  cost-per-fragility-point-averted metric.\n- **B2**: cost-free qualitative policy list. Rejected — problem asks for a\n  predicted total cost.\n\nPlease confirm or correct: (1) the logistic + hysteresis tipping definition;\n(2) the three-lever intervention and cost structure."
+        ],
+        "expert_answers": [
+          "The recommended A+B hybrid is the correct structure. Anchor the core on the FSI 12-indicator taxonomy and 0–120 scale, with climate entering as stressor-driven displacement ΔIᵢ of climate-sensitive indicators, so fragility classification and climate impact (ΔF) are read off the same calibrated index. This satisfies \"simultaneously measure\" transparently and keeps Tasks 2 and 4 judge-verifiable. Add only a reduced one-dimensional dynamic overlay—logistic threshold crossing on the composite or a critical indicator—to supply the tipping-point and intervention-cost trajectories Tasks 3 and 4 demand. A full ODE network is unjustified: coupling parameters are unidentifiable and FSI validation would weaken.",
+          "Confirm both.\n\n(1) Thresholds: 55/80 on the 0–120 composite, aligned to FSI Guard/Warning zones, with a top-decile \"very fragile\" flag at F ≥ 100. Defensible and judge-verifiable.\n\n(2) Mapping: two-tier displacement is correct. Direct → E1, E2, P2, P4; indirect → P1, C3, C2, X1. Keep the saturation cap at 10 per indicator and attach the yield-loss and adaptation benchmarks to E2/E1 as the entry points. Uniform displacement across all 12 would make ΔF uninterpretable—reject it.\n\nOne refinement: state explicitly that ΔF is computed against a no-climate counterfactual baseline, so \"climate impact\" is a difference, not a level. That keeps Tasks 2–4 comparable.",
+          "Confirm both.\n\n(1) Tipping: logistic overlay with resilience-loss (hysteresis) criterion is correct. Define the tipping point as the first crossing of the unstable equilibrium s*, with the recovery-time tolerance as the fallback criterion when no crossing occurs. This directly answers \"how do you define a tipping point and predict when a country may reach it,\" and the hysteresis test supplies the \"definitive indicators.\" Retain static F-crosses-80 only as a cross-check, not the primary definition.\n\n(2) Intervention: the three-lever structure is correct — agricultural adaptation (K, yield pass-through), social protection (P2/P4/C3 coefficients), early-warning infrastructure (s*, D(t) growth). Cost = coverage × unit cost × population × years, discounted, with cost-per-fragility-point-averted as the headline metric. Keep the no-intervention vs full-intervention F(t) comparison explicit."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8625,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8666666666666667,
+        "modeling_rigorousness_evaluation": 0.875,
+        "practicality_and_scientificity_evaluation": 0.8333333333333334,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each task, explicitly linking them to the Fragile States Index (FSI) framework. The objectives are precise: Task 1 establishes a general framework for classification and impact measurement; Tasks 2 and 3 specify concrete case studies (Yemen and Ethiopia) with relevant data points; Task 4 focuses on intervention costs; and Task 5 addresses scalability. The distinction between direct and indirect climate impacts is explicitly noted, ensuring the model's goals align with the problem requirements. The analysis is accurate and the goals are explicit, leaving little ambiguity about what needs to be achieved in each sub-problem.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all five required tasks comprehensively. There is a strong logical dependency: Task 1 builds the model, which is applied in Tasks 2 and 3, with Task 4 building on the findings of Task 3 (and referencing Task 2), and Task 5 extending the model's applicability. The selection of Yemen (top 10) and Ethiopia (non-top 10) directly addresses the specific constraints of Tasks 2 and 3. No key parts are missing, and the sub-tasks are interrelated, supporting the final goal of understanding climate-induced fragility and mitigation. The coverage is complete and aligned with the problem requirements.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a computable framework that quantifies climate impacts on state fragility, includes predictive tipping point analysis, provides actionable cost-benefit estimates, and demonstrates scalability to different geographic scales with validated baselines.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, combining static index analysis with dynamic logistic modeling to capture tipping points. It uses a counterfactual method to isolate climate impacts and integrates interdisciplinary concepts, though the equal weighting of indicators is a minor simplification.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, with detailed decomposition of model outputs and clear causal pathways, effectively supporting decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying structural and data biases, and providing appropriate interpretations and corrections to reduce their impact.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with empirical data sources. The structural choice is well-reasoned, and specific parameters like thresholds and stress loads are defined with transparency, ensuring a robust modeling foundation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model structure is scientifically sound, combining static FSI metrics with dynamic critical state analysis. The logical decomposition of climate impacts and the specific, quantifiable intervention strategies reflect a realistic and rational approach to the problem.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2018_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p1_20260927_101216",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p1_20260927_101216/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Core framework for a climate-adjusted country fragility model\n\n## Problem understanding\n\n- Problem 2018_E asks for a model that (1) classifies a country as stable / vulnerable /\n  fragile and simultaneously measures how climate change raises its fragility directly\n  and through other indicators; (2) applies it to a top-10 FSI state (counterfactual:\n  how much less fragile without climate change); (3) applies it to a non-top-10 state and\n  defines/predicts a tipping point; (4) evaluates state interventions and their total\n  cost; (5) discusses transfer to cities or continents.\n- Only pre-gathered data is available: the FSI 2018 structure (12 indicators, 0–10 each,\n  0–120 total; top-10 membership; historical scores for Syria, Yemen), drought-yield-loss\n  benchmarks (0.8% per drought event; 3–12% multi-year maize/soybean losses; adaptation\n  effects: yields +15–64%, and −1.7% drought yield loss per +10% irrigation share). No\n  other data may be collected.\n- Stage: about to commit to the core model architecture that will drive all five tasks.\n\n## Decision point\n\nHow should the composite fragility model be structured and classified? Two candidate\nframeworks, and my primary recommendation (Option A):\n\n**Option A (recommended): static weighted composite anchored on the FSI taxonomy.**\nFragility index F = Σ wᵢ·Iᵢ over the 12 FSI indicators (0–10 each), climate change\nentering through a climate stress submodel S(t) (drought/temperature) that shifts\nclimate-exposed indicator scores via quantified yield-loss pathways; classification\nby calibrated fixed thresholds (stable / vulnerable / fragile); tipping point defined\nas the year a dynamic component (e.g., a lagged, accumulating fragility state) crosses\na threshold with sustained slope. Advantages: directly satisfies the FSI-anchored\ncalibration the data supports, transparent weights and indicators, clean\ncounterfactual (set S=0), cheap and reproducible. Limitations: static cross-section,\nno endogenous feedback loops, thresholds need justification.\n\n**Option B: dynamic agent/threshold system model** with feedback loops (e.g., climate\nshock → food insecurity → migration → social grievance → state legitimacy loss →\nreduced service capacity → larger future shock response), simulated as coupled ODEs /\ndifference equations over time. Advantages: naturally yields tipping points,\nhysteresis, and intervention timing. Limitations: far more parameters than the data\ncan support, weak identifiability, heavy assumptions, harder to benchmark against FSI.\n\n**Option C: hybrid** — FSI-anchored composite for scoring/classification plus a single\nlightweight dynamic component (e.g., accumulated climate stress with a recovery lag)\nfor tipping-point prediction and intervention timing. Advantages: keeps benchmarkability\nwhile providing dynamics where the problem demands them. Limitations: more moving parts\nthan A.\n\nWhy it matters: the choice fixes the entire downstream structure of Tasks 1–5, the\ncalibration approach, the counterfactual construction, and what \"tipping point\" means.\n\nMy primary recommendation is Option C (hybrid: FSI-anchored static composite + one\nlightweight dynamic climate-stress component for tipping points).\n\nWhich option do you endorse, and if not my recommendation, which do you prefer?",
+              "# Expert Question 2 — Classification thresholds, climate decomposition, and counterfactual construction\n\n## Problem understanding\n\n- Round 1 settled the architecture: an FSI-anchored 12-indicator composite (each 0–10,\n  total 0–120) with climate change entering via a quantified climate-stress submodel\n  S(t) that shifts climate-exposed indicator scores, plus exactly one dynamic\n  climate-stress state (accumulating stress with a recovery lag) for tipping-point\n  prediction and intervention timing.\n- Available anchors: FSI 2018 top-10 (South Sudan, Somalia, CAR, Yemen, Sudan, Syria,\n  DRC, Chad, Afghanistan, Iraq); Fund for Peace flags top ~9th decile (≈110+) as\n  \"Very High Alert\"; historical scores — Syria ~73 (2010) → ~95+ (2014), Yemen ~75\n  (2014) → ~98 (2018); drought benchmarks (−0.8% per event; 3–12% multi-year yield\n  losses; 2020–2050 country-level losses a few % to >20%).\n- Stage: about to finalize the scoring rules that Tasks 1–4 will all reuse.\n\n## Decision point\n\nThree coupled choices in one decision: (a) stable/vulnerable/fragile thresholds;\n(b) how to split total climate contribution into direct vs. indirect; (c) how to build\nthe Task 2 counterfactual. My recommendation (primary option):\n\n**Option 1 (recommended): equal-weight composite, decile-anchored thresholds,\nadditive direct/indirect decomposition, \"climate-off\" counterfactual.**\n- F = (1/12)·Σ w-scale Iᵢ on a 0–100 basis (12 equal-weighted indicators × 10 / 120 →\n  0–100). Climate enters as ΔI on exposed indicators (economic decline E2, uneven\n  development E3, group grievance C3, human flight E4, refugees/IDPs P4, external\n  intervention X1, public services P2) via a linear yield-loss→indicator mapping\n  calibrated so that a benchmark drought event produces a defensible indicator\n  increment.\n- Thresholds by decile anchoring: fragile ≥ ~70 (≈ 8th decile; captures the top-10\n  cluster of 90+), vulnerable ~45–70, stable < 45 — i.e., roughly\n  stable < 45 ≤ vulnerable < 70 ≤ fragile on the 0–100 scale, justified by the\n  ≈110/120 \"Very High Alert\" marker and the top-10 scores.\n- Climate impact split: ΔF = ΔF_direct + ΔF_indirect, where direct = climate-driven\n  shifts on economic/production indicators (E2, E3, P2) and indirect = shifts on\n  cohesion/social indicators (C3, E4, P4, X1) triggered through the direct channels\n  (food insecurity → grievance, migration, external intervention).\n- Task 2 counterfactual: F_noCC = F with S(t) = 0 (all climate-driven indicator\n  increments removed); the difference F − F_noCC, decomposed into direct/indirect\n  shares, quantifies \"how much less fragile without climate change.\"\n\n**Option 2: data-driven weights from an FSI regression.** Estimate indicator weights\nfrom published FSI scores for a few anchor countries. Advantage: weights reflect the\nreal index. Limitation: with only ~3–4 historical anchor points per country the\nregression is underdetermined and fragile; adds estimation noise to every downstream\ntask.\n\n**Option 3: nonlinear (saturation/logistic) climate-to-indicator mapping** instead of\nlinear, so extreme drought saturates rather than extrapolates. Advantage: bounded\nbehavior. Limitation: needs extra shape parameters not supported by the available\nbenchmarks; complicates the counterfactual algebra.\n\nWhy it matters: thresholds decide the fragile/vulnerable/stable labels for every\ncountry in Tasks 2–4; the decomposition is the explicit answer to \"direct means or\nindirectly\"; the counterfactual construction is the entire Task 2 deliverable.\n\nMy primary recommendation is Option 1. Do you endorse it, and if not, which of the\nthree do you prefer?",
+              "# Expert Question 3 — Case-country selection for Tasks 2–4 and the formal tipping-point definition\n\n## Problem understanding\n\n- Rounds 1–2 settled the model: equal-weight FSI-anchored 12-indicator composite\n  (0–100); thresholds stable < 45 ≤ vulnerable < 70 ≤ fragile; climate enters through\n  a linear, bound-capped yield-loss→indicator mapping on exposed indicators (direct:\n  E2, E3, P2; indirect: C3, E4, P4, X1), giving ΔF = ΔF_direct + ΔF_indirect; Task 2\n  counterfactual is S(t) = 0; plus one dynamic climate-stress state S(t) with\n  accumulation and recovery lag for tipping points.\n- Available data anchors: FSI top-10 membership; Syria ~73 (2010) → ~95+ (2014) after\n  the 2006–2010 drought; Yemen ~75 (2014) → ~98 (2018); drought benchmarks (0.8%/event,\n  3–12% multi-year, >20% by 2050 in drought-prone regions; adaptation: yields +15–64%,\n  −1.7% yield loss per +10% irrigation share). No further data may be collected.\n- Stage: final strategic choice before implementation — which countries to run and how\n  to define the tipping point.\n\n## Decision point\n\nTwo coupled choices, my primary recommendation first:\n\n**Option 1 (recommended): Yemen for Task 2 (top-10 case), Niger for Task 3\n(non-top-10 case), tipping point = first year in a 5-year forward simulation (2020–2050,\nSSP2-4.5-style stress envelope from the 2020–2050 projection benchmark) where the\ndynamic stress state S crosses the fragile threshold band (70) with a sustained\npositive slope (5-year rolling slope > 0), reported together with the direct\nindicator that crosses first.**\n- Yemen: top-10 (FSI ≈ 98 in 2018), arid, documented drought-driven water stress and\n  documented climate-aggravated fragility; strong 2014→2018 historical anchor\n  (75 → 98) lets the counterfactual show a defensible \"less fragile without climate\n  change\" gap.\n- Niger: outside the top 10, Sahelian, rainfall-varying, high food-import dependence,\n  so its stress state plausibly crosses the fragile band inside the 2020–2050 window —\n  giving a concrete \"when\" for Task 3 and a meaningful intervention case for Task 4.\n- Tipping point as threshold crossing with sustained slope (not instantaneous crossing):\n  the sustained-slope condition distinguishes a genuine regime shift from threshold\n  noise, matching the \"predict when a country may reach it\" requirement.\n\n**Option 2: Somalia for Task 2, Eritrea or Djibouti for Task 3.**\nSomalia is also top-10 with strong drought exposure (2016–2018 megadrought), but its\nFSI time-series anchors are less well documented in the available data than\nYemen's, weakening the counterfactual's calibration. Horn-of-Africa non-top-10\nalternatives (Eritrea, Djibouti) are smaller and less climate-food stressed than\nNiger, making a 2020–2050 crossing less likely inside the window.\n\n**Option 3: keep country choice open to whatever maximizes a crossing event** (screen\nmany non-top-10 countries in simulation and report the first one that crosses).\nAdvantage: guarantees a concrete \"when.\" Limitation: selection after the fact (a\nspecification search), weakens the claim that the model *predicts* the crossing, and\ncosts simulation/interpretation effort for marginal gain.\n\nWhy it matters: the country choices determine all case-study results in Tasks 2–4;\nthe tipping-point definition is an explicit deliverable of Task 3 and drives the\nintervention-timing analysis of Task 4.\n\nMy primary recommendation is Option 1 (Yemen, Niger, sustained-slope crossing).\nDo you endorse it, and if not, which of the three do you prefer?"
+            ],
+            "expert_answers": [
+              "I endorse Option C, your recommendation.\n\nOption A alone cannot satisfy Task 3's requirement to define and predict a tipping point, since a purely static cross-section has no temporal mechanism for crossing a threshold. Option B is unidentifiable given the available data and would break the FSI benchmarking that Tasks 1–2 depend on.\n\nOption C preserves the FSI-anchored composite for scoring, classification, and the clean S=0 counterfactual, while adding exactly one dynamic climate-stress state with a recovery lag. That single component is sufficient to define a tipping point (threshold crossing with sustained slope), to time interventions in Task 4, and to remain calibratable from the drought-yield benchmarks. Keep the dynamic layer minimal — one accumulating state, not a full feedback network — so identifiability and reproducibility survive.",
+              "I endorse Option 1, with one refinement.\n\nEqual weights are the right call: they are transparent, reproducible, and avoid the underdetermined regression of Option 2. Decile-anchored thresholds are defensible because they tie the labels to the FSI's own distribution rather than to arbitrary cut points, and they place the top-10 cluster correctly in the fragile band.\n\nThe additive direct/indirect split is the correct answer to Task 1's \"direct means or indirectly\" requirement, and the S=0 counterfactual is the cleanest possible Task 2 construction.\n\nMy one refinement: keep the climate-to-indicator mapping linear as you propose, but cap each exposed indicator's climate increment at its 0–10 bound. This preserves Option 1's algebra and counterfactual simplicity while preventing the unbounded extrapolation that motivated Option 3, without introducing any new shape parameters.",
+              "I endorse Option 1.\n\nYemen is the correct Task 2 choice: it is top-10, its 2014→2018 anchor (75→98) is the best-documented in the available data, and its arid, drought-driven water stress makes the S=0 counterfactual both defensible and interpretable. Somalia's weaker time-series anchors would undermine the counterfactual calibration.\n\nNiger is the correct Task 3 choice: outside the top 10, Sahelian, rainfall-sensitive, and food-import dependent, so a crossing inside 2020–2050 is plausible rather than forced. Option 3's post-hoc screening would convert a prediction into a specification search and should be rejected.\n\nThe tipping-point definition — first year S crosses 70 with a 5-year rolling slope > 0, reported with the first-crossing direct indicator — is the right formalization. The sustained-slope condition is what separates a regime shift from threshold noise, and naming the leading indicator makes the prediction falsifiable."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_fb22cbc25c4f",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8458333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8333333333333334,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p1_20260927_101216/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately restates the core objectives of all five tasks, clearly defining the scope to include fragility classification, climate impact measurement, and intervention analysis. The goals are explicit, distinguishing between direct and indirect climate effects and specifying the need for tipping point definitions. However, the analysis is largely a paraphrase of the prompt without adding significant depth regarding specific metrics, data sources, or the logical framework connecting the sub-problems, which limits the clarity of the modeling approach.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced, moving from model development to application on specific cases (fragile and non-fragile states), then to interventions and scalability. This structure ensures complete coverage of the problem requirements. The dependencies are implicit but clear: Task 1 provides the tool for Tasks 2-4, and Task 5 tests the model's robustness. No key parts are missing, and the tasks directly support the final goal of understanding climate-induced fragility and mitigation strategies.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative insights, logical inference paths, and a balanced discussion of model strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases, and explaining their impact on results, though corrections are primarily through documentation rather than statistical adjustment.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear, explicit, and well-justified with data, though the simplification of climate impact to a single state variable is a notable limitation.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (FSI anchoring, dynamic stress state) and rational country selections, with a robust definition of tipping points and clear intervention logic.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear, interpretable framework that quantifies climate impacts on fragility, predicts tipping points, and evaluates intervention costs, directly supporting policy decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, using a justified mathematical structure (differential equations, composite indices) grounded in empirical data and domain-specific causal mechanisms, ensuring a rational and theoretically sound approach.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        },
+        {
+          "problem_id": "2018_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Task 2018_E (Climate Change and State Fragility)\n\n## Problem Understanding\n\nThe MM-Bench 2018_E problem asks for (Task 1) a model that determines a\ncountry's fragility AND simultaneously measures climate-change impact, classifying\nstates as stable / vulnerable / fragile, and tracing direct and indirect\nclimate→fragility pathways; (Task 2) apply it to a top-10 FSI country; (Task 3)\napply it to a non-top-10 country with tipping-point prediction; (Task 4) quantify\nstate interventions and total cost; (Task 5) discuss scale transferability\n(cities / continents).\n\nPre-gathered data: the FSI 2018 structure (12 indicators, 0–10 each, 0–120\ntotal; three categories Cohesion / Economy / Society), the 2018 top-10 list,\nalert thresholds, drought-yield-loss benchmarks (−0.8% GDP-agri per drought\nevent; 3–12% multi-year maize/soy yield reductions; 2020–2050 projections to\n>20%), and adaptation magnitudes (+15–64% yield with adaptation; −1.7% yield\nloss per +10% irrigation share).\n\n## Current Stage\n\nFormulating the core model (Task 1) before any implementation.\n\n## Decision Point\n\nHow should the composite fragility model be structured with respect to climate\nchange? Two fundamentally different approaches:\n\n**Option A — Indicator-injection model (static, weighted).**\nTake the 12 FSI indicators as the fragility basis. Climate change is modeled as\nshifting the scores of the climate-sensitive indicators (e.g. E2 economic\ndecline via yield-loss→revenue, E1 demographic pressure via migration, P2 public\nservices, X1) through a direct climate-stressor mapping. Composite index\nF = Σ wᵢ · Iᵢ(t), with Iᵢ(t) = Iᵢ,base + ΔIᵢ(climate stressors). Climate\nimpact measured as ΔF = F(climate) − F(no climate). Simple, transparent,\ndirectly calibrated to FSI scores/thresholds; but mostly static and the\n\"simultaneously measure\" requirement is met only via the ΔF decomposition.\n\n**Option B — Dynamic coupled model.**\nA system of ODEs/difference equations coupling climate stressors (temperature\nrise, precipitation/drought frequency), agricultural output, economic\nfragility, social cohesion, and political legitimacy over time. Can produce\ntipping points and intervention cost trajectories; but parameters are not\navailable for most coupling terms, and FSI-calibrated validation is much\nweaker.\n\nMy primary recommendation is **Option A as the core** (FSI-anchored,\ncalibrated to the 12-indicator taxonomy and 0–120 scale), augmented with a\n**lightweight Option-B overlay** (a simple logistic/tipping-point dynamics for\nTask 3's prediction requirement) rather than a full ODE system.\n\n## Why It Matters\n\nThe choice determines the entire architecture: calibration strategy, what\n\"simultaneously measure climate impact\" means, and whether tipping-point\nprediction in Task 3 is an empirical threshold-crossing or a dynamic\ninstability — downstream it shapes Tasks 2–5 and the validation approach.\n\n## Candidate Strategies Summary\n\n- **A (recommended core)**: direct + indirect pathways via indicator\n  displacement; climate impact = index difference; calibrated to FSI 2018.\n  Pros: grounded, explainable, judge-verifiable. Cons: limited dynamics.\n- **B (full dynamic)**: ODE network. Pros: endogenous tipping points. Cons:\n  weak parameter identifiability; harder to tie to FSI; risk of an unanchored\n  model.\n- **A+B hybrid (recommended)**: A for measurement/classification/calibration;\n  B-reduced (one-dimensional tipping dynamics on the composite or on a\n  critical indicator) only where Tasks 3–4 require trajectory/cost\n  prediction.",
+              "# Expert Question 2 — Task 2018_E (builds on Round 1)\n\n## Reply Received (Round 1)\n\nConfirmed: A+B hybrid. Core = FSI 12-indicator taxonomy on 0–120 scale;\nclimate enters as stressor-driven displacement ΔIᵢ of climate-sensitive\nindicators; classification and climate impact (ΔF) read off the same\ncalibrated index. Add a reduced one-dimensional dynamic overlay (logistic\nthreshold crossing) for tipping-point and intervention-cost trajectories\n(Tasks 3–4). No full ODE network.\n\n## Current Stage\n\nArchitecture settled. Now defining (a) the three-state classification\nthresholds and (b) which indicators receive climate displacement and through\nwhich pathway.\n\n## Decision Point\n\n**Thresholds.** FSI publishes alert zones (\"Safe ~40–55, Guard 55–80,\nWarning 80–100, Crisis 100+\"). The problem asks for three classes:\nstable / vulnerable / fragile. My proposal:\n- **Stable**: F < 55\n- **Vulnerable**: 55 ≤ F < 80\n- **Fragile**: F ≥ 80\nwith \"very fragile / very high alert\" noted when F ≥ 100 (top decile, matches\nthe ~110+ Very High Alert convention in the data).\n\n**Displacement mapping.** Direct pathway: drought/temperature stressors act\non E2 (Economic Decline, via yield loss → revenue/GDP), E1 (Demographic\nPressures, via food insecurity → migration), P2 (Public Services, via\nwater/food service collapse), P4 (Refugees and IDPs). Indirect pathway:\nrevenue loss → reduced services/legitimacy → P1; economic stress → group\ngrievance C3 and factionalized elites C2; migration inflows → X1/X4\n(external intervention). Each ΔIᵢ = f(climate stressor load, exposure\ncoefficients) with a saturation cap at 10.\n\n## Why It Matters\n\nThe thresholds determine classification for every task; the mapping determines\nwhich pathways are defensible and where the 0.8%-per-event / 3–12% yield-loss\nbenchmarks and the +15–64% adaptation figures attach.\n\n## Candidate Strategies\n\n- **Thresholds (recommended as stated)**: 55 / 80 cutpoints on the 0–120\n  composite, aligned to FSI Guard/Warning zones and the top-decile fragile\n  convention. Alternative: 60/85 — rejected, less defensible against FSI\n  zones.\n- **Mapping (recommended)**: two-tier (direct → E1, E2, P2, P4; indirect →\n  P1, C3, C2, X1) with saturation; alternative: uniform displacement across\n  all 12 — rejected, ignores FSI's category structure and makes climate\n  impact uninterpretable.\n\nPlease confirm or correct: (1) the 55/80 threshold scheme and its top-decile\nfragile flag; (2) the direct/indirect indicator displacement mapping.",
+              "# Expert Question 3 — Task 2018_E (builds on Rounds 1–2)\n\n## Replies Received\n\n- R1: A+B hybrid confirmed (FSI-anchored core + 1-D logistic tipping\n  overlay; no ODE network).\n- R2: Thresholds 55/80 (fragile ≥80, very fragile ≥100) confirmed;\n  two-tier displacement (direct → E1,E2,P2,P4; indirect → P1,C3,C2,X1;\n  saturation cap 10) confirmed; ΔF defined against a no-climate\n  counterfactual baseline.\n\n## Current Stage\n\nReady to implement. Two design decisions remain for the reduced dynamic\noverlay (Tasks 3–4) and the intervention accounting (Task 4).\n\n## Decision Point\n\n**A. Tipping-point dynamics (Task 3).** My proposal: one-dimensional\ndiscrete logistic on a critical-state variable s(t) ∈ [0,100],\ns(t+1) = s(t) + r·s(t)·(1 − s(t)/K) − D(t)·G(s(t)), where K is the\nresilience capacity and D(t) is the cumulative climate stress load from the\ncore model's displacement channel. The tipping point is defined as the first\ntime s crosses a critical level s* (identified as the unstable equilibrium of\nthe logistic map with stress offset, s* = K/2 + stress shift), equivalently\nthe loss of resilience: recovery time to baseline after a shock exceeds a\ntolerance (hysteresis test). Climate pushes a non-fragile state to fragility\nwhen its composite F crosses 80 in the overlay.\n\nAlternative: define tipping purely as a static threshold crossing (F crosses\n80 in a scenario projection) — simpler but loses the \"definitive indicators\"\nand resilience-loss character the problem asks for.\n\n**B. Intervention accounting (Task 4).** My proposal: model interventions as\nmodifiers on the overlay and core: (i) agricultural adaptation (irrigation\nexpansion, drought-resistant crops) raises resilience capacity K by +15–64%\nband and cuts yield-loss pass-through (−1.7% loss per +10% irrigation share);\n(ii) social protection (food subsidies, IDP response) dampens the P2/P4/C3\ndisplacement coefficients; (iii) early-warning/resilience infrastructure\nraises the tipping threshold s* and reduces D(t) growth rate. Total cost =\nΣ over interventions of (coverage share × per-capita cost × population ×\nyears), discounted; compare no-intervention vs full-intervention F(t)\ntrajectories and report cost per fragility-point averted.\n\n## Why It Matters\n\nFixes the Task 3 tipping definition (the problem explicitly asks \"How do you\ndefine a tipping point and predict when a country may reach it?\") and the\nTask 4 cost model; both are judged deliverables.\n\n## Candidates\n\n- **A1 (recommended)**: logistic overlay + resilience-loss (hysteresis)\n  criterion; tipping time = first crossing of s* or, if none, when recovery\n  time tolerance is exceeded.\n- **A2**: static threshold crossing only. Rejected as primary; retained as\n  a cross-check.\n- **B1 (recommended)**: three intervention levers with quantified pass-through\n  from the provided benchmarks, cost = coverage × unit cost × pop × years,\n  cost-per-fragility-point-averted metric.\n- **B2**: cost-free qualitative policy list. Rejected — problem asks for a\n  predicted total cost.\n\nPlease confirm or correct: (1) the logistic + hysteresis tipping definition;\n(2) the three-lever intervention and cost structure."
+            ],
+            "expert_answers": [
+              "The recommended A+B hybrid is the correct structure. Anchor the core on the FSI 12-indicator taxonomy and 0–120 scale, with climate entering as stressor-driven displacement ΔIᵢ of climate-sensitive indicators, so fragility classification and climate impact (ΔF) are read off the same calibrated index. This satisfies \"simultaneously measure\" transparently and keeps Tasks 2 and 4 judge-verifiable. Add only a reduced one-dimensional dynamic overlay—logistic threshold crossing on the composite or a critical indicator—to supply the tipping-point and intervention-cost trajectories Tasks 3 and 4 demand. A full ODE network is unjustified: coupling parameters are unidentifiable and FSI validation would weaken.",
+              "Confirm both.\n\n(1) Thresholds: 55/80 on the 0–120 composite, aligned to FSI Guard/Warning zones, with a top-decile \"very fragile\" flag at F ≥ 100. Defensible and judge-verifiable.\n\n(2) Mapping: two-tier displacement is correct. Direct → E1, E2, P2, P4; indirect → P1, C3, C2, X1. Keep the saturation cap at 10 per indicator and attach the yield-loss and adaptation benchmarks to E2/E1 as the entry points. Uniform displacement across all 12 would make ΔF uninterpretable—reject it.\n\nOne refinement: state explicitly that ΔF is computed against a no-climate counterfactual baseline, so \"climate impact\" is a difference, not a level. That keeps Tasks 2–4 comparable.",
+              "Confirm both.\n\n(1) Tipping: logistic overlay with resilience-loss (hysteresis) criterion is correct. Define the tipping point as the first crossing of the unstable equilibrium s*, with the recovery-time tolerance as the fallback criterion when no crossing occurs. This directly answers \"how do you define a tipping point and predict when a country may reach it,\" and the hysteresis test supplies the \"definitive indicators.\" Retain static F-crosses-80 only as a cross-check, not the primary definition.\n\n(2) Intervention: the three-lever structure is correct — agricultural adaptation (K, yield pass-through), social protection (P2/P4/C3 coefficients), early-warning infrastructure (s*, D(t) growth). Cost = coverage × unit cost × population × years, discounted, with cost-per-fragility-point-averted as the headline metric. Keep the no-intervention vs full-intervention F(t) comparison explicit."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_fb22cbc25c4f",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p1_20260927_101216/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each task, explicitly linking them to the Fragile States Index (FSI) framework. The objectives are precise: Task 1 establishes a general framework for classification and impact measurement; Tasks 2 and 3 specify concrete case studies (Yemen and Ethiopia) with relevant data points; Task 4 focuses on intervention costs; and Task 5 addresses scalability. The distinction between direct and indirect climate impacts is explicitly noted, ensuring the model's goals align with the problem requirements. The analysis is accurate and the goals are explicit, leaving little ambiguity about what needs to be achieved in each sub-problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five required tasks comprehensively. There is a strong logical dependency: Task 1 builds the model, which is applied in Tasks 2 and 3, with Task 4 building on the findings of Task 3 (and referencing Task 2), and Task 5 extending the model's applicability. The selection of Yemen (top 10) and Ethiopia (non-top 10) directly addresses the specific constraints of Tasks 2 and 3. No key parts are missing, and the sub-tasks are interrelated, supporting the final goal of understanding climate-induced fragility and mitigation. The coverage is complete and aligned with the problem requirements.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a computable framework that quantifies climate impacts on state fragility, includes predictive tipping point analysis, provides actionable cost-benefit estimates, and demonstrates scalability to different geographic scales with validated baselines.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, combining static index analysis with dynamic logistic modeling to capture tipping points. It uses a counterfactual method to isolate climate impacts and integrates interdisciplinary concepts, though the equal weighting of indicators is a minor simplification.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, with detailed decomposition of model outputs and clear causal pathways, effectively supporting decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying structural and data biases, and providing appropriate interpretations and corrections to reduce their impact.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with empirical data sources. The structural choice is well-reasoned, and specific parameters like thresholds and stress loads are defined with transparency, ensuring a robust modeling foundation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model structure is scientifically sound, combining static FSI metrics with dynamic critical state analysis. The logical decomposition of climate impacts and the specific, quantifiable intervention strategies reflect a realistic and rational approach to the problem.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8625,
+      "interaction_cost": 0.8781535865921365,
+      "interaction_penalty": 0.043907679329606826,
+      "net_utility": 0.8185923206703932,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3353,
+          "total_expert_latency_seconds": 5.3,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9530978292306307,
+          "latency_cost_component": 0.29245622321461484,
+          "interaction_cost": 0.8812391316922523,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2940,
+          "total_expert_latency_seconds": 5.32,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9376701037300514,
+          "latency_cost_component": 0.29295985639410643,
+          "interaction_cost": 0.8750680414920207,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2018_A",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Framing of the Part I link budget\n\n## Problem understanding\nHF (3–30 MHz) constant-carrier, 100 W point source on land; signal first reflects off the\nionosphere, then off the ocean surface (the \"first ocean reflection\"), then propagates\nmulti-hop (ionosphere–ocean bounces) until the received strength falls below a 10 dB SNR\nthreshold. Part I asks: (a) strength of the first ocean reflection on a turbulent ocean\ncompared with a calm ocean, and (b) the maximum number of hops over calm oceans before\nSNR < 10 dB.\n\n## Decision point\nHow to structure the reflection-strength comparison so it is defensible and quantitative.\nTwo candidate framings:\n\n1. **Angle-consistent Fresnel contrast (recommended).** Treat the calm ocean as a flat,\n   smooth dielectric interface and use the plane-wave Fresnel reflection coefficient\n   R(θ_i) at the same incidence angle, with seawater's complex relative permittivity from\n   the Meissner/Huisman/Ulaby Debye fit (external data item 1). Model turbulence as\n   (i) effective-ε/σ perturbation of the surface layer (a few %) and (ii) small-scale\n   surface roughness scattering loss via a perturbation/Bragg-type correction that grows\n   with the roughness height variance σ_s² relative to wavelength. Report the\n   calm-vs-turbulent contrast in dB at the common incidence angle.\n\n2. **Full physical-geometry two-interface model.** Simultaneously solve the two-interface\n   (ionosphere + ocean) eigenvalue/refraction problem, letting turbulence perturb the\n   wavevector and the ocean's electromagnetic gradient. More physically complete but far\n   more complex; the \"turbulence\" would then be baked into the propagation constant.\n\n## Why it matters\nThe choice decides the whole Part I deliverable and cascades into the hop count (b) and\nPart III. Option 1 keeps the comparison at the reflection coefficient (clean, citable,\nsensitive to roughness), Option 2 mixes reflection and refraction effects that are hard\nto separate in the answer.\n\n## Candidate strategies\n- **Option 1 (recommended):** Fresnel R(θ) at common incidence angle + roughness\n  scattering correction. Advantages: isolates the ocean-surface effect the problem asks\n  about; each term (Fresnel, Debye ε, roughness) is a standard citable result; the\n  hop-count budget in (b) then follows from a per-hop loss chain (Fresnel² + ionospheric\n  + free-space/spherical spreading). Limitations: perturbation theory is valid only for\n  small roughness (σ_s ≪ λ); needs a roughness parameter (e.g. significant wave height\n  mapped to σ_s) that must be stated as an assumption.\n- **Option 2:** full two-interface model. Advantages: captures turbulence changing the\n  propagation constant, not just the reflection coefficient. Limitations: heavy; the\n  \"turbulent vs calm first-reflection\" contrast becomes entangled with refraction;\n  harder to justify parameter choices without data (the dataset is empty).\n\nMy primary recommendation is Option 1: a Fresnel-based reflection coefficient at the\ncommon incidence angle, with turbulence entering as an effective-ε/σ perturbation plus\na small-roughness scattering loss, followed by a per-hop loss chain to answer the hop\ncount.",
+          "# Expert Question 2 — Part III: shipboard moving receiver\n\n## Context so far (from Question 1)\nPart I is settled: Fresnel reflection coefficient R(θ_i) at the common incidence angle,\ncalm = smooth-interface Debye value, turbulence = small effective-ε/σ perturbation +\nroughness scattering loss scaling with σ_s²/λ²; hop count (b) from a per-hop loss chain\n(ocean Fresnel², ionospheric, spherical spreading) against a 10 dB SNR floor.\n\n## Decision point\nFor Part III, the receiver is a ship moving across a turbulent ocean. Two candidate\nframings for \"how the model changes\" and for \"how long can the ship remain in\ncommunication using the same multi-hop path\":\n\n1. **Geometric path-window (recommended).** Keep the static link-budget model but make\n   the receiver position time-dependent: the ship moves at speed v (e.g. 15–20 knots),\n   the multi-hop path length and its incidence angles are recomputed as functions of\n   ship position, and the ship remains in communication over \"the same multi-hop path\"\n   while the received power (hence SNR) at its moving position stays above the 10 dB\n   floor. The communication duration is then the time the ship takes to cross the\n   geometric window where SNR ≥ 10 dB (t = window length / v). Doppler from ship motion\n   enters only as a small carrier-frequency/bandwidth consideration (a few Hz at ~30\n   knots and 10 MHz), which for a constant-carrier SNR metric is treated as negligible;\n   turbulence already enters via the roughness/ε corrections from Part I.\n\n2. **Dynamic fading model.** Model the moving receiver through a time-varying\n   multipath/fading process (Doppler spread, Rayleigh/fading depth) and define the\n   communication duration statistically (e.g. the time the fade stays above 10 dB).\n   This is more \"wireless-channel\"-like but requires a fading distribution and Doppler\n   spectral model that are not given by the problem and are hard to justify with an\n   empty dataset.\n\n## Why it matters\nIt determines what \"remain in communication using the same multi-hop path\" quantifies.\nOption 1 gives a concrete, physically clear duration (window/v) consistent with the\nstatic budget from Part I. Option 2 reframes the question as a statistical channel\nproblem, which departs from the reflection-strength framing the expert confirmed in\nQuestion 1.\n\n## Candidate strategies\n- **Option 1 (recommended):** geometric path-window with position-dependent budget;\n  Doppler treated as negligible for the constant-carrier SNR. Advantages: directly\n  reuses Part I budget; yields a definite communication time; physically transparent.\n  Limitations: ignores deep fades; assumes the ionospheric path is quasi-static over the\n  window.\n- **Option 2:** Doppler/fading statistical model. Advantages: captures time-varying\n  fades. Limitations: needs fading/Doppler parameters absent from the problem; mixes\n  the reflection-strength model with channel statistics; harder to defend.\n\nMy primary recommendation is Option 1: treat the ship's motion as a geometric sweep of\nthe receiver through the SNR-feasible window of the same multi-hop path, with Doppler\nnegligible for the constant-carrier SNR metric.",
+          "# Expert Question 3 — Part II: rugged-terrain comparison\n\n## Context (settled in Q1, Q2)\nPart I: Fresnel R(θ_i) at common incidence angle; calm ocean = smooth Debye interface;\nturbulent ocean = small ε/σ perturbation + roughness scattering loss (∝ σ_s²/λ²); hop\ncount from per-hop loss chain vs 10 dB SNR floor. Part III: ship as geometric sweep of\nthe receiver through the SNR-feasible window; Doppler negligible.\n\n## Decision point\nPart II asks how Part I's findings compare with HF reflections off mountainous/rugged\nterrain vs smooth terrain. The ocean result is organized around surface roughness\nscattering (σ_s²/λ²) on a high-permittivity lossy medium. Two framings for the\ncomparison:\n\n1. **Direct roughness analogy (recommended).** Treat both the turbulent ocean and\n   mountainous terrain as rough reflectors and compare via the same roughness-scattering\n   mechanism: rugged terrain has far larger effective roughness height σ_s (tens of\n   metres vs centimetres for ocean waves), so at HF (λ ≈ 10–100 m) σ_s/λ is large and\n   the perturbation/small-roughness approximation breaks down — terrain reflection is\n   diffuse/scattering-dominated with strongly reduced coherent (specular) return, plus\n   shadowing and multi-path from the terrain profile. Smooth terrain ≈ the \"calm ocean\"\n   analog (specular Fresnel return at a common angle); rugged terrain ≈ the \"turbulent\n   ocean\" analog with much stronger attenuation. The comparison is therefore: rough\n   (turbulent ocean, rugged terrain) attenuates the coherent return more than smooth\n   (calm ocean, flat terrain), with terrain attenuating far more because σ_s/λ ≫ 1.\n   Note the one physical difference: terrain reflection is from a low-permittivity\n   (soil/rock) interface rather than a high-permittivity one, so the Fresnel baseline\n   magnitude and its angle dependence differ, but the roughness mechanism is common.\n\n2. **Separate terrain-propagation model.** Build a distinct terrain diffraction/model\n   (knife-edge, ITM/Longley–Rice) for Part II rather than reusing the roughness\n   mechanism. More standard in RF site planning but a different modeling framework from\n   Part I, making the \"comparison\" less direct.\n\n## Why it matters\nIt fixes how Part II is stated relative to Part I: as a direct same-mechanism\n(roughness) comparison with a noted dielectric-baseline difference, or as a separate\nterrain framework.\n\n## Candidate strategies\n- **Option 1 (recommended):** direct roughness analogy, common σ_s²/λ² mechanism, with\n  the caveat that terrain is a low-ε interface so its Fresnel baseline differs.\n  Advantages: one unifying mechanism across all parts; directly answers \"compare with\";\n  shows why rugged terrain is worse (σ_s/λ ≫ 1 breaks the small-roughness limit).\n  Limitations: must explicitly flag the dielectric-baseline difference for rigor.\n- **Option 2:** separate ITM/diffraction terrain model. Advantages: standard terrain\n  tool. Limitations: different framework, weaker \"comparison\" link to Part I, heavier\n  parameterization not grounded in the problem.\n\nMy primary recommendation is Option 1: compare rugged vs smooth terrain through the\nsame roughness-scattering mechanism as the turbulent-vs-calm ocean, explicitly noting\nthe low-ε dielectric baseline difference for terrain."
+        ],
+        "expert_answers": [
+          "Option 1 is the defensible framing. The question asks specifically for the strength of the ocean reflection, so the comparison belongs at the reflection coefficient, not inside a coupled propagation constant. Using R(θ_i) at a common incidence angle keeps calm and turbulent cases commensurable: the calm case is the smooth-interface Fresnel value from the Debye permittivity, and turbulence enters as two separable, citable corrections—a small effective-ε/σ perturbation and a roughness scattering loss scaling with σ_s²/λ². This isolates the surface effect the problem targets and yields a clean dB contrast. Option 2 entangles reflection with refraction, making the requested turbulent-vs-calm contrast ambiguous and parameter-hungry given the empty dataset. Option 1 also cascades cleanly: the per-hop loss chain (Fresnel², ionospheric, spreading) directly produces the hop count in (b) and extends to Part III. State the roughness assumption explicitly.",
+          "Option 1 is correct. The question asks how long the ship can remain in communication on the same multi-hop path, which is a geometric-window question, not a channel-statistics question. Keep the Part I link budget intact and let only the receiver position vary: recompute path length and incidence angles as functions of ship position, and define the communication duration as the time to traverse the region where SNR ≥ 10 dB, i.e. window length divided by ship speed. Doppler at HF and ship speeds is a few Hz and does not move a constant-carrier SNR metric, so treat it as negligible. Turbulence already enters through the Part I roughness and permittivity corrections; do not add a second, unjustified fading layer. Option 2 would require a fading distribution and Doppler spectrum the problem never supplies, and it would abandon the reflection-strength framing already settled.",
+          "Option 1 is correct. Part II asks for a comparison with Part I, so it must reuse Part I's mechanism: roughness scattering scaling with σ_s²/λ². Smooth terrain is the calm-ocean analog (specular Fresnel return at the common angle); rugged terrain is the turbulent-ocean analog, but with σ_s of tens of metres against HF wavelengths of 10–100 m, so σ_s/λ is order unity or larger and the small-roughness perturbation limit fails. The coherent specular return is then strongly suppressed and the reflection becomes diffuse/scattering-dominated, worsened by shadowing and terrain multipath. State the one genuine physical difference: terrain is a low-permittivity soil/rock interface, so its Fresnel baseline magnitude and angular dependence differ from the high-permittivity ocean, even though the roughness mechanism is shared. Option 2's ITM/diffraction framework is a different model class and would weaken the requested comparison."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8625,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.85,
+        "practicality_and_scientificity_evaluation": 0.8500000000000001,
+        "result_and_bias_analysis_evaluation": 0.85
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately identifies the scope and goals for all four parts of the problem. Task 1 clearly defines the physical scenario (100W HF signal, below MUF) and the specific objectives (comparing turbulent vs. calm ocean reflection strength and determining max hops for a 10 dB SNR threshold). Tasks 2, 3, and 4 correctly capture the comparative analysis, the dynamic shipboard scenario, and the publication requirement, respectively. The definitions are explicit and align perfectly with the problem requirements.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all required aspects of the problem without deviation. The sub-tasks are logically ordered, with Task 1 providing the foundational model needed for the comparisons in Task 2 and the dynamic adjustments in Task 3. Task 4 serves as the synthesis step. There are no missing key components, and the dependencies between tasks (e.g., using Part I results for Part II and III) are implicitly respected by the structure. The coverage is complete and coherent.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, logically sound, and provides deep physical insight into the dominance of free-space loss over reflection losses, with explicit limitations noted.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model identifies key assumptions and limitations (data/model bias) and explains their impact, though it lacks quantitative sensitivity analysis to fully correct for them.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively solves the problem by integrating physical propagation laws with practical engineering constraints, providing actionable insights on link budget limitations and antenna requirements.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, employing established electromagnetic theories (Fresnel, Debye, Rice) with correct mathematical application and justified assumptions for the specific HF propagation context.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with cited data sources. They effectively model the physical effects of turbulence (permittivity and roughness) and are consistent with the problem background.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate EM methods (Fresnel, Rice roughness) and a sound link budget structure. It correctly handles the transition to rugged terrain and the moving receiver scenario with rational simplifications.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2018_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p2_20260927_101216",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p2_20260927_101216/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Core modeling framework for ocean-surface reflection loss\n\n## Problem understanding\n2018_A requires a physics model of HF (3–30 MHz) signal strength after one or more\nionospheric hops with ocean-surface reflections: (a) first ocean reflection of a\n100 W constant carrier, turbulent vs calm sea; (b) max hop count before SNR < 10 dB\nunder calm-sea re-reflections; (c) rough-terrain comparison; (d) moving shipboard\nreceiver on a turbulent sea and communication time on a fixed multi-hop path.\nExternal data supply: seawater complex permittivity (Meissner et al. 2004, ionic\nconductivity dominated at HF, |εr| ~ 10^2–10^3, lossy) and ionospheric practice\n(FOT ≈ 0.85×MUF, foE ≈ 4 MHz, foF2 ≈ 5–12 MHz).\n\n## Decision point\nHow to quantify the *ocean-surface* reflection loss — i.e. the single dominant\nuncertainty that decides every numeric answer in Parts I–IV:\n\n- **A. Smooth-surface Fresnel reflection with grazing incidence.** Compute the\n  Fresnel coefficient for the complex seawater ε(f) at the actual grazing angle\n  of the oblique ionospheric ray. Turbulence enters as an *effective* change of\n  ε (conductivity/roughness-induced mixing) plus a modest empirical roughness\n  loss. This is fully deterministic and reproducible, but real HF ocean\n  reflection losses (scattering into space, wave shadowing) are known to be\n  much larger than smooth-surface Fresnel predicts at shallow grazing angles.\n- **B. Empirical sea-surface model (ITU-R P.232 / Longley–Rice-type land/mobile\n  sea loss).** Base loss = P.232 median sea loss + spread; turbulence adds an\n  explicit extra loss term scaled by significant wave height Hs. Well validated\n  for 30 MHz and shipboard links, but the median-vs-worst-case spread and the\n  Hs parameterization are less \"first-principles\".\n- **C. Hybrid: smooth Fresnel as the physically grounded base for calm sea,\n  plus a roughness/scattering correction (e.g. small-roughness perturbation\n  with Rayleigh criterion) for the turbulent sea, calibrated so the calm→\n  turbulent increment matches the empirically observed order of magnitude\n  (a few dB to ~10 dB at HF for moderate seas).**\n\n## Why it matters\nThe first-reflection strength, the hop-count answer (SNR budget), the terrain\ncomparison, and the ship communication time are all *functions of the per-hop\nocean loss*. A framework choice that misplaces that loss by 5–10 dB changes\nevery reported number and the final hop count.\n\n## Candidate strategies\n- **A (Fresnel-only):** fully first-principles, transparent; underestimates\n  turbulent loss; risk: answers look unrealistically optimistic vs field data.\n- **B (empirical P.232):** matches field practice, robust for ship links;\n  risk: less defensible as a \"mathematical model\", parameterization opaque.\n- **C (Fresnel + roughness correction, empirically calibrated):** transparent\n  physics base, defensible turbulence increment, bounded by observations;\n  moderate complexity.\n\n## Recommendation\nOption C: use Fresnel reflection of the complex seawater dielectric at the\ntrue grazing incidence for the calm ocean (first principles, uses external\nItem 1), add a small-roughness perturbation loss for turbulence parameterized\nby Hs and validated against typical HF over-sea reflection losses; use the\nper-hop ocean loss + ionospheric absorption (Item 2, FOT = 0.85×MUF) as the\nbudget for the SNR-threshold hop count.\n\nPlease confirm or redirect.",
+              "# Expert Question 2 — SNR noise floor basis and per-hop cost for the hop count\n\n## Status\nOption C framework implemented and computed. Seawater |εr| ≈ 7049 (ionic,\n10.2 MHz), calm-ocean Fresnel ≈ 0.4–0.9 dB (vert 0.025 dB, horiz 0.84 dB,\nequal-power avg 0.42 dB), turbulent (Hs=1.5 m) ≈ +2.2 dB. First ocean\nreflection of the 100 W carrier at 10.2 MHz over a ~2000 km path gives\nP_rx ≈ 7.7e-17 W (calm) / 4.7e-17 W (turbulent).\n\n## Decision point\nThe hop-count answer (Part I b) and ship communication time (Part III) are\nfunctions of the SNR definition. Two independent choices:\n\n1. **Noise floor N0.** I used thermal noise N0 = kT·B with T=290 K, B=300 Hz\n   (carrier/phone bandwidth) → N0 ≈ 8.4e-21 W, so SNR ≈ 18 dB (calm first\n   bounce). Alternatives: (a) a wider RF bandwidth (e.g. 3 kHz) would lower\n   SNR by ~10 dB; (b) a reference-signal basis (compare received power to a\n   fixed usable reference level) instead of a thermal-noise floor. Which\n   basis should define the 10 dB \"usable SNR threshold\" for the hop count?\n\n2. **Per-extra-hop cost.** I charged each additional calm-sea reflection with\n   the ocean Fresnel reflection (≈0.49 dB) + one ionospheric up/down pair\n   (2 dB) ≈ 2.5 dB, giving a maximum of **4 hops**. Charging the full\n   per-segment free-space path instead would give far fewer hops. Which\n   accounting is the intended \"hop\" definition (reflection count vs.\n   path-segment count)?\n\n## Why it matters\nThese two choices directly set the reported hop count (4 vs. much smaller)\nand the ship communication window (hours), i.e. the headline numeric\nanswers of Parts I and III.\n\n## Recommendation\nUse the thermal-noise floor at a 300 Hz carrier/phone bandwidth (N0=kT·B,\nT=290 K) as the SNR reference, and define a \"hop\" as one additional ocean\nreflection, charging the ocean Fresnel + one ionospheric up/down pair per\nhop. This yields a first-bounce SNR ≈ 18 dB (calm), 4 usable calm hops, and\na multi-hop (turbulent) ship communication window of order tens of hours.\n\nPlease confirm or redirect.",
+              "# Expert Question 3 — Part III: how the model changes for a moving ship, and what bounds the communication time\n\n## Status\nParts I and II are settled (expert-confirmed): calm first-bounce SNR ≈ 18 dB,\nturbulent ≈ 16 dB (≈2.2 dB penalty), 4 usable calm hops, rugged-terrain hop\ncount ≈ 1. Seawater |εr|≈7049, Fresnel 0.025/0.84 dB (vert/horiz), roughness\nmodel Hs-scaled.\n\n## Decision point\nPart III: a shipboard receiver moving on a turbulent ocean uses the same\nmulti-hop path. Two coupled questions:\n\n1. **How the model changes.** The moving receiver (a) changes the\n   receiver-to-reflection-point geometry so the grazing angle and hence the\n   per-hop Fresnel/roughness loss drift with position, (b) imposes Doppler on\n   the reflected carrier (frequency spread ~ v_ship/c scale), and (c) moves the\n   receiver through the turbulent surface so the small-scale (fast) fading\n   timescale is set by the dominant wave period (≈1.6 s for Hs=1.5 m). My\n   current treatment: hold the fixed multi-hop geometry, track the large-scale\n   (slow) fade from the receiver drifting out of the favorable reflection\n   zone, and note the fast-fade timescale separately.\n\n2. **What bounds the communication time.** I bound it by the large-scale\n   path growth: as the ship moves, the geometric path to the fixed transmitter\n   lengthens (FSPL 20 log10 d), so the communication ends when the turbulent\n   SNR reaches 10 dB → usable distance ≈ 3950 km → ≈ 36.6 h at 30 m/s.\n   Alternative: bound it by the ionospheric reflection-zone width / the\n   multi-hop path validity (the path itself ceases to support the same hops\n   once the geometry no longer closes), which could be shorter or longer.\n\n## Why it matters\nThis sets the headline Part III number (communication time) and the stated\nmodel modifications for the moving receiver.\n\n## Recommendation\nKeep the fixed multi-hop path; the dominant, reproducible bound is the\nlarge-scale path-growth (FSPL) fade of the turbulent first-reflection\nsignal, giving ≈ 36.6 h at 30 m/s over ≈ 3950 km of track. State the fast-fade\n(wave-period ~1.6 s) and Doppler as secondary, time-varying effects that cause\nshort outages but not the end of communication. This keeps Part III a direct\nextension of the Part I SNR budget.\n\nPlease confirm or redirect."
+            ],
+            "expert_answers": [
+              "Confirm Option C. It is the correct framework for this problem.\n\nRationale, briefly: the calm-sea baseline must be first-principles (Fresnel at the true grazing angle with complex seawater permittivity), since that is the only defensible \"mathematical model\" and it uses the supplied external data. Pure Fresnel (A) is physically transparent but systematically optimistic at shallow grazing angles, where scattering, shadowing, and wave-slope effects dominate — so it would corrupt the hop-count and ship-communication-time answers. Pure empirical P.232 (B) matches field practice but is opaque and weak as a modeling contribution.\n\nThe hybrid keeps the deterministic Fresnel base and adds a bounded roughness/scattering correction scaled by significant wave height, calibrated to the observed few-dB-to-~10-dB calm→turbulent increment. This preserves reproducibility, isolates the single dominant uncertainty (per-hop ocean loss), and lets the SNR budget with ionospheric absorption drive Parts I–IV consistently.",
+              "Confirm both choices.\n\n**Noise floor:** Use the thermal floor N0 = kT·B with T = 290 K and B = 300 Hz (carrier/phone bandwidth). This is the standard, reproducible SNR reference for a constant-carrier HF link and is consistent with the 100 W carrier framing. Do not switch to a wider RF bandwidth or a fixed reference-signal level; those would arbitrarily shift the 10 dB threshold and the hop count.\n\n**Hop definition:** Define a hop as one additional ocean reflection, charging the ocean Fresnel loss plus one ionospheric up/down pair per hop. This matches the problem's own language (\"reflections 2 through n off calm oceans\") and keeps the budget tied to the per-hop ocean loss that Option C isolates. Charging full free-space path per segment conflates geometry with reflection loss and is not the intended accounting.\n\nProceed with 4 calm hops and the tens-of-hours ship window.",
+              "Confirm the recommendation, with one clarification.\n\n**Model changes:** Keep the fixed multi-hop geometry and treat the moving receiver as (a) a slow drift of grazing angle and per-hop Fresnel/roughness loss, (b) a Doppler spread on the reflected carrier, and (c) passage through the turbulent surface setting a fast-fade timescale of order the dominant wave period (~1.6 s). This is the right decomposition: slow geometry-driven fade as the primary effect, fast fading and Doppler as secondary.\n\n**Bound on communication time:** Confirm the large-scale path-growth (FSPL) bound as the headline answer — turbulent SNR reaching 10 dB at ≈3950 km, ≈36.6 h at 30 m/s. This keeps Part III a direct extension of the Part I SNR budget and is reproducible.\n\nDo not substitute the ionospheric reflection-zone-width bound; it introduces an uncalibrated geometric criterion that would make the headline number arbitrary. Mention it only as a caveat, not the governing bound."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_fb22cbc25c4f",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8541666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.7999999999999999,
+            "practicality_and_scientificity_evaluation": 0.8666666666666667,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r1p2_20260927_101216/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the core objectives of each part of the problem. Task 1 clearly defines the goal to calculate signal strength for turbulent vs. calm ocean reflections and determine the maximum hop count based on the SNR threshold. Tasks 2, 3, and 4 correctly identify the comparative analysis, dynamic receiver modeling, and synthesis requirements. The scope is well-defined, and the goals are explicit, directly mirroring the problem requirements without ambiguity or deviation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all four parts of the problem requirements comprehensively. The sub-tasks are logically ordered, with Task 1 providing the foundational model needed for the comparisons in Task 2 and the dynamic adjustments in Task 3. There are no missing key components; the modeler correctly identifies the dependency where the static ocean model informs the terrain comparison and the moving ship scenario. The coverage is complete and directly supports the final goal of producing a publishable synopsis.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are clear, quantitative, and well-explained, with transparent inference and explicit identification of model strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies key biases in geometry, turbulence modeling, and environmental factors, providing clear limitations and scaling contexts to mitigate their impact.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the practical problem by providing quantifiable metrics for signal strength, hop limits, and communication duration, directly supporting decision-making for HF maritime communications with clear, physically grounded predictions.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, grounded in first-principles electromagnetic theory and accurate physical parameters for seawater and ocean turbulence, demonstrating a sophisticated and justified application of domain-specific scientific knowledge.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and physically justified. They correctly identify key parameters (frequency, angle, sea state) and use standard physical principles (Fresnel reflection) for the baseline, with a rational perturbation approach for turbulence. The impact of assumptions on the model's output is acknowledged.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (Fresnel reflection, roughness correction) and metrics (SNR, dB). The structure logically reflects the physical process of multi-hop HF propagation. The handling of the moving receiver by focusing on geometric path loss as the limiting factor is scientifically rational and realistic for the timescale of interest.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2018_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Framing of the Part I link budget\n\n## Problem understanding\nHF (3–30 MHz) constant-carrier, 100 W point source on land; signal first reflects off the\nionosphere, then off the ocean surface (the \"first ocean reflection\"), then propagates\nmulti-hop (ionosphere–ocean bounces) until the received strength falls below a 10 dB SNR\nthreshold. Part I asks: (a) strength of the first ocean reflection on a turbulent ocean\ncompared with a calm ocean, and (b) the maximum number of hops over calm oceans before\nSNR < 10 dB.\n\n## Decision point\nHow to structure the reflection-strength comparison so it is defensible and quantitative.\nTwo candidate framings:\n\n1. **Angle-consistent Fresnel contrast (recommended).** Treat the calm ocean as a flat,\n   smooth dielectric interface and use the plane-wave Fresnel reflection coefficient\n   R(θ_i) at the same incidence angle, with seawater's complex relative permittivity from\n   the Meissner/Huisman/Ulaby Debye fit (external data item 1). Model turbulence as\n   (i) effective-ε/σ perturbation of the surface layer (a few %) and (ii) small-scale\n   surface roughness scattering loss via a perturbation/Bragg-type correction that grows\n   with the roughness height variance σ_s² relative to wavelength. Report the\n   calm-vs-turbulent contrast in dB at the common incidence angle.\n\n2. **Full physical-geometry two-interface model.** Simultaneously solve the two-interface\n   (ionosphere + ocean) eigenvalue/refraction problem, letting turbulence perturb the\n   wavevector and the ocean's electromagnetic gradient. More physically complete but far\n   more complex; the \"turbulence\" would then be baked into the propagation constant.\n\n## Why it matters\nThe choice decides the whole Part I deliverable and cascades into the hop count (b) and\nPart III. Option 1 keeps the comparison at the reflection coefficient (clean, citable,\nsensitive to roughness), Option 2 mixes reflection and refraction effects that are hard\nto separate in the answer.\n\n## Candidate strategies\n- **Option 1 (recommended):** Fresnel R(θ) at common incidence angle + roughness\n  scattering correction. Advantages: isolates the ocean-surface effect the problem asks\n  about; each term (Fresnel, Debye ε, roughness) is a standard citable result; the\n  hop-count budget in (b) then follows from a per-hop loss chain (Fresnel² + ionospheric\n  + free-space/spherical spreading). Limitations: perturbation theory is valid only for\n  small roughness (σ_s ≪ λ); needs a roughness parameter (e.g. significant wave height\n  mapped to σ_s) that must be stated as an assumption.\n- **Option 2:** full two-interface model. Advantages: captures turbulence changing the\n  propagation constant, not just the reflection coefficient. Limitations: heavy; the\n  \"turbulent vs calm first-reflection\" contrast becomes entangled with refraction;\n  harder to justify parameter choices without data (the dataset is empty).\n\nMy primary recommendation is Option 1: a Fresnel-based reflection coefficient at the\ncommon incidence angle, with turbulence entering as an effective-ε/σ perturbation plus\na small-roughness scattering loss, followed by a per-hop loss chain to answer the hop\ncount.",
+              "# Expert Question 2 — Part III: shipboard moving receiver\n\n## Context so far (from Question 1)\nPart I is settled: Fresnel reflection coefficient R(θ_i) at the common incidence angle,\ncalm = smooth-interface Debye value, turbulence = small effective-ε/σ perturbation +\nroughness scattering loss scaling with σ_s²/λ²; hop count (b) from a per-hop loss chain\n(ocean Fresnel², ionospheric, spherical spreading) against a 10 dB SNR floor.\n\n## Decision point\nFor Part III, the receiver is a ship moving across a turbulent ocean. Two candidate\nframings for \"how the model changes\" and for \"how long can the ship remain in\ncommunication using the same multi-hop path\":\n\n1. **Geometric path-window (recommended).** Keep the static link-budget model but make\n   the receiver position time-dependent: the ship moves at speed v (e.g. 15–20 knots),\n   the multi-hop path length and its incidence angles are recomputed as functions of\n   ship position, and the ship remains in communication over \"the same multi-hop path\"\n   while the received power (hence SNR) at its moving position stays above the 10 dB\n   floor. The communication duration is then the time the ship takes to cross the\n   geometric window where SNR ≥ 10 dB (t = window length / v). Doppler from ship motion\n   enters only as a small carrier-frequency/bandwidth consideration (a few Hz at ~30\n   knots and 10 MHz), which for a constant-carrier SNR metric is treated as negligible;\n   turbulence already enters via the roughness/ε corrections from Part I.\n\n2. **Dynamic fading model.** Model the moving receiver through a time-varying\n   multipath/fading process (Doppler spread, Rayleigh/fading depth) and define the\n   communication duration statistically (e.g. the time the fade stays above 10 dB).\n   This is more \"wireless-channel\"-like but requires a fading distribution and Doppler\n   spectral model that are not given by the problem and are hard to justify with an\n   empty dataset.\n\n## Why it matters\nIt determines what \"remain in communication using the same multi-hop path\" quantifies.\nOption 1 gives a concrete, physically clear duration (window/v) consistent with the\nstatic budget from Part I. Option 2 reframes the question as a statistical channel\nproblem, which departs from the reflection-strength framing the expert confirmed in\nQuestion 1.\n\n## Candidate strategies\n- **Option 1 (recommended):** geometric path-window with position-dependent budget;\n  Doppler treated as negligible for the constant-carrier SNR. Advantages: directly\n  reuses Part I budget; yields a definite communication time; physically transparent.\n  Limitations: ignores deep fades; assumes the ionospheric path is quasi-static over the\n  window.\n- **Option 2:** Doppler/fading statistical model. Advantages: captures time-varying\n  fades. Limitations: needs fading/Doppler parameters absent from the problem; mixes\n  the reflection-strength model with channel statistics; harder to defend.\n\nMy primary recommendation is Option 1: treat the ship's motion as a geometric sweep of\nthe receiver through the SNR-feasible window of the same multi-hop path, with Doppler\nnegligible for the constant-carrier SNR metric.",
+              "# Expert Question 3 — Part II: rugged-terrain comparison\n\n## Context (settled in Q1, Q2)\nPart I: Fresnel R(θ_i) at common incidence angle; calm ocean = smooth Debye interface;\nturbulent ocean = small ε/σ perturbation + roughness scattering loss (∝ σ_s²/λ²); hop\ncount from per-hop loss chain vs 10 dB SNR floor. Part III: ship as geometric sweep of\nthe receiver through the SNR-feasible window; Doppler negligible.\n\n## Decision point\nPart II asks how Part I's findings compare with HF reflections off mountainous/rugged\nterrain vs smooth terrain. The ocean result is organized around surface roughness\nscattering (σ_s²/λ²) on a high-permittivity lossy medium. Two framings for the\ncomparison:\n\n1. **Direct roughness analogy (recommended).** Treat both the turbulent ocean and\n   mountainous terrain as rough reflectors and compare via the same roughness-scattering\n   mechanism: rugged terrain has far larger effective roughness height σ_s (tens of\n   metres vs centimetres for ocean waves), so at HF (λ ≈ 10–100 m) σ_s/λ is large and\n   the perturbation/small-roughness approximation breaks down — terrain reflection is\n   diffuse/scattering-dominated with strongly reduced coherent (specular) return, plus\n   shadowing and multi-path from the terrain profile. Smooth terrain ≈ the \"calm ocean\"\n   analog (specular Fresnel return at a common angle); rugged terrain ≈ the \"turbulent\n   ocean\" analog with much stronger attenuation. The comparison is therefore: rough\n   (turbulent ocean, rugged terrain) attenuates the coherent return more than smooth\n   (calm ocean, flat terrain), with terrain attenuating far more because σ_s/λ ≫ 1.\n   Note the one physical difference: terrain reflection is from a low-permittivity\n   (soil/rock) interface rather than a high-permittivity one, so the Fresnel baseline\n   magnitude and its angle dependence differ, but the roughness mechanism is common.\n\n2. **Separate terrain-propagation model.** Build a distinct terrain diffraction/model\n   (knife-edge, ITM/Longley–Rice) for Part II rather than reusing the roughness\n   mechanism. More standard in RF site planning but a different modeling framework from\n   Part I, making the \"comparison\" less direct.\n\n## Why it matters\nIt fixes how Part II is stated relative to Part I: as a direct same-mechanism\n(roughness) comparison with a noted dielectric-baseline difference, or as a separate\nterrain framework.\n\n## Candidate strategies\n- **Option 1 (recommended):** direct roughness analogy, common σ_s²/λ² mechanism, with\n  the caveat that terrain is a low-ε interface so its Fresnel baseline differs.\n  Advantages: one unifying mechanism across all parts; directly answers \"compare with\";\n  shows why rugged terrain is worse (σ_s/λ ≫ 1 breaks the small-roughness limit).\n  Limitations: must explicitly flag the dielectric-baseline difference for rigor.\n- **Option 2:** separate ITM/diffraction terrain model. Advantages: standard terrain\n  tool. Limitations: different framework, weaker \"comparison\" link to Part I, heavier\n  parameterization not grounded in the problem.\n\nMy primary recommendation is Option 1: compare rugged vs smooth terrain through the\nsame roughness-scattering mechanism as the turbulent-vs-calm ocean, explicitly noting\nthe low-ε dielectric baseline difference for terrain."
+            ],
+            "expert_answers": [
+              "Option 1 is the defensible framing. The question asks specifically for the strength of the ocean reflection, so the comparison belongs at the reflection coefficient, not inside a coupled propagation constant. Using R(θ_i) at a common incidence angle keeps calm and turbulent cases commensurable: the calm case is the smooth-interface Fresnel value from the Debye permittivity, and turbulence enters as two separable, citable corrections—a small effective-ε/σ perturbation and a roughness scattering loss scaling with σ_s²/λ². This isolates the surface effect the problem targets and yields a clean dB contrast. Option 2 entangles reflection with refraction, making the requested turbulent-vs-calm contrast ambiguous and parameter-hungry given the empty dataset. Option 1 also cascades cleanly: the per-hop loss chain (Fresnel², ionospheric, spreading) directly produces the hop count in (b) and extends to Part III. State the roughness assumption explicitly.",
+              "Option 1 is correct. The question asks how long the ship can remain in communication on the same multi-hop path, which is a geometric-window question, not a channel-statistics question. Keep the Part I link budget intact and let only the receiver position vary: recompute path length and incidence angles as functions of ship position, and define the communication duration as the time to traverse the region where SNR ≥ 10 dB, i.e. window length divided by ship speed. Doppler at HF and ship speeds is a few Hz and does not move a constant-carrier SNR metric, so treat it as negligible. Turbulence already enters through the Part I roughness and permittivity corrections; do not add a second, unjustified fading layer. Option 2 would require a fading distribution and Doppler spectrum the problem never supplies, and it would abandon the reflection-strength framing already settled.",
+              "Option 1 is correct. Part II asks for a comparison with Part I, so it must reuse Part I's mechanism: roughness scattering scaling with σ_s²/λ². Smooth terrain is the calm-ocean analog (specular Fresnel return at the common angle); rugged terrain is the turbulent-ocean analog, but with σ_s of tens of metres against HF wavelengths of 10–100 m, so σ_s/λ is order unity or larger and the small-roughness perturbation limit fails. The coherent specular return is then strongly suppressed and the reflection becomes diffuse/scattering-dominated, worsened by shadowing and terrain multipath. State the one genuine physical difference: terrain is a low-permittivity soil/rock interface, so its Fresnel baseline magnitude and angular dependence differ from the high-permittivity ocean, even though the roughness mechanism is shared. Option 2's ITM/diffraction framework is a different model class and would weaken the requested comparison."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_fb22cbc25c4f",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8708333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_8/train_parent_1/runs/round_8/r2p2_20260927_101216/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the scope and goals for all four parts of the problem. Task 1 clearly defines the physical scenario (100W HF signal, below MUF) and the specific objectives (comparing turbulent vs. calm ocean reflection strength and determining max hops for a 10 dB SNR threshold). Tasks 2, 3, and 4 correctly capture the comparative analysis, the dynamic shipboard scenario, and the publication requirement, respectively. The definitions are explicit and align perfectly with the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all required aspects of the problem without deviation. The sub-tasks are logically ordered, with Task 1 providing the foundational model needed for the comparisons in Task 2 and the dynamic adjustments in Task 3. Task 4 serves as the synthesis step. There are no missing key components, and the dependencies between tasks (e.g., using Part I results for Part II and III) are implicitly respected by the structure. The coverage is complete and coherent.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, logically sound, and provides deep physical insight into the dominance of free-space loss over reflection losses, with explicit limitations noted.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies key assumptions and limitations (data/model bias) and explains their impact, though it lacks quantitative sensitivity analysis to fully correct for them.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the problem by integrating physical propagation laws with practical engineering constraints, providing actionable insights on link budget limitations and antenna requirements.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, employing established electromagnetic theories (Fresnel, Debye, Rice) with correct mathematical application and justified assumptions for the specific HF propagation context.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with cited data sources. They effectively model the physical effects of turbulence (permittivity and roughness) and are consistent with the problem background.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate EM methods (Fresnel, Rice roughness) and a sound link budget structure. It correctly handles the transition to rugged terrain and the moving receiver scenario with rational simplifications.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8625,
+      "interaction_cost": 0.874680765910874,
+      "interaction_penalty": 0.043734038295543703,
+      "net_utility": 0.8187659617044564,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2688,
+          "total_expert_latency_seconds": 5.63,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9271527681459988,
+          "latency_cost_component": 0.3005686925318732,
+          "interaction_cost": 0.8708611072583996,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3163,
+          "total_expert_latency_seconds": 5.02,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9462510614083705,
+          "latency_cost_component": 0.2852324276811493,
+          "interaction_cost": 0.8785004245633482,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-27T10:27:26.593189",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_fb22cbc25c4f",
+  "workflow": {
+    "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "name": "Direct Confirmation Execution",
+    "purpose": "To maximize efficiency by treating expert confirmation as a final directive, eliminating redundant verification steps that do not alter the modeling path.",
+    "maximum_expert_interactions": 3,
+    "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+    "evolution_mode": "mutation",
+    "changed_components": [
+      "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+    ],
+    "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+    "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "max_exchanges": 3,
+    "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+    "actions": [
+      {
+        "action_id": "step_1_identify_decision_point",
+        "action_type": "agent_step",
+        "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+      },
+      {
+        "action_id": "step_2_prepare_expert_query",
+        "action_type": "expert_exchange",
+        "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+      },
+      {
+        "action_id": "step_3_integrate_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+      }
+    ],
+    "entry_action": "step_1_identify_decision_point",
+    "workflow_id": "interaction_workflow_fb22cbc25c4f",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 7,
+    "parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "training_batch": [
+      "2017_D",
+      "2018_A"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2018_E",
+    "2018_A"
+  ],
+  "absolute_utility": 0.8625,
+  "interaction_cost": 0.8764171762515052,
+  "interaction_penalty": 0.04382085881257526,
+  "net_utility": 0.8186791411874248,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

@@ -1,0 +1,77 @@
+# Solution
+
+## Subtask 1: Part I: Model HF signal reflection off the ocean. For a 100-W, below-MUF (f = 10 MHz, ~0.85x MUF with MUF ~ 12 MHz) cons
+
+### Problem
+
+Part I: Model HF signal reflection off the ocean. For a 100-W, below-MUF (f = 10 MHz, ~0.85x MUF with MUF ~ 12 MHz) constant carrier from a land point source, determine the strength of the first reflection off a turbulent ocean (one prior ionospheric reflection already taken) and compare it with a calm-ocean first reflection. Then, if reflections 2..n occur off calm oceans, find the maximum number of hops before the received signal-to-noise ratio falls below a usable 10 dB.
+
+### Analysis
+
+Assumptions (settled with the expert, rounds 1-2): (1) grazing-angle plane-wave Fresnel reflection at the sea surface; (2) spherical 1/r^2 spreading booked once over the total geometric path length L_tot = N*skip (per-segment FSPL would double-count 1/r^2 and is rejected); (3) a fixed 2 dB ionospheric absorption per ionospheric pass (ITU-R P.531 daytime mid-latitude order of magnitude at 10 MHz); (4) isotropic 0 dBi antennas as the base case because '100-W point source' specifies no antenna pattern (a 3.2 dBi dipole is carried as a sensitivity); (5) the ocean is a flat plane with RMS surface slope s_rms; turbulence is a small-slope perturbation that redirects energy out of the specular direction; (6) usability = received power vs. the kTB thermal-noise floor (k=1.38e-23 J/K, T=293 K, B=3 kHz -> N = -139.16 dBm) at a 10 dB SNR threshold, i.e. P_rx >= -129.16 dBm. Geometry: ionospheric reflection height 300 km, per-hop ground range 200 km (a typical 10 MHz daytime skip), so per-hop slant skip = 2*sqrt((100 km)^2 + (300 km - 10 m)^2) = 632.4 km and the grazing angle at the ocean reflection point (from horizontal) is 71.6 deg. The calm-vs-turbulent contrast is made quantitative by the seawater complex permittivity (data item 1): the Fresnel coefficient depends on eps_r, and turbulence multiplies the calm specular power by a small-slope reduction exp(-2 s_rms^2 / sin^2(grazing)) for the two passes (down and up) through the rough surface. s_rms = 0.01 (calm) and 0.10 (moderate turbulence, H_s ~ 1-2 m). This framing extends directly to the terrain (Part II) and moving-receiver (Part III) comparisons.
+
+### Modeling Process
+
+Seawater complex relative permittivity (Meissner et al. 2004 / Ellison et al. 1998), salinity 35 ppt, T = 20 C: eps_r(f) = eps_s + (eps_inf - eps_s)/(1 + i omega tau) + i sigma_d/(omega eps0), with eps_s=78, eps_inf=4.9, tau=8.2e-12 s, sigma_d=4 S/m. At 10 MHz, eps_r = 4.90 + i 7190 (|eps_r| ~ 7190, ionic conductivity dominates). Fresnel reflection for perpendicular polarization, incidence from air onto the dielectric with n2 = sqrt(eps_r), incidence angle from the normal theta_i = 90 deg - grazing: R = (cos theta_i - n2 cos theta_t)/(cos theta_i + n2 cos theta_t), Snell sin theta_t = sin theta_i / n2; specular power G = |R|^2. Calm: G_calm = 0.9688 (loss 0.137 dB). Turbulent: G_turb = G_calm * exp(-2 s_rms_turb^2/sin^2(grazing)) / exp(-2 s_rms_calm^2/sin^2(grazing)) = 0.9478 (loss 0.233 dB). First-ocean-reflection strength: the incident power at the ocean surface after one half-skip (TX->iono->ocean) and one ionospheric pass is P_in = P_tx - FSPL(f, skip/2) - L_iono = 50 dBm - 104.45 dB - 2 dB = -54.45 dBm; the reflected strength is P_in + 10 log10(G). Turbulent: -54.68 dBm; calm: -54.59 dBm. Turbulent is 0.096 dB weaker than calm at this grazing angle. Multi-hop budget for N ocean reflections (first turbulent, rest calm): P_rx(N) = P_tx + G_tx + G_rx - FSPL(f, N*skip) - N*L_iono - 10 log10(1/G_turb) - (N-1)*10 log10(1/G_calm), with FSPL = 20 log10(f_Hz d_m) - 147.55. Solve P_rx(N) - N_floor >= 10 dB for the largest N. The per-hop SNR decay is ~2.56 dB/hop (dominated by the extra skip-length spreading plus 2 dB ionospheric absorption and ~0.14-0.23 dB reflection loss).
+
+### Outcome Analysis
+
+First turbulent-ocean reflection strength: -54.68 dBm (in the upward ray just after the bounce), versus -54.59 dBm for a calm ocean, i.e. turbulence attenuates the first reflection by 0.096 dB (a ~0.22% power reduction) at the 71.6 deg grazing angle. The calm-vs-turbulent gap is small at this high grazing angle because sin^2(grazing) is large; it grows toward normal incidence and for steeper sea states (the small-slope model gives a reduction scaling as 1/sin^2(grazing)). Maximum hops (isotropic base case, first turbulent + rest calm): 20 hops, with SNR = 11.82 dB at N=20 and 9.26 dB at N=21, so 20 is the largest hop count keeping SNR >= 10 dB (total ground range ~4200 km). All-calm (20 hops, SNR 11.92 dB) is essentially identical, confirming that the single turbulent first reflection is a minor penalty relative to the cumulative spreading+ionospheric budget. Dipole sensitivity (3.2 dBi both ends): 23 hops. Limitations: (a) the small-slope specular-reduction exponent (factor 2, two passes) is a standard approximation, not a measured scattering loss, so the absolute calm-vs-turbulent dB gap carries uncertainty even though its sign and grazing-angle dependence are robust; (b) 2 dB ionospheric absorption per pass and 3 kHz noise bandwidth are stated modeling choices (data item 2: FOT = 0.85 MUF, small vertical-incidence absorption) and would shift the hop count by a hop or two; (c) the ionosphere is treated as a fixed-height mirror (300 km) rather than a frequency-dependent refractive layer, which the expert flagged as unnecessary for these conclusions.
+
+## Subtask 2: Part II: Compare the Part I ocean findings with HF reflections off mountainous/rugged terrain versus smooth terrain.
+
+### Problem
+
+Part II: Compare the Part I ocean findings with HF reflections off mountainous/rugged terrain versus smooth terrain.
+
+### Analysis
+
+The same grazing-angle Fresnel + small-slope framework applies with the surface permittivity and RMS slope swapped. Smooth terrain is modeled as a calm plane with rock permittivity eps_r ~ 8 (real, low loss, typical of dry rock); rugged/mountainous terrain is the same smooth-rock surface with a large RMS slope s_rms = 0.5 (steep facets), applying the identical small-slope specular reduction. This directly parallels Part I: the contrast 'smooth vs rugged terrain' is the analog of 'calm vs turbulent ocean,' and the ocean-vs-terrain contrast is the analog of 'calm ocean vs calm rock,' driven purely by the surface permittivity.
+
+### Modeling Process
+
+Calm/smooth rock: G = |R|^2 with eps_r = 8 -> G_rock_calm = 0.2453 (loss 6.10 dB). Rugged rock: G_rugged = G_rock_calm * exp(-2*0.5^2/sin^2(71.6 deg)) = 0.1408 (loss 8.52 dB), a 2.41 dB penalty from roughness. Hop counts under the same 10 dB SNR budget: max_hops(rugged) = 5, max_hops(smooth rock) = 6. Ocean-vs-terrain contrast at the same (calm) surface: G_ocean_calm / G_rock_calm = 3.95, i.e. the calm ocean reflects 5.97 dB more power than the calm rock at this grazing angle.
+
+### Outcome Analysis
+
+The ocean is a far better reflector than rock: the calm-ocean Fresnel coefficient exceeds the calm-rock coefficient by a factor 3.95 (5.97 dB) because |eps_r| for seawater (~7190 at 10 MHz) is much larger than rock (~8), pushing R -> -1. Rugged terrain reflects ~2.4 dB less than smooth terrain (G 0.245 -> 0.141), so roughness degrades terrain reflection by a smaller absolute amount than it does the ocean (0.23 dB) because the rock Fresnel coefficient is already far from total reflection and the large-slope facets redirect a larger fraction of the already-weak reflected power. Consequently rugged terrain supports only 5 hops versus 6 for smooth rock (and 20 for the ocean), i.e. terrain roughness costs roughly one hop. The qualitative finding matches the problem's premise that rougher surfaces attenuate more: in every surface class (ocean, rock), increasing RMS slope reduces the specular reflection and hence the maximum hop count. Limitations: s_rms = 0.5 for 'rugged' and eps_r = 8 for 'rock' are representative orders of magnitude, not measured values for a specific circuit; the small-slope model overestimates loss for very steep, shadowed facets (real mountains also add diffraction/absorption and multipath that this specular model does not resolve).
+
+## Subtask 3: Part III: A ship travelling across a turbulent ocean uses HF for communications and to receive weather/traffic reports. 
+
+### Problem
+
+Part III: A ship travelling across a turbulent ocean uses HF for communications and to receive weather/traffic reports. How does the model change for a shipboard receiver moving on a turbulent ocean, and how long can the ship remain in communication using the same multi-hop path?
+
+### Analysis
+
+Per the expert (round 3), 'the same multi-hop path' means the fixed N-hop geometry (N = 20 ocean bounces, 200 km per-hop ground range) is held constant while the ship moves downrange off the path's terminal ocean bounce. The model change from Part I is that the LAST ocean reflection (nearest the ship) is turbulent - the ship is on the turbulent sea - and as the ship advances by a downrange distance D, the final segment (last ocean bounce -> ship) lengthens and the ship-side grazing angle at that turbulent bounce decreases toward the horizontal. Because the small-slope specular reduction scales as 1/sin^2(grazing), the terminal turbulent reflection degrades rapidly as the ship moves downrange, which is the mechanism that eventually drops the SNR below 10 dB. (An alternative reading - a path that reconfigures to track the ship - has no degradation mechanism in this model and yields no finite duration; it is reported only as a caveat.) Ship speed 15 kts = 7.72 m/s.
+
+### Modeling Process
+
+For N = 20 bounces and a downrange offset D of the ship beyond the reference terminal position: total path length L_tot(D) = (N-1)*skip + skip/2 + sqrt((D + 100 km)^2 + (300 km - 10 m)^2); the N-1 interior bounces are calm (G_calm = 0.9688) and the terminal bounce is turbulent at the ship-side grazing angle g_ship(D) = atan(300 km / (D + 100 km)), with G_terminal(D) = G_calm * exp(-2*0.1^2/sin^2(g_ship(D))) / exp(-2*0.01^2/sin^2(g_ship(D))). Received power P_rx(D) = 50 dBm - FSPL(10 MHz, L_tot(D)) - N*2 dB - (N-1)*10 log10(1/G_calm) - 10 log10(1/G_terminal(D)). Solve P_rx(D) - (-139.16 dBm) = 10 dB for the largest D by bisection; duration t = D_max / v_ship.
+
+### Outcome Analysis
+
+At the reference position (D = 0) the 20-hop path has SNR = 11.82 dB. Moving downrange, the terminal grazing angle falls from 71.6 deg toward the horizontal and the turbulent terminal reflection degrades; the largest downrange distance keeping SNR >= 10 dB is D_max ~ 1046 km, giving t_max ~ 2260 min ~ 37.7 h at 15 kts. This is reported as a path-coverage limit: it is how far downrange the fixed 20-hop path still reaches before the terminal turbulent reflection (combined with the added final-segment spreading) pushes the SNR below 10 dB, not a statement that the multi-hop path itself cannot persist. Under the alternate 'path reconfigures to track the ship' reading there is no degradation mechanism in the model, so no finite duration follows from the physics - the ship would remain in contact as long as the path stays below the MUF and the sea state is unchanged. Limitations: (a) the duration is governed almost entirely by the small-slope terminal-reflection model and the 20-hop geometry, so it inherits their uncertainty; (b) real shipboard HF also suffers Doppler spread, wave-induced antenna height variation, and shadowing from the ship's own wake and superstructure, none of which are modeled; (c) the 37.7 h figure is a worst-case coverage number along one fixed bearing and would be shorter in steeper seas (larger s_rms) and longer if the path is re-optimized as the ship moves.
+
+## Subtask 4: Part IV: A short synopsis of the results suitable for a short note in IEEE Communications Magazine.
+
+### Problem
+
+Part IV: A short synopsis of the results suitable for a short note in IEEE Communications Magazine.
+
+### Analysis
+
+Synthesize the three parts into a single quantitative statement of how ocean-surface turbulence, surface material, and receiver motion each limit the number of usable HF multi-hop skywave reflections, using the grazing-angle Fresnel + total-path-spreading + kTB-SNR model. The synopsis leads with the headline numbers (first-reflection penalty, maximum hop count, terrain comparison, ship communication duration) and the one physical mechanism that ties them together: the surface Fresnel coefficient, set by the complex permittivity, modified by small-slope roughness, which controls both the calm-vs-turbulent contrast and the hop budget.
+
+### Modeling Process
+
+Headline numbers from the model: (1) A 100-W, 10-MHz below-MUF carrier reflected once off a turbulent ocean after one ionospheric pass has strength -54.7 dBm in the upward ray, 0.096 dB weaker than the -54.6 dBm calm-ocean reflection (small-slope specular reduction at 71.6 deg grazing, s_rms 0.01 vs 0.10). (2) With reflections 2..n off calm oceans, the maximum number of hops keeping a 3-kHz carrier above a 10 dB SNR over the -139.2 dBm thermal floor is 20 (SNR 11.8 dB at 20 hops, 9.3 dB at 21); 23 hops with 3.2-dBi dipoles. (3) The calm ocean reflects 5.97 dB more power than calm rock (Fresnel |R|^2 ratio 3.95) because seawater |eps_r| ~ 7190 >> rock ~ 8; rugged terrain (s_rms 0.5) reflects 2.41 dB less than smooth rock, cutting the hop count from 6 to 5. (4) A 15-knot ship on the turbulent sea, using the same fixed 20-hop path, can travel ~1046 km downrange (~37.7 h) before the degrading terminal turbulent reflection drops the SNR below 10 dB (path-coverage limit).
+
+### Outcome Analysis
+
+The unifying result is that the per-hop reflection loss - not the ionospheric path - is what distinguishes ocean from terrain and calm from turbulent: seawater's large complex permittivity makes the ocean a near-unity reflector (0.14 dB loss) while rock is a 6 dB reflector, and small-slope roughness adds a loss that scales as 1/sin^2(grazing), so both turbulence and rugged terrain are most penalizing at low grazing angles. Practical takeaway for HF link planning: calm-ocean multi-hop paths support roughly three times as many hops as rugged-terrain paths at the same power, a single turbulent first reflection costs <0.1 dB (negligible against the ~2.5 dB/hop cumulative budget), and a moving ship's contact time on a fixed path is set by how quickly its terminal grazing angle degrades the last turbulent reflection. The model's main caveats - small-slope scattering as a proxy for measured ocean/terrain loss, fixed 300-km ionospheric mirror, 2 dB/pass absorption, 3 kHz bandwidth - bound the absolute numbers but not the qualitative rankings or the grazing-angle dependence, which follow directly from the Fresnel physics and the supplied seawater-permittivity data.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

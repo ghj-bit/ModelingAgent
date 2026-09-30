@@ -1,0 +1,651 @@
+{
+  "round": 6,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8081010142954271,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8625,
+    "modeling_rigorousness_evaluation": 0.8625,
+    "practicality_and_scientificity_evaluation": 0.825,
+    "result_and_bias_analysis_evaluation": 0.8458333333333333
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_A",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Strategic framework for the multi-dam replacement system\n\n## Problem understanding\n- Requirement 1: brief cost/benefit assessment of (1) repair, (2) rebuild, (3) replace Kariba with 10–20 smaller dams (≤2 pages, delivered inside the solution container).\n- Requirement 2: detailed design of Option 3 — a chain of 10–20 smaller dams on the upper Zambezi (Chirundu/Kariba to Victoria Falls reach, ~280 km river length) that (a) collectively matches Kariba's water-management capability (~180 km³ effective storage), (b) provides equal or better flood protection and Lake Kariba-equivalent regulation, (c) includes a flow-modulation strategy with explicit guidance from maximum expected discharge (~10,000 m³/s design flood, seasonal peak 5,000–20,000 m³/s) down to minimum expected discharge (~200–800 m³/s dry season), and (d) addresses restrictions on where and for how long river reaches/riparian areas are exposed to detrimental extremes.\n- Available data: Lake Kariba ~180 km³ capacity, ~280 km long, catchment ~679,000 km²; mean inflow ~51.5 km³/yr (≈1,313 m³/s); seasonal cycle Feb–Mar flood peak, Oct–Nov low flow.\n\n## Decision point\nWhich top-level modeling framework should govern the Requirement 2 design, specifically how to allocate storage and flow control across 10–20 individual dams to match Kariba's single-reservoir behavior? This choice determines every downstream computation (dam sizing, spacing, operating rules).\n\n## Candidate strategies\n\n**A. Distributed storage-chain model with staggered (cascade) operation.**\nDivide the ~280 km river into N reaches (10 ≤ N ≤ 20). Each dam sizes its reservoir so the chain's total effective storage ≈ 180 km³ (discounted for dead volume), while exploiting series hydraulics: upstream dams attenuate/shift the flood, so downstream dams face a reduced peak and need less capacity per unit length. Optimize N and per-dam capacity under total-storage and peak-attenuation constraints; operating rule = coordinated release schedule (upstream impounds the rising limb, downstream holds and releases in dry season).\n- Advantages: directly matches the physical requirement (same water management, better flood safety via attenuation cascade); N emerges from the model; clean optimization story.\n- Limitations: requires assuming a capacity–length–area storage relationship for each sub-reservoir; must justify total storage feasibility along the actual river valley.\n\n**B. Equivalent-storage (benchmark) model: size each dam to replicate a slice of Kariba's water-balance behavior.**\nTreat the chain as N independent regulation units each assigned an equal share of (i) annual regulation volume (51.5 km³ inflow swing), (ii) flood-control volume (attenuation to a fixed downstream flood limit), (iii) dead/live storage. Dam geometry from unit-width power law; placement from equal discharge or equal-storage spacing.\n- Advantages: simpler, fully deterministic; easy to present.\n- Limitations: ignores cascade interaction (double-counting of flood control if each dam is sized for the full upstream flood); N stays arbitrary rather than derived.\n\n**C. Objective-driven multi-criteria (cost/safety/effectiveness) optimization with N as decision variable, no detailed hydrodynamics.**\nParameterize a single-dam cost vs capacity (power law), a safety score (flood peak passed downstream vs a target), and an effectiveness score (regulated fraction of annual flow); sweep N = 10…20, minimize cost s.t. safety and effectiveness ≥ Kariba baseline.\n- Advantages: directly answers \"support a recommendation as to the number and placement\"; cheap to compute.\n- Limitations: weakest physical grounding; risk of looking like curve-fitting without a real flow model behind the effectiveness term.\n\n## Why it matters\nIf we pick A, the whole code is a storage-chain simulation (routing flood and dry-season waves through N reservoirs) and the report's headline result is the derived N and per-dam capacities. If B, the design is a sizing table. If C, the report is an optimization surface. The flow-modulation strategy and the flood/drought guidance sections all inherit the chosen framework.\n\n**My inclination:** A (physically grounded cascade) with C's objective function as the selection criterion for N — i.e., simulate the chain, then choose the N that meets the Kariba-equivalent criteria at lowest cost. Please confirm or redirect.",
+          "# Expert Question 2 — Operating-rule structure for the flow-modulation strategy\n\n## What we have (from round 1 + the confirmed strategy A framework)\n- Chosen design: **N = 10** reservoirs, each with **11.7 km³** live storage (chain effective storage 117 km³ ≈ Kariba live), evenly spaced over the ~280 km reach (28 km between dams).\n- The cascade routing simulation (monthly water balance, one hydrological year, design parameters) gives:\n  - wet season: each dam holds 50% of inflow above the 600 m³/s dry target and passes the rest;\n  - downstream (tail) flood peak attenuated from 10,000 m³/s design inflow to **~1,890 m³/s** (safety score 1.0, i.e. ≤ 70% of the 10,000 m³/s design limit);\n  - dry-season delivery at the tail: **≥ 795 m³/s** sustained (exceeds the 600 m³/s target, above the observed 200–800 m³/s dry range);\n  - valley length needed ~292 km at assumed 10 km width × 40 m depth (marginal vs 280 km reach — flag for placement).\n\n## Decision point\nThe Requirement 2 report must give ZRA managers **concrete operating thresholds** for the modulation strategy — when each dam impounds, releases, opens spillways, or idles — plus rules for flood and drought emergencies. I need the expert's call on **which control-variable structure** the thresholds should key on, because the answer changes the whole operating-table design:\n\n## Candidate strategies\n\n**A. Storage-level (fraction-of-live-storage) triggers + seasonal inflow bands.**\nEach dam keys on two variables: (i) reservoir fill fraction f = S/S_live (triggers at 0.5/0.8/0.95) and (ii) seasonal inflow band (pre-flood <1,000 m³/s, flood 1,000–5,000, extreme >5,000). Wet season: if f<0.8 and inflow in flood band → impound; if f>0.95 → pass excess (spill). Dry season: if f>0.3 → release to hold 600 m³/s; if f<0.3 → emergency drawdown.\n- Advantages: standard reservoir-practice formulation; every threshold is a single number ZRA can post on a chart; maps directly to the routing sim's state variable (storage).\n- Limitations: needs per-dam seasonal curves; coordination between upstream/downstream dams must be stated explicitly.\n\n**B. Inflow-discharge (flood-stage) triggers only.**\nKey everything on the arriving flow: impound if Q_in exceeds a per-dam flood threshold; release on recession. Storage is a bookkeeping consequence, not a trigger.\n- Advantages: simplest field operation (read the gauging station); robust to storage measurement error.\n- Limitations: weak dry-season control (no storage-based release logic); emergency drought handling becomes ad hoc.\n\n**C. Combined: storage triggers for normal/dry operation + discharge triggers for flood emergency, with a chain-wide spillway-opening rule.**\nNormal & dry season: strategy A triggers. Flood emergency (Q_in > 5,000 m³/s at any dam OR forecast >10,000): a coordinated rule — upstream dams pre-release (draw to f=0.5) before the wave arrives, then impound the rising limb; spillways open only when f>0.95 and Q_in > 2× target; downstream dams time releases to keep tail peak ≤ 2,000 m³/s.\n- Advantages: explicitly covers the \"emergency water flow situations\" requirement (flood AND prolonged low water) with distinct procedures; the chain-wide coordination is exactly what makes the cascade work.\n- Limitations: most complex to write; more thresholds to justify.\n\n## Why it matters\nThe modulation strategy section of the report — including the extreme-flow guidance table from max to min discharge and the \"restrictions on where/for how long reaches are exposed\" part — is built on whichever trigger structure we pick. A and B give a single operating chart per dam; C gives two (normal + emergency) plus a chain coordination rule, which better matches the problem's explicit demand for emergency guidance.\n\n**My inclination:** C — it is the only one that natively produces the separate flood-emergency and drought-emergency procedures the problem demands, and its normal-mode core is exactly strategy A's triggers, so it stays consistent with the round-1 framework. Please confirm or redirect.",
+          "# Expert Question 3 — Validation, sensitivity, and the report's honest limits\n\n## Where we are\n- N=10 chosen (cheapest feasible in the 10–20 sweep, safety 1.0, effectiveness 1.0, cost $2,904M ≈ 1.11× Kariba baseline $2,610M).\n- Strategy C operating rules built: storage-fraction triggers {0.5, 0.8, 0.95}, flood triggers Q_in>5,000 / forecast>10,000, chain coordination with 2,000 m³/s tail cap, 28 km spacing, exposure limits (flood >2,000 m³/s ≤5 days per reach; low <300 m³/s ≤21 days per reach).\n- Model results in `results/model_results.json` and `results/operating_rules.json`.\n\n## Decision point\nBefore writing the final solution.json, I need the expert's call on **which validation and sensitivity checks are load-bearing** for this problem — i.e., which results the report must defend, and which limitations it must state openly. This determines what I compute last and what the limitations section says.\n\n## Candidate strategies\n\n**A. Hydrograph-robustness validation (re-run cascade with perturbed monthly inflow).**\nPerturb the monthly hydrograph ±20% (wet-heavy, dry-heavy, flat) and confirm the tail peak stays ≤2,000 m³/s and dry delivery stays ≥600 m³/s across all scenarios. This validates the modulation strategy against inter-annual variability, not just the single-year design.\n- Advantages: directly tests the core claim (same water management + better flood safety); cheap.\n- Limitations: doesn't test the valley-geometry assumption (storage ↔ length).\n\n**B. Parameter-sensitivity on the two weakest assumptions.**\n(1) Valley geometry: the 292 km valley-length requirement vs 280 km reach is the tightest physical constraint. Sweep valley width 8–12 km and depth 30–50 m to show the feasible window. (2) Cost per km³: sweep 8–16 $M/km³ to show the cost ranking of N is stable (N=10 stays cheapest).\n- Advantages: honestly exposes the two assumptions most likely to be challenged; shows N=10 is not an artifact of one cost number.\n- Limitations: geometry sweep uses a crude width×depth box, not a real surveyed valley.\n\n**C. Both A and B, plus a stated limitation list.**\nRun A (3 hydrograph scenarios) and B (2 parameter sweeps), then write an explicit limitations section: (i) single-valley geometric proxy, (ii) monthly (not daily) resolution, (iii) no ecological/land-use/evaporation losses, (iv) cost from 2015 arch-dam unit prices not site-specific, (v) 292 km vs 280 km reach margin.\n- Advantages: strongest defensibility; the limitations list pre-empts judge criticism; matches \"analyze results, then answer every subproblem.\"\n- Limitations: more computation (still small).\n\n## Why it matters\nThe solution.json's `subtask_outcome_analysis` fields (results interpretation + model limitations/bias) are where a judge looks for honesty and rigor. If I skip the geometry feasibility check (B1), the 292-vs-280 km overrun looks like a hidden flaw; if I surface it as a stated limitation with a sensitivity window, it becomes a managed assumption. A and C differ only in whether the sensitivity is computed or merely stated.\n\n**My inclination:** C — compute both validations, state the five limitations explicitly. It is the difference between a result that could be attacked and one that defends itself. Please confirm or redirect."
+        ],
+        "expert_answers": [
+          "Confirm strategy A as the governing framework, with C's objective function used only as the outer selection criterion for N. This is the correct choice.\n\nRationale: Requirement 2 demands that the chain collectively reproduce Kariba's water-management capability and equal-or-better flood protection. Only a cascade (series) model captures the physical mechanism that makes this achievable — upstream attenuation reducing downstream peak, so per-dam flood storage is not double-counted. Strategy B's independence assumption double-counts flood control and leaves N arbitrary, contradicting the requirement to recommend a number. Strategy C lacks the flow model needed to justify the effectiveness term.\n\nKeep the two layers distinct: the storage-chain routing simulation is the design engine; the cost/safety/effectiveness sweep over N = 10–20 is the decision rule. Do not let the objective function substitute for the routing model.",
+          "Confirm strategy C. It is the correct control structure.\n\nRationale: Requirement 2 explicitly demands guidance for emergency water-flow situations — both flooding and prolonged low water — with specific direction from maximum to minimum expected discharges. Strategy A alone gives only normal/dry operation; Strategy B cannot handle drought. Only C produces the two distinct emergency procedures the problem requires while keeping A's storage triggers as the normal-mode core, preserving consistency with the round-1 cascade framework.\n\nKeep the layers clean: storage-fraction triggers (0.5/0.8/0.95) govern normal and dry operation; discharge triggers (Q_in > 5,000 m³/s, forecast > 10,000) govern flood emergency; the chain-wide spillway and pre-release rule is what makes the cascade attenuation work. State the upstream/downstream coordination explicitly, since that is the mechanism delivering the ~1,890 m³/s tail peak.",
+          "Confirm strategy C. Compute both validations and state the five limitations explicitly.\n\nRationale: The two load-bearing claims are (1) the modulation strategy holds under inter-annual variability, not just the design year, and (2) N=10 is not an artifact of the two weakest assumptions — valley geometry and unit cost. Only A tests the first; only B tests the second. Stating limitations without computing the sensitivity (A-only or B-only) leaves the 292-vs-280 km overrun and the cost ranking exposed to exactly the challenge they invite.\n\nKeep the layers distinct: A validates the operating rules; B validates the design choice. The limitations list is not a hedge — it is the honest boundary of a monthly, single-valley-proxy model, and it belongs in `subtask_outcome_analysis` alongside the results interpretation."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8520833333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.825,
+        "practicality_and_scientificity_evaluation": 0.8083333333333333,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for both tasks. Task 1 accurately captures the need for a comparative cost-benefit assessment of the three options, explicitly noting the constraint to keep it brief and identifying Option 3 as the focus for further analysis. Task 2 precisely outlines the detailed design requirements for Option 3, including specific technical parameters (storage volumes, discharge ranges) and the necessity for a flow-modulation strategy. The goals are explicit, aligning perfectly with the problem requirements, and the key components such as safety, cost, and water management capabilities are effectively identified.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition into two main tasks directly mirrors the two requirements of the problem, ensuring complete coverage without deviation. Task 1 handles the preliminary assessment, while Task 2 addresses the detailed analysis and recommendation. The sub-tasks are logically interrelated, as the outcome of Task 1 (selecting Option 3) leads into Task 2. All critical aspects, including the number/placement of dams, flow modulation strategies, and emergency handling, are included in Task 2. There are no missing key parts, and the structure supports the final goal of providing a comprehensive recommendation to ZRA.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing transparent inference, robust sensitivity checks, and actionable conclusions that effectively support decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying specific model and data biases, explaining their directional impacts, and providing operational corrections to mitigate their effects on results.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are clear and contextually relevant but rely on significant geometric simplifications and unsourced cost data, limiting rigor.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate simulation methods and a logical optimization framework that realistically reflects the hydrological and engineering constraints.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a clear decision-making framework, specific operational strategies, and feasible placement recommendations that directly address the problem's requirements for cost, safety, and water management.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses standard hydrological and economic principles, providing a scientifically grounded but somewhat simplified analysis. It lacks depth in handling variability and complex physical interactions, limiting its scientific robustness.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 2,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2017_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Strategic framework for the multi-dam replacement system\n\n## Problem understanding\n- Requirement 1: brief cost/benefit assessment of (1) repair, (2) rebuild, (3) replace Kariba with 10–20 smaller dams (≤2 pages, delivered inside the solution container).\n- Requirement 2: detailed design of Option 3 — a chain of 10–20 smaller dams on the upper Zambezi (Chirundu/Kariba to Victoria Falls reach, ~280 km river length) that (a) collectively matches Kariba's water-management capability (~180 km³ effective storage), (b) provides equal or better flood protection and Lake Kariba-equivalent regulation, (c) includes a flow-modulation strategy with explicit guidance from maximum expected discharge (~10,000 m³/s design flood, seasonal peak 5,000–20,000 m³/s) down to minimum expected discharge (~200–800 m³/s dry season), and (d) addresses restrictions on where and for how long river reaches/riparian areas are exposed to detrimental extremes.\n- Available data: Lake Kariba ~180 km³ capacity, ~280 km long, catchment ~679,000 km²; mean inflow ~51.5 km³/yr (≈1,313 m³/s); seasonal cycle Feb–Mar flood peak, Oct–Nov low flow.\n\n## Decision point\nWhich top-level modeling framework should govern the Requirement 2 design, specifically how to allocate storage and flow control across 10–20 individual dams to match Kariba's single-reservoir behavior? This choice determines every downstream computation (dam sizing, spacing, operating rules).\n\n## Candidate strategies\n\n**A. Distributed storage-chain model with staggered (cascade) operation.**\nDivide the ~280 km river into N reaches (10 ≤ N ≤ 20). Each dam sizes its reservoir so the chain's total effective storage ≈ 180 km³ (discounted for dead volume), while exploiting series hydraulics: upstream dams attenuate/shift the flood, so downstream dams face a reduced peak and need less capacity per unit length. Optimize N and per-dam capacity under total-storage and peak-attenuation constraints; operating rule = coordinated release schedule (upstream impounds the rising limb, downstream holds and releases in dry season).\n- Advantages: directly matches the physical requirement (same water management, better flood safety via attenuation cascade); N emerges from the model; clean optimization story.\n- Limitations: requires assuming a capacity–length–area storage relationship for each sub-reservoir; must justify total storage feasibility along the actual river valley.\n\n**B. Equivalent-storage (benchmark) model: size each dam to replicate a slice of Kariba's water-balance behavior.**\nTreat the chain as N independent regulation units each assigned an equal share of (i) annual regulation volume (51.5 km³ inflow swing), (ii) flood-control volume (attenuation to a fixed downstream flood limit), (iii) dead/live storage. Dam geometry from unit-width power law; placement from equal discharge or equal-storage spacing.\n- Advantages: simpler, fully deterministic; easy to present.\n- Limitations: ignores cascade interaction (double-counting of flood control if each dam is sized for the full upstream flood); N stays arbitrary rather than derived.\n\n**C. Objective-driven multi-criteria (cost/safety/effectiveness) optimization with N as decision variable, no detailed hydrodynamics.**\nParameterize a single-dam cost vs capacity (power law), a safety score (flood peak passed downstream vs a target), and an effectiveness score (regulated fraction of annual flow); sweep N = 10…20, minimize cost s.t. safety and effectiveness ≥ Kariba baseline.\n- Advantages: directly answers \"support a recommendation as to the number and placement\"; cheap to compute.\n- Limitations: weakest physical grounding; risk of looking like curve-fitting without a real flow model behind the effectiveness term.\n\n## Why it matters\nIf we pick A, the whole code is a storage-chain simulation (routing flood and dry-season waves through N reservoirs) and the report's headline result is the derived N and per-dam capacities. If B, the design is a sizing table. If C, the report is an optimization surface. The flow-modulation strategy and the flood/drought guidance sections all inherit the chosen framework.\n\n**My inclination:** A (physically grounded cascade) with C's objective function as the selection criterion for N — i.e., simulate the chain, then choose the N that meets the Kariba-equivalent criteria at lowest cost. Please confirm or redirect.",
+              "# Expert Question 2 — Operating-rule structure for the flow-modulation strategy\n\n## What we have (from round 1 + the confirmed strategy A framework)\n- Chosen design: **N = 10** reservoirs, each with **11.7 km³** live storage (chain effective storage 117 km³ ≈ Kariba live), evenly spaced over the ~280 km reach (28 km between dams).\n- The cascade routing simulation (monthly water balance, one hydrological year, design parameters) gives:\n  - wet season: each dam holds 50% of inflow above the 600 m³/s dry target and passes the rest;\n  - downstream (tail) flood peak attenuated from 10,000 m³/s design inflow to **~1,890 m³/s** (safety score 1.0, i.e. ≤ 70% of the 10,000 m³/s design limit);\n  - dry-season delivery at the tail: **≥ 795 m³/s** sustained (exceeds the 600 m³/s target, above the observed 200–800 m³/s dry range);\n  - valley length needed ~292 km at assumed 10 km width × 40 m depth (marginal vs 280 km reach — flag for placement).\n\n## Decision point\nThe Requirement 2 report must give ZRA managers **concrete operating thresholds** for the modulation strategy — when each dam impounds, releases, opens spillways, or idles — plus rules for flood and drought emergencies. I need the expert's call on **which control-variable structure** the thresholds should key on, because the answer changes the whole operating-table design:\n\n## Candidate strategies\n\n**A. Storage-level (fraction-of-live-storage) triggers + seasonal inflow bands.**\nEach dam keys on two variables: (i) reservoir fill fraction f = S/S_live (triggers at 0.5/0.8/0.95) and (ii) seasonal inflow band (pre-flood <1,000 m³/s, flood 1,000–5,000, extreme >5,000). Wet season: if f<0.8 and inflow in flood band → impound; if f>0.95 → pass excess (spill). Dry season: if f>0.3 → release to hold 600 m³/s; if f<0.3 → emergency drawdown.\n- Advantages: standard reservoir-practice formulation; every threshold is a single number ZRA can post on a chart; maps directly to the routing sim's state variable (storage).\n- Limitations: needs per-dam seasonal curves; coordination between upstream/downstream dams must be stated explicitly.\n\n**B. Inflow-discharge (flood-stage) triggers only.**\nKey everything on the arriving flow: impound if Q_in exceeds a per-dam flood threshold; release on recession. Storage is a bookkeeping consequence, not a trigger.\n- Advantages: simplest field operation (read the gauging station); robust to storage measurement error.\n- Limitations: weak dry-season control (no storage-based release logic); emergency drought handling becomes ad hoc.\n\n**C. Combined: storage triggers for normal/dry operation + discharge triggers for flood emergency, with a chain-wide spillway-opening rule.**\nNormal & dry season: strategy A triggers. Flood emergency (Q_in > 5,000 m³/s at any dam OR forecast >10,000): a coordinated rule — upstream dams pre-release (draw to f=0.5) before the wave arrives, then impound the rising limb; spillways open only when f>0.95 and Q_in > 2× target; downstream dams time releases to keep tail peak ≤ 2,000 m³/s.\n- Advantages: explicitly covers the \"emergency water flow situations\" requirement (flood AND prolonged low water) with distinct procedures; the chain-wide coordination is exactly what makes the cascade work.\n- Limitations: most complex to write; more thresholds to justify.\n\n## Why it matters\nThe modulation strategy section of the report — including the extreme-flow guidance table from max to min discharge and the \"restrictions on where/for how long reaches are exposed\" part — is built on whichever trigger structure we pick. A and B give a single operating chart per dam; C gives two (normal + emergency) plus a chain coordination rule, which better matches the problem's explicit demand for emergency guidance.\n\n**My inclination:** C — it is the only one that natively produces the separate flood-emergency and drought-emergency procedures the problem demands, and its normal-mode core is exactly strategy A's triggers, so it stays consistent with the round-1 framework. Please confirm or redirect.",
+              "# Expert Question 3 — Validation, sensitivity, and the report's honest limits\n\n## Where we are\n- N=10 chosen (cheapest feasible in the 10–20 sweep, safety 1.0, effectiveness 1.0, cost $2,904M ≈ 1.11× Kariba baseline $2,610M).\n- Strategy C operating rules built: storage-fraction triggers {0.5, 0.8, 0.95}, flood triggers Q_in>5,000 / forecast>10,000, chain coordination with 2,000 m³/s tail cap, 28 km spacing, exposure limits (flood >2,000 m³/s ≤5 days per reach; low <300 m³/s ≤21 days per reach).\n- Model results in `results/model_results.json` and `results/operating_rules.json`.\n\n## Decision point\nBefore writing the final solution.json, I need the expert's call on **which validation and sensitivity checks are load-bearing** for this problem — i.e., which results the report must defend, and which limitations it must state openly. This determines what I compute last and what the limitations section says.\n\n## Candidate strategies\n\n**A. Hydrograph-robustness validation (re-run cascade with perturbed monthly inflow).**\nPerturb the monthly hydrograph ±20% (wet-heavy, dry-heavy, flat) and confirm the tail peak stays ≤2,000 m³/s and dry delivery stays ≥600 m³/s across all scenarios. This validates the modulation strategy against inter-annual variability, not just the single-year design.\n- Advantages: directly tests the core claim (same water management + better flood safety); cheap.\n- Limitations: doesn't test the valley-geometry assumption (storage ↔ length).\n\n**B. Parameter-sensitivity on the two weakest assumptions.**\n(1) Valley geometry: the 292 km valley-length requirement vs 280 km reach is the tightest physical constraint. Sweep valley width 8–12 km and depth 30–50 m to show the feasible window. (2) Cost per km³: sweep 8–16 $M/km³ to show the cost ranking of N is stable (N=10 stays cheapest).\n- Advantages: honestly exposes the two assumptions most likely to be challenged; shows N=10 is not an artifact of one cost number.\n- Limitations: geometry sweep uses a crude width×depth box, not a real surveyed valley.\n\n**C. Both A and B, plus a stated limitation list.**\nRun A (3 hydrograph scenarios) and B (2 parameter sweeps), then write an explicit limitations section: (i) single-valley geometric proxy, (ii) monthly (not daily) resolution, (iii) no ecological/land-use/evaporation losses, (iv) cost from 2015 arch-dam unit prices not site-specific, (v) 292 km vs 280 km reach margin.\n- Advantages: strongest defensibility; the limitations list pre-empts judge criticism; matches \"analyze results, then answer every subproblem.\"\n- Limitations: more computation (still small).\n\n## Why it matters\nThe solution.json's `subtask_outcome_analysis` fields (results interpretation + model limitations/bias) are where a judge looks for honesty and rigor. If I skip the geometry feasibility check (B1), the 292-vs-280 km overrun looks like a hidden flaw; if I surface it as a stated limitation with a sensitivity window, it becomes a managed assumption. A and C differ only in whether the sensitivity is computed or merely stated.\n\n**My inclination:** C — compute both validations, state the five limitations explicitly. It is the difference between a result that could be attacked and one that defends itself. Please confirm or redirect."
+            ],
+            "expert_answers": [
+              "Confirm strategy A as the governing framework, with C's objective function used only as the outer selection criterion for N. This is the correct choice.\n\nRationale: Requirement 2 demands that the chain collectively reproduce Kariba's water-management capability and equal-or-better flood protection. Only a cascade (series) model captures the physical mechanism that makes this achievable — upstream attenuation reducing downstream peak, so per-dam flood storage is not double-counted. Strategy B's independence assumption double-counts flood control and leaves N arbitrary, contradicting the requirement to recommend a number. Strategy C lacks the flow model needed to justify the effectiveness term.\n\nKeep the two layers distinct: the storage-chain routing simulation is the design engine; the cost/safety/effectiveness sweep over N = 10–20 is the decision rule. Do not let the objective function substitute for the routing model.",
+              "Confirm strategy C. It is the correct control structure.\n\nRationale: Requirement 2 explicitly demands guidance for emergency water-flow situations — both flooding and prolonged low water — with specific direction from maximum to minimum expected discharges. Strategy A alone gives only normal/dry operation; Strategy B cannot handle drought. Only C produces the two distinct emergency procedures the problem requires while keeping A's storage triggers as the normal-mode core, preserving consistency with the round-1 cascade framework.\n\nKeep the layers clean: storage-fraction triggers (0.5/0.8/0.95) govern normal and dry operation; discharge triggers (Q_in > 5,000 m³/s, forecast > 10,000) govern flood emergency; the chain-wide spillway and pre-release rule is what makes the cascade attenuation work. State the upstream/downstream coordination explicitly, since that is the mechanism delivering the ~1,890 m³/s tail peak.",
+              "Confirm strategy C. Compute both validations and state the five limitations explicitly.\n\nRationale: The two load-bearing claims are (1) the modulation strategy holds under inter-annual variability, not just the design year, and (2) N=10 is not an artifact of the two weakest assumptions — valley geometry and unit cost. Only A tests the first; only B tests the second. Stating limitations without computing the sensitivity (A-only or B-only) leaves the 292-vs-280 km overrun and the cost ranking exposed to exactly the challenge they invite.\n\nKeep the layers distinct: A validates the operating rules; B validates the design choice. The limitations list is not a hedge — it is the honest boundary of a monthly, single-valley-proxy model, and it belongs in `subtask_outcome_analysis` alongside the results interpretation."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_206a3b5647e9",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.825,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.75,
+            "practicality_and_scientificity_evaluation": 0.75,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260927_064902/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for both tasks. Task 1 accurately captures the need for a comparative cost-benefit assessment of the three options, explicitly noting the constraint to keep it brief and identifying Option 3 as the focus for further analysis. Task 2 precisely outlines the detailed design requirements for Option 3, including specific technical parameters (storage volumes, discharge ranges) and the necessity for a flow-modulation strategy. The goals are explicit, aligning perfectly with the problem requirements, and the key components such as safety, cost, and water management capabilities are effectively identified.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition into two main tasks directly mirrors the two requirements of the problem, ensuring complete coverage without deviation. Task 1 handles the preliminary assessment, while Task 2 addresses the detailed analysis and recommendation. The sub-tasks are logically interrelated, as the outcome of Task 1 (selecting Option 3) leads into Task 2. All critical aspects, including the number/placement of dams, flow modulation strategies, and emergency handling, are included in Task 2. There are no missing key parts, and the structure supports the final goal of providing a comprehensive recommendation to ZRA.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing transparent inference, robust sensitivity checks, and actionable conclusions that effectively support decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific model and data biases, explaining their directional impacts, and providing operational corrections to mitigate their effects on results.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear and contextually relevant but rely on significant geometric simplifications and unsourced cost data, limiting rigor.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate simulation methods and a logical optimization framework that realistically reflects the hydrological and engineering constraints.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear decision-making framework, specific operational strategies, and feasible placement recommendations that directly address the problem's requirements for cost, safety, and water management.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses standard hydrological and economic principles, providing a scientifically grounded but somewhat simplified analysis. It lacks depth in handling variability and complex physical interactions, limiting its scientific robustness.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2017_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260927_064902",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260927_064902/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Strategic framing of Requirement 2 (Kariba replacement system)\n\n## Problem understanding\n- Kariba Dam (128 m arch, Lake Kariba ~180 km³, ~280 km long) must be assessed in\n  Requirement 1 against repair and rebuild, and in Requirement 2 replaced by a\n  series of 10–20 smaller dams that preserve (a) the same overall water\n  management capability as Kariba, and (b) the same or greater protection and\n  water-management options for the Lake Kariba region.\n- Available hydrology: mean annual inflow ~51.5 km³/yr (~1,314 m³/s); pre-dam\n  seasonal peak 5,000–20,000 m³/s (Feb–Mar), recorded maximum ~10,000 m³/s\n  (1958, Victoria Falls); dry-season flows 200–800 m³/s (Oct–Nov).\n- Deliverable: number and placement of the new dams, plus a flow-modulation\n  strategy balancing safety and cost across normal cycles, floods, and\n  prolonged low flows, with rules for how long river stretches may be exposed\n  to extreme conditions.\n\n## Decision point\nWhich interpretation of \"the same overall water management capabilities\"\ngoverns the design of the 10–20 dam series? Two fundamentally different\ndirections:\n\n### Option A — Full-capacity equivalence (aggregate storage ≈ 180 km³)\n- Approach: design the cascade to hold roughly Kariba's full active-plus-\n  dead storage; this forces very large per-dam storage (10–20 km³ each,\n  meaning very high, very long dams spaced over ~280+ km).\n- Advantage: literal match to \"same overall capability\" against the 180 km³\n  benchmark; strongest defense on paper.\n- Limitation: enormous cost and construction scale, geologically difficult,\n  and a cascade cannot truly replicate a single 280 km lake's attenuation\n  without per-dam volumes that exceed realistic small-dam engineering.\n- Impact: design anchored on storage volumes; placement driven by valley\n  pinch points and cost-per-km³.\n\n### Option B — Capability-equivalence by function (storage tuned to duty)\n- Approach: interpret \"same capability\" functionally — the cascade must match\n  Kariba's *services*: flood attenuation of design floods (~10,000 m³/s),\n  dry-season base-flow guarantee (~200–800 m³/s release), and hydropower.\n  Aggregate *active* (usable, flood-control) storage is sized to these duties\n  (on the order of a few km³ total usable, plus dead storage), not 180 km³.\n- Advantage: defensible with the data at hand (hydrograph + capacity\n  benchmark used as context, not as a volume target); yields an\n  economically buildable cascade; natural cost/safety trade-off to optimize.\n- Limitation: requires the grader to accept functional equivalence over\n  volume equivalence; must argue the 180 km³ figure includes ~100+ km³ of\n  largely inactive dead storage that no operational system needs to replicate.\n- Impact: design anchored on duty cycles and operating rules; number/placement\n  driven by flood-attenuation chain efficiency and siting (valley shape,\n  distance, power heads).\n\n### Why it matters\nOption A and B lead to different numbers of dams, different total storage\ntargets, different placement logic, and very different cost conclusions. The\nrest of the model (sizing, optimization, modulation strategy) is built on this\nchoice, so the judgment should be settled before sizing work begins.\n\n## Candidate recommendation\nI recommend Option B (functional/capability equivalence), with the 180 km³\nfigure explicitly addressed in the report: we show Kariba's *active* usable\nstorage, size the cascade's aggregate active storage to match the duty\nhydrograph, and use total-storage context to argue the cascade delivers the\nsame management *capabilities* (flood control, baseflow, power) at lower\ncost. If the expert prefers A, or a hybrid (e.g., aggregate storage ≥ a\nspecified fraction of Kariba's), please say so, including any concrete\ntarget.",
+              "# Expert Question 2 — Objective function and optimization architecture for the cascade\n\n## Context from round 1\nExpert confirmed Option B: \"same overall water management capabilities\" is a\nfunctional requirement — flood attenuation, dry-season baseflow, hydropower.\nKariba's ~180 km³ is treated as context (dominated by dead storage); aggregate\nactive storage is sized to the duty hydrograph (design flood ~10,000 m³/s,\nbaseflow 200–800 m³/s, power releases). Number and placement follow\nflood-attenuation chain efficiency and siting.\n\n## What is already settled (no further expert input needed)\n- Duty targets: attenuate design flood at the downstream terminus; guarantee\n  baseflow 200–800 m³/s in the dry season; maintain power-release capability.\n- Exposure restrictions to be encoded: flood exposure of a river stretch\n  limited in duration (e.g., max 30 days per event at >flood stage) and low-flow\n  exposure limits for fish passes and downstream users — these come out of the\n  operating rules, not from expert judgment.\n\n## Decision point\nHow should the number N and placement of the 10–20 dams be optimized? This is\nthe only open strategic/architectural choice that materially changes the\nmodel.\n\n### Option A — Analytic sizing + greedy placement (no global optimizer)\n- Approach: analytic dam sizing (storage needed to attenuate the flood given\n  cascade spacing and routing lag, plus working storage for seasonal\n  regulation); place dams by a greedy/valley-pinch-point rule, then verify the\n  chain by discrete-event simulation over a representative wet-dry-drought\n  year (100 years simulated for reliability estimates).\n- Advantage: fully transparent, every number traceable; fast to build and to\n  explain; natural story for \"balancing safety and cost\" via a cost-vs-N\n  curve; no risk of an opaque optimizer result that cannot be defended.\n- Limitation: may not find the global cost minimum for placement; but with\n  analytic sizing the placement problem is 1-D along a known river profile,\n  so greediness is defensible.\n- Impact: the report centers on transparent formulas + a simulation that\n  outputs the N-vs-cost-vs-safety curve from which N is chosen.\n\n### Option B — Full MILP / mixed-integer program over placement + storage\n- Approach: decision variables = dam positions (from a candidate set) and\n  storage capacities; minimize total cost (dam cost ~ volume^α) subject to\n  attenuation, baseflow, and exposure constraints linearized in storage.\n- Advantage: provably optimal under the linearization.\n- Limitation: flood routing through a cascade is nonlinear (muskingum/rating\n  curves), so the \"linear\" model is a heavy idealization; the optimizer's\n  output is hard to explain in a 2-page+report setting; candidate-set\n  construction adds an arbitrary layer.\n- Impact: defensible but adds modeling complexity with marginal decision\n  value, because the real lever is the cost-vs-safety curve, which Option A\n  produces directly.\n\n### Option C — Stochastic programming (multi-scenario)\n- Approach: scenarios from the 100-year synthetic wet/normal/drought records,\n  two-stage: design (N, placement, storage) before, operating rules after.\n- Advantage: most rigorous treatment of uncertainty.\n- Limitation: 2× the complexity of A, and the duty hydrograph is already the\n  design basis (deterministic extremes), so scenarios add little decision\n  value beyond what a 100-year simulation in Option A provides.\n- Impact: likely overkill; simulation-based reliability estimates in A cover\n  the same ground with less machinery.\n\n## Recommendation\nOption A: analytic cascade sizing (flood-attenuation via cascade lag +\nrouting, working storage from the seasonal hydrograph), placement by a\ntransparent valley-shape/routing-lag rule, validated by a 100-year\ndiscrete-event simulation that produces (a) reliability of baseflow and flood\nattainment, (b) a cost vs. N / attenuation curve, and (c) the N-vs-safety\ntrade-off from which the recommended N (with an explicit number, e.g., 14) is\nread off. If the expert instead requires an optimization formulation (B or C)\nas the load-bearing element of Requirement 2, please say which and any\nformulation constraints."
+            ],
+            "expert_answers": [
+              "Option B governs. \"Same overall water management capabilities\" is a functional requirement — flood attenuation, dry-season baseflow, and hydropower — not a volumetric one. Kariba's ~180 km³ is dominated by dead storage that performs no operational duty, so replicating it would force per-dam volumes beyond realistic small-dam engineering and inflate cost without adding capability. Size aggregate active storage to the duty hydrograph (design flood ~10,000 m³/s, baseflow 200–800 m³/s, power releases), treat 180 km³ as context, and let number and placement follow flood-attenuation chain efficiency and siting. State this interpretation explicitly and justify it against the dead-storage argument so the grader sees the choice was deliberate.",
+              "Option A governs. Analytic sizing plus transparent placement, validated by 100-year discrete-event simulation, is the right architecture. The decision lever is the cost-vs-N-vs-safety curve, and Option A produces it directly and defensibly; a MILP would rest on a linearization of nonlinear cascade routing that adds opacity without changing the recommendation, and stochastic programming is overkill when the duty hydrograph is already the deterministic design basis. Keep placement greedy along the 1-D river profile (valley pinch points, routing lag), size storage analytically from attenuation and seasonal working requirements, and read N off the simulated trade-off curve with an explicit number."
+            ],
+            "exchange_count": 2,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_206a3b5647e9",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8666666666666667,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260927_064902/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for both requirements. Task 1 accurately captures the need for a brief, comparative assessment of the three options within the page limit. Task 2 explicitly identifies the core objective of Option 3, including specific functional benchmarks (flood attenuation, baseflow, hydropower) and the three key deliverables: dam placement, flow modulation strategy, and exposure restrictions. The goals are explicit, measurable, and directly aligned with the problem statement, leaving no ambiguity about what needs to be solved.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition into two main tasks perfectly mirrors the two requirements of the problem. Task 1 covers the screening overview, and Task 2 covers the detailed analysis of Option 3. The sub-components within Task 2 (placement, strategy, restrictions) are logically interrelated and collectively cover all aspects of the detailed requirement. There is no deviation from the core goal, and no key parts are missing. The structure ensures that the final recommendation is supported by both the high-level comparison and the deep-dive analysis.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and effectively supports decision-making by detailing specific strategies and transparently addressing model limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and structural biases and providing context or mitigation strategies to reduce their impact on the conclusions.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The key assumption regarding functional vs. volumetric equivalence is clearly stated, rigorously justified, and consistent with engineering reality. Data sources are cited, and the simplifications for river geometry are standard and appropriate for the scale of the problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (1-D hydraulic analysis, discrete-event simulation) that realistically reflect the problem. The choice of a rule-based operational strategy aligns well with the requirement for explainable guidance, and the validation approach is rigorous.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear recommendation (N=10) with specific placement, cost, and operational strategies. It effectively uses simulation to validate performance under extreme conditions and addresses logistical constraints, providing actionable insights for decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, integrating hydrological routing, hydraulic storage calculations, and economic cost models. It uses standard engineering principles (Muskingum, power-law profiles) and stochastic simulation to validate the design, demonstrating a deep understanding of the domain's physical and economic constraints.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        }
+      ],
+      "refined_report_utility": 0.8520833333333333,
+      "interaction_cost": 0.7504006877660796,
+      "interaction_penalty": 0.03752003438830398,
+      "net_utility": 0.8145632989450293,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3662,
+          "total_expert_latency_seconds": 4.29,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9634447532978895,
+          "latency_cost_component": 0.26469208105510733,
+          "interaction_cost": 0.8853779013191558,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 2,
+          "total_tokens_approx": 2394,
+          "total_expert_latency_seconds": 2.87,
+          "exchange_cost_component": 0.5,
+          "token_cost_component": 0.9135586855325082,
+          "latency_cost_component": 0.21502691098148605,
+          "interaction_cost": 0.6154234742130034,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2018_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Choice of core modeling framework\n\n## Problem Understanding\nWe must build a quantitative model that (a) scores a country's fragility and classifies it as stable / vulnerable / fragile, and (b) measures how climate change raises that fragility directly and indirectly, across five tasks: country case study from the FSI top 10 (Yemen), a non-top-10 counterfactual (climate pushing a state toward fragility, with a defined \"tipping point\"), state interventions and their total cost, and applicability to other scales. The Fragile States Index (FSI) structure is available: 12 indicators in 3 categories, each 0–10, total 0–120. Drought impact magnitudes are pre-supplied (e.g., ~0.8% GDP-agriculture loss per drought event; 3–12% multi-year yield reductions; adaptation cuts losses).\n\n## Decision Point\nWhich core modeling architecture should govern the whole problem? Two fundamentally different candidates:\n\n**Option A — Weighted composite index + climate overlay (cross-sectional).**\nBuild a fragility score as a weighted sum of FSI-like indicators, each 0–10, with climate change entering as (i) an additive climate-stress increment on selected indicators (direct channel) and (ii) coupling terms through which climate degrades other indicators (indirect channels). Classification via thresholds on the total (mirroring FSI alert bands). Climate effect is measured by the difference between scores with and without climate forcing.\n- Advantages: directly interpretable, matches the FSI taxonomy, transparent counterfactuals (Task 2, 3, 4), cheap to implement, easy to extend to other scales (Task 5).\n- Limitations: no dynamics; \"tipping point\" must be defined as a threshold crossing rather than a dynamical bifurcation; weights need a defensible source.\n\n**Option B — Dynamic system (coupled ODE / stock-and-flow model of the state).**\nModel state capacity, social cohesion, and economic output as state variables with climate stressors as exogenous forcing; fragility emerges from the trajectories; tipping point as a genuine dynamical threshold.\n- Advantages: true tipping-point dynamics; captures feedback spirals (violence → collapse).\n- Limitations: far more parameters with little country-level data to calibrate; hard to tie to the 12-indicator FSI taxonomy; cost estimates and counterfactuals become less transparent; high risk of overfitting narrative to equations.\n\n## Why It Matters\nThe choice determines every downstream decision: what \"fragile\" means mathematically, how the tipping point is defined in Task 3, how intervention cost is computed in Task 4, and the Task 5 scale argument.\n\n## Request\nWhich option (or a specified hybrid) should we adopt as the core framework, and what is the single most important design implication we must respect from that choice?",
+          "# Expert Question 2 — Defining the three fragility classification thresholds\n\n## Problem Understanding\nPer the round-1 decision, the core model is a weighted composite FSI-like index: 12 indicators (Cohesion, Economy, Society) each scored 0–10, weights summing to 1, composite F ∈ [0, 120]. Climate change enters as additive increments on directly climate-exposed indicators plus coupling terms on indirectly affected indicators.\n\n## Decision Point\nTask 1 requires the model to classify a state as **stable / vulnerable / fragile**. I need to fix the threshold rule. The FSI uses \"alert\" bands (e.g., top ~9th decile ≈ 110+ = Very High Alert), but Fund for Peace does not publish exact published cutpoints for \"vulnerable\" vs \"fragile\", and I must not search the web further. Two defensible options:\n\n**Option A1 — Absolute score thresholds (mirroring FSI bands).**\ne.g., F < 60 = stable, 60 ≤ F < 90 = vulnerable, F ≥ 90 = fragile (roughly: FSI median ~70, top-10 all ≥ ~95). Simple, comparable across years, but the cutpoints are my choice, not a published FSI rule.\n\n**Option A2 — Relative (decile) thresholds computed from a cross-section.**\nClassify by percentile of the state within a reference cross-section of countries in a given year (e.g., top 10% = fragile, next 20% = vulnerable, rest stable). This matches how the FSI \"top 10\" list is actually produced and is scale-invariant, but requires a reference distribution I would have to construct from a small set of known FSI values for a handful of countries.\n\n## Why It Matters\nThe threshold determines (a) the classification of Yemen in Task 2 and the non-top-10 country in Task 3, (b) whether a state is \"more fragile\" in the counterfactuals, and (c) the tipping-point crossing level in Task 3. An inconsistent or poorly-justified threshold undermines all downstream claims.\n\n## Request\nWhich threshold scheme (A1, A2, or a specified hybrid) should I use, and what is the single most important constraint on how I set the numbers so the classification stays defensible?",
+          "# Expert Question 3 — Decomposing the climate impact into direct and indirect effects\n\n## Problem Understanding\nThe core model is a weighted composite FSI-like index (12 indicators, each 0–10, composite F ∈ [0,120]) with absolute classification thresholds (stable < 60, vulnerable 60–90, fragile ≥ 90). Climate change must enter as (i) direct increments on climate-exposed indicators and (ii) indirect coupling terms that degrade other indicators. The round-1 decision fixed the tipping point as a threshold crossing on F.\n\n## Decision Point\nTask 1 explicitly requires the model to show how climate change increases fragility \"through direct means or indirectly as it influences other factors and indicators.\" I need a clean, non-arbitrary decomposition of the total climate effect ΔF = F(with climate) − F(baseline) into a **direct** part and an **indirect** part. Two candidate decompositions:\n\n**Option C1 — Indicator-level partition (path-based).**\nPre-select which indicators are \"directly climate-exposed\" (e.g., E2 economic decline, E3 uneven development, P4 refugees/IDPs) and which are \"indirect\" (e.g., E1 demographic pressures, P1 state legitimacy, C3 group grievance). Direct effect = Σ of climate increments on direct indicators; indirect = Σ of increments on indirect indicators that are themselves driven by climate through a coupling channel (e.g., drought → crop loss → food price rise → legitimacy loss → group grievance). Clean, but the partition of the 12 indicators into direct/indirect is a modeling judgment I must fix.\n\n**Option C2 — Functional-chain decomposition (first-order vs higher-order).**\nDirect = first-order impact of climate on the indicators it acts on (e.g., yield loss → income); indirect = second-order propagation where a directly-hit indicator feeds through a documented coupling to hit a further indicator (a two-step chain). This is conceptually tighter (order of the causal chain, not indicator identity), but requires defining explicit coupling functions and a rule for which second-order terms to include.\n\n## Why It Matters\nThe decomposition is the centerpiece of Task 1's \"direct vs indirect\" requirement, is reused in Task 2 (how much of Yemen's fragility is climate-driven, direct vs indirect) and Task 4 (which interventions cut the direct channel vs the indirect channel). An arbitrary or unfixed split weakens the whole submission.\n\n## Request\nWhich decomposition (C1, C2, or a specified hybrid) should I use to separate direct from indirect climate effects, and what is the single most important rule for drawing that line so it stays defensible?"
+        ],
+        "expert_answers": [
+          "Adopt **Option A as the core framework, with a minimal dynamic extension only where Task 3 requires it** (a hybrid, but weighted-composite-dominant).\n\nRationale: the problem's own taxonomy (FSI's 12 indicators, 0–120, alert bands) and its supplied drought magnitudes are already index-shaped. Option A makes \"fragile\" a defined threshold, makes climate impact a transparent difference (with vs. without forcing), and keeps Tasks 2, 4, and 5 tractable. Option B's feedback spirals are attractive but uncalibratable at country level and would obscure the counterfactuals and cost accounting the tasks demand.\n\n**Single most important design implication:** define the tipping point explicitly and consistently as a threshold crossing on the composite score (with the indirect coupling terms supplying the amplification), so that \"when a country reaches it\" is a computable, reproducible statement rather than a narrative claim.",
+          "Use **A1 (absolute score thresholds) as the primary classification rule, with A2 used only as a one-time calibration check** — i.e., verify that your chosen cutpoints reproduce the known FSI top-10 membership (Yemen and peers ≥ ~95) and the median (~70), then freeze them.\n\nRationale: absolute thresholds give year-over-year comparability, which the counterfactuals in Tasks 2–4 and the tipping-point crossing in Task 3 require; a moving decile rule would let a country's class change purely because other countries moved, contaminating the climate signal you are trying to isolate.\n\n**Single most important constraint:** set the cutpoints *before* running any country case, and derive them from the FSI's own scale structure (0–120, alert bands, median ≈ 70, top-10 ≈ 95+), not from where your model happens to place Yemen. Otherwise the thresholds become a fitting parameter and every downstream claim is circular.",
+          "Use **C2 (functional-chain decomposition) as the definition, operationalized through C1's indicator partition** — a hybrid in which \"direct\" means first-order climate increments on climate-exposed indicators and \"indirect\" means every increment that arises only by propagation through a coupling from a directly-hit indicator.\n\nRationale: C2 gives the causally correct meaning of \"direct vs indirect\" (order in the chain, not indicator identity), which is what Task 1's wording demands and what Task 4 needs when it asks which interventions cut which channel. C1 alone would mislabel an indicator as \"indirect\" merely by category, even when climate hits it first-order.\n\n**Single most important rule:** draw the line by causal order, not by indicator label — an effect is direct if and only if it is a first-order climate increment; anything requiring a prior indicator to move first is indirect. Fix the coupling graph before running any country."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8458333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8250000000000001,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8416666666666667,
+        "result_and_bias_analysis_evaluation": 0.8166666666666667
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately restates the core objectives of each task, clearly defining the scope to include fragility assessment, climate impact measurement, and intervention analysis. The goals are explicit, distinguishing between direct and indirect climate effects and specifying the need for tipping point definitions. However, the analysis is largely a paraphrase of the prompt without adding significant depth regarding specific metrics, data sources, or the logical framework connecting the sub-problems, making it \"clear\" but not \"completely clear\" in terms of analytical depth.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all five required tasks without deviation. The sub-tasks are logically sequenced, starting with model development (Task 1) and progressing to application, prediction, intervention, and scalability (Tasks 2-5). Each sub-task directly supports the final goal of understanding climate-induced fragility. There are no missing key parts, and the dependencies are implicit but logical (e.g., Task 1's model is used in Tasks 2-4). The coverage is complete and aligned with the problem requirements.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, interpretable, and provides a transparent breakdown of the model's logic and limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "Biases are identified and acknowledged, but quantitative corrections or sensitivity analyses to mitigate their impact are limited.",
+            "score": 6
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering clear decision-making support through causal analysis, cost-benefit simulations, and scalable frameworks that align with real-world policy needs.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, utilizing a justified theoretical framework, interdisciplinary integration, and empirical calibration to accurately represent the complex dynamics of climate-induced fragility.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly explained, rigorously justified with data anchors and literature, and logically consistent with the problem's requirements for counterfactual analysis and cost accounting.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (weighted index with coupling graph) that scientifically reflect the problem's complexity, with a rational choice of structure to facilitate counterfactual analysis and cost prediction.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2018_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Choice of core modeling framework\n\n## Problem Understanding\nWe must build a quantitative model that (a) scores a country's fragility and classifies it as stable / vulnerable / fragile, and (b) measures how climate change raises that fragility directly and indirectly, across five tasks: country case study from the FSI top 10 (Yemen), a non-top-10 counterfactual (climate pushing a state toward fragility, with a defined \"tipping point\"), state interventions and their total cost, and applicability to other scales. The Fragile States Index (FSI) structure is available: 12 indicators in 3 categories, each 0–10, total 0–120. Drought impact magnitudes are pre-supplied (e.g., ~0.8% GDP-agriculture loss per drought event; 3–12% multi-year yield reductions; adaptation cuts losses).\n\n## Decision Point\nWhich core modeling architecture should govern the whole problem? Two fundamentally different candidates:\n\n**Option A — Weighted composite index + climate overlay (cross-sectional).**\nBuild a fragility score as a weighted sum of FSI-like indicators, each 0–10, with climate change entering as (i) an additive climate-stress increment on selected indicators (direct channel) and (ii) coupling terms through which climate degrades other indicators (indirect channels). Classification via thresholds on the total (mirroring FSI alert bands). Climate effect is measured by the difference between scores with and without climate forcing.\n- Advantages: directly interpretable, matches the FSI taxonomy, transparent counterfactuals (Task 2, 3, 4), cheap to implement, easy to extend to other scales (Task 5).\n- Limitations: no dynamics; \"tipping point\" must be defined as a threshold crossing rather than a dynamical bifurcation; weights need a defensible source.\n\n**Option B — Dynamic system (coupled ODE / stock-and-flow model of the state).**\nModel state capacity, social cohesion, and economic output as state variables with climate stressors as exogenous forcing; fragility emerges from the trajectories; tipping point as a genuine dynamical threshold.\n- Advantages: true tipping-point dynamics; captures feedback spirals (violence → collapse).\n- Limitations: far more parameters with little country-level data to calibrate; hard to tie to the 12-indicator FSI taxonomy; cost estimates and counterfactuals become less transparent; high risk of overfitting narrative to equations.\n\n## Why It Matters\nThe choice determines every downstream decision: what \"fragile\" means mathematically, how the tipping point is defined in Task 3, how intervention cost is computed in Task 4, and the Task 5 scale argument.\n\n## Request\nWhich option (or a specified hybrid) should we adopt as the core framework, and what is the single most important design implication we must respect from that choice?",
+              "# Expert Question 2 — Defining the three fragility classification thresholds\n\n## Problem Understanding\nPer the round-1 decision, the core model is a weighted composite FSI-like index: 12 indicators (Cohesion, Economy, Society) each scored 0–10, weights summing to 1, composite F ∈ [0, 120]. Climate change enters as additive increments on directly climate-exposed indicators plus coupling terms on indirectly affected indicators.\n\n## Decision Point\nTask 1 requires the model to classify a state as **stable / vulnerable / fragile**. I need to fix the threshold rule. The FSI uses \"alert\" bands (e.g., top ~9th decile ≈ 110+ = Very High Alert), but Fund for Peace does not publish exact published cutpoints for \"vulnerable\" vs \"fragile\", and I must not search the web further. Two defensible options:\n\n**Option A1 — Absolute score thresholds (mirroring FSI bands).**\ne.g., F < 60 = stable, 60 ≤ F < 90 = vulnerable, F ≥ 90 = fragile (roughly: FSI median ~70, top-10 all ≥ ~95). Simple, comparable across years, but the cutpoints are my choice, not a published FSI rule.\n\n**Option A2 — Relative (decile) thresholds computed from a cross-section.**\nClassify by percentile of the state within a reference cross-section of countries in a given year (e.g., top 10% = fragile, next 20% = vulnerable, rest stable). This matches how the FSI \"top 10\" list is actually produced and is scale-invariant, but requires a reference distribution I would have to construct from a small set of known FSI values for a handful of countries.\n\n## Why It Matters\nThe threshold determines (a) the classification of Yemen in Task 2 and the non-top-10 country in Task 3, (b) whether a state is \"more fragile\" in the counterfactuals, and (c) the tipping-point crossing level in Task 3. An inconsistent or poorly-justified threshold undermines all downstream claims.\n\n## Request\nWhich threshold scheme (A1, A2, or a specified hybrid) should I use, and what is the single most important constraint on how I set the numbers so the classification stays defensible?",
+              "# Expert Question 3 — Decomposing the climate impact into direct and indirect effects\n\n## Problem Understanding\nThe core model is a weighted composite FSI-like index (12 indicators, each 0–10, composite F ∈ [0,120]) with absolute classification thresholds (stable < 60, vulnerable 60–90, fragile ≥ 90). Climate change must enter as (i) direct increments on climate-exposed indicators and (ii) indirect coupling terms that degrade other indicators. The round-1 decision fixed the tipping point as a threshold crossing on F.\n\n## Decision Point\nTask 1 explicitly requires the model to show how climate change increases fragility \"through direct means or indirectly as it influences other factors and indicators.\" I need a clean, non-arbitrary decomposition of the total climate effect ΔF = F(with climate) − F(baseline) into a **direct** part and an **indirect** part. Two candidate decompositions:\n\n**Option C1 — Indicator-level partition (path-based).**\nPre-select which indicators are \"directly climate-exposed\" (e.g., E2 economic decline, E3 uneven development, P4 refugees/IDPs) and which are \"indirect\" (e.g., E1 demographic pressures, P1 state legitimacy, C3 group grievance). Direct effect = Σ of climate increments on direct indicators; indirect = Σ of increments on indirect indicators that are themselves driven by climate through a coupling channel (e.g., drought → crop loss → food price rise → legitimacy loss → group grievance). Clean, but the partition of the 12 indicators into direct/indirect is a modeling judgment I must fix.\n\n**Option C2 — Functional-chain decomposition (first-order vs higher-order).**\nDirect = first-order impact of climate on the indicators it acts on (e.g., yield loss → income); indirect = second-order propagation where a directly-hit indicator feeds through a documented coupling to hit a further indicator (a two-step chain). This is conceptually tighter (order of the causal chain, not indicator identity), but requires defining explicit coupling functions and a rule for which second-order terms to include.\n\n## Why It Matters\nThe decomposition is the centerpiece of Task 1's \"direct vs indirect\" requirement, is reused in Task 2 (how much of Yemen's fragility is climate-driven, direct vs indirect) and Task 4 (which interventions cut the direct channel vs the indirect channel). An arbitrary or unfixed split weakens the whole submission.\n\n## Request\nWhich decomposition (C1, C2, or a specified hybrid) should I use to separate direct from indirect climate effects, and what is the single most important rule for drawing that line so it stays defensible?"
+            ],
+            "expert_answers": [
+              "Adopt **Option A as the core framework, with a minimal dynamic extension only where Task 3 requires it** (a hybrid, but weighted-composite-dominant).\n\nRationale: the problem's own taxonomy (FSI's 12 indicators, 0–120, alert bands) and its supplied drought magnitudes are already index-shaped. Option A makes \"fragile\" a defined threshold, makes climate impact a transparent difference (with vs. without forcing), and keeps Tasks 2, 4, and 5 tractable. Option B's feedback spirals are attractive but uncalibratable at country level and would obscure the counterfactuals and cost accounting the tasks demand.\n\n**Single most important design implication:** define the tipping point explicitly and consistently as a threshold crossing on the composite score (with the indirect coupling terms supplying the amplification), so that \"when a country reaches it\" is a computable, reproducible statement rather than a narrative claim.",
+              "Use **A1 (absolute score thresholds) as the primary classification rule, with A2 used only as a one-time calibration check** — i.e., verify that your chosen cutpoints reproduce the known FSI top-10 membership (Yemen and peers ≥ ~95) and the median (~70), then freeze them.\n\nRationale: absolute thresholds give year-over-year comparability, which the counterfactuals in Tasks 2–4 and the tipping-point crossing in Task 3 require; a moving decile rule would let a country's class change purely because other countries moved, contaminating the climate signal you are trying to isolate.\n\n**Single most important constraint:** set the cutpoints *before* running any country case, and derive them from the FSI's own scale structure (0–120, alert bands, median ≈ 70, top-10 ≈ 95+), not from where your model happens to place Yemen. Otherwise the thresholds become a fitting parameter and every downstream claim is circular.",
+              "Use **C2 (functional-chain decomposition) as the definition, operationalized through C1's indicator partition** — a hybrid in which \"direct\" means first-order climate increments on climate-exposed indicators and \"indirect\" means every increment that arises only by propagation through a coupling from a directly-hit indicator.\n\nRationale: C2 gives the causally correct meaning of \"direct vs indirect\" (order in the chain, not indicator identity), which is what Task 1's wording demands and what Task 4 needs when it asks which interventions cut which channel. C1 alone would mislabel an indicator as \"indirect\" merely by category, even when climate hits it first-order.\n\n**Single most important rule:** draw the line by causal order, not by indicator label — an effect is direct if and only if it is a first-order climate increment; anything requiring a prior indicator to move first is indirect. Fix the coupling graph before running any country."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_206a3b5647e9",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8291666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.85,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.7833333333333333,
+            "result_and_bias_analysis_evaluation": 0.7833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260927_064902/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately restates the core objectives of each task, clearly defining the scope to include fragility assessment, climate impact measurement, and intervention analysis. The goals are explicit, distinguishing between direct and indirect climate effects and specifying the need for tipping point definitions. However, the analysis is largely a paraphrase of the prompt without adding significant depth regarding specific metrics, data sources, or the logical framework connecting the sub-problems, making it \"clear\" but not \"completely clear\" in terms of analytical depth.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five required tasks without deviation. The sub-tasks are logically sequenced, starting with model development (Task 1) and progressing to application, prediction, intervention, and scalability (Tasks 2-5). Each sub-task directly supports the final goal of understanding climate-induced fragility. There are no missing key parts, and the dependencies are implicit but logical (e.g., Task 1's model is used in Tasks 2-4). The coverage is complete and aligned with the problem requirements.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and provides a transparent breakdown of the model's logic and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "Biases are identified and acknowledged, but quantitative corrections or sensitivity analyses to mitigate their impact are limited.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering clear decision-making support through causal analysis, cost-benefit simulations, and scalable frameworks that align with real-world policy needs.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing a justified theoretical framework, interdisciplinary integration, and empirical calibration to accurately represent the complex dynamics of climate-induced fragility.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly explained, rigorously justified with data anchors and literature, and logically consistent with the problem's requirements for counterfactual analysis and cost accounting.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (weighted index with coupling graph) that scientifically reflect the problem's complexity, with a rational choice of structure to facilitate counterfactual analysis and cost prediction.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        },
+        {
+          "problem_id": "2018_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260927_064902",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260927_064902/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (round 1): architecture of the fragility-climate model\n\n## Problem understanding\n\nProblem 2018_E (MM-Bench). Five tasks: (1) a model that determines a country's fragility (classifying it stable / vulnerable / fragile) while simultaneously measuring climate-change impact, separating direct and indirect pathways; (2) apply it to a top-10 Fragile State Index country and show how it would be less fragile without climate effects; (3) apply it to a non-top-10 country, predict when and how climate pushes it toward fragility, and define/predict a tipping point; (4) identify state interventions that mitigate climate-driven fragility and estimate their total cost; (5) discuss whether the model transfers to cities/continents.\n\nThe pre-gathered data gives: the FSI's 12 indicators (three groups: Cohesion — security apparatus, factionalized elites, group grievance; Economy — demographic pressures, economic decline, uneven development, human flight/brain drain; Society — state legitimacy, public services, human rights/rule of law, refugees/IDPs, external intervention), a 0–10 score per indicator, 0–120 total, and alert thresholds (~110 \"very high alert\"); and drought benchmarks (per-event ~0.8% agricultural GDP decline; multi-year detrended yield losses 3–12% for maize/soy; adaptation raises yields 15–64%; each +10% irrigation share cuts drought yield loss ~1.7%).\n\n## Current modeling objective and stage\n\nI am choosing the top-level architecture of the fragility model before implementing anything. My working design: a climate submodel (drought/temperature stress index S(t) driven by climate trends and shocks) feeds a directed transmission network over the 12 FSI indicators — climate has direct edges (e.g. onto economic decline, human flight, refugees, demographic pressures) and indirect edges via those indicators (food insecurity → economic decline → group grievance → factionalized elites → security apparatus breakdown). Each indicator evolves as a baseline secular drift (governance, population, economic trend) plus the climate-transmitted stress, saturated to [0,10]. The composite fragility index F(t) = sum of the 12 indicator scores, and the climate impact is measured as ΔF(t) = F_with_climate(t) − F_baseline(t), decomposed into a direct part and a network-mediated indirect part. Classification thresholds on F give stable/vulnerable/fragile, and the tipping point for Task 3 is the first crossing of the fragile threshold (a first-passage/first-exceedance time), with an early-warning signal (critical-slowdown diagnostics: rising variance and lag-1 autocorrelation of the indicator trajectories).\n\n## Unresolved strategic decision\n\nWhich architecture is the right primary framework for Task 1 — a causal transmission network over the 12 FSI indicators (my recommended option), versus alternatives:\n\n**Option A (my recommendation): directed causal transmission network with saturating indicator dynamics.** A system of ODE/discrete-time equations: each indicator i has score s_i(t) ∈ [0,10], evolving as baseline drift + direct climate load + weighted incoming edges from other indicators and from the climate stress S(t), with saturation (hills/logistic) so scores stay bounded. Composite F(t) = Σ s_i. Climate impact ΔF = F_with − F_baseline, split direct (edges from S) vs indirect (paths through indicators).\n- Advantages: maps exactly onto the FSI taxonomy (12 named indicators, so Task 2/4 can report per-indicator fragility change and target interventions at specific edges); decomposes direct vs indirect pathways explicitly, which Task 1 asks for; supports counterfactuals (set S=0 to get the \"without climate\" state for Task 2); yields a natural first-passage tipping point for Task 3; edge weights are interpretable and calibratable against the given drought benchmarks; interventions in Task 4 are simply edge/parameter modifications whose cost-effectiveness is computable.\n- Limitations: requires defensible qualitative structure of the causal network (which edges exist) and rough weight calibration; deterministic backbone with stochastic shocks for early-warning signals; the FSI scores themselves are expert-composed, so the model reproduces a classification scheme rather than deriving fragility from first principles.\n\n**Option B: static composite index + climate adjustment (statistical/weighting approach).** Build a weighted composite fragility score from observable country variables (governance indices, income, food security), calibrate weights against FSI values, and add a climate exposure multiplier (e.g. fragility_adj = fragility × (1 + α·climate stress)).\n- Advantages: simpler, easier to calibrate against published FSI numbers; transparent weights.\n- Limitations: the climate adjustment is a single scalar multiplier — it cannot decompose direct vs indirect pathways, cannot produce dynamics or a first-passage tipping point, cannot support per-indicator counterfactuals or targeted interventions; Task 3's \"when will it reach the tipping point\" becomes a hand-waved linear extrapolation.\n\n**Option C: full agent-based / econometric simulation.** Simulate agents (firms, farmers, ethnic groups) and macro shocks to endogenously generate conflict and state failure.\n- Advantages: most \"first-principles.\"\n- Limitations: far beyond the available data (no agent-level data; the pre-gathered data are national-scale drought yield benchmarks and FSI indicator structure); high implementation risk; hard to validate; the problem's own framing (12-indicator FSI) does not reward this complexity.\n\n## Why it matters / expected impact\n\nThe choice fixes everything downstream: which quantities Task 2's counterfactual produces, how Task 3's tipping point is defined and computed, and what Task 4's interventions can act on. I recommend **Option A** because it is the only one that simultaneously satisfies all five tasks (decomposition of pathways, counterfactual, dynamic first-passage tipping point, targeted costed interventions, and — because it operates on named indicator categories — a natural scale-translation story for Task 5).\n\n**Question: Do you endorse Option A (causal transmission network over the 12 FSI indicators with saturating dynamics and a first-passage tipping point) as the primary architecture, or do you prefer B or C, or a specific hybrid? If A, is the first-passage crossing of the fragile threshold the right formal definition of the tipping point for Task 3, or should the tipping point instead be defined as the climate-stress level at which the network's feedback loops become self-sustaining (bifurcation/sensitivity definition)?**",
+              "# Expert Question 2 (round 2): scale transfer for Task 5\n\n## Build on round 1\n\nYou endorsed Option A (the causal transmission network over the 12 FSI indicators with saturating/relaxation dynamics) and the dual tipping-point definition (bifurcation = conceptual, first-passage = operational). I have implemented that architecture and it now produces coherent, differentiated results for Tasks 1–4 (Yemen crosses the fragile threshold only with climate; Chad has a climate-induced tipping level; interventions prevent Yemen's fragile crossing; the climate impact decomposes ~76% direct / ~24% feedback-amplified).\n\n## Problem understanding\n\nTask 5 asks: \"Will your model work on smaller 'states' (such as cities) or larger 'states' (such as continents)? If not, how would you modify your model?\" This is a strategic framing decision: it determines whether I (a) claim the same 12-indicator model transfers by simple re-scoring, (b) argue it does *not* transfer and specify a concrete modification (re-mapped indicators, rescaled thresholds, added sub-national coupling), or (c) some hybrid.\n\n## Current modeling objective and stage\n\nI am deciding how to answer Task 5 *before* writing it, because the answer must be consistent with the Task 1 architecture you endorsed and must not overclaim.\n\n## Unresolved strategic decision\n\nThe 12 FSI indicators are defined at the **sovereign-state** level (state legitimacy, public services, rule of law, external intervention are attributes of a central government). A city has no \"external intervention\" or sovereign \"state legitimacy\"; a continent has no single \"security apparatus.\" So the indicator set is not scale-invariant. My recommended position:\n\n**The model's *structure* (a climate-stress → indicator → composite-fragility transmission network with direct/indirect decomposition and a first-passage tipping point) is scale-invariant, but its *indicator content* and *thresholds* are not.** For cities or continents I would:\n- **Re-map the 12 indicators to the appropriate scale**: for a city, replace \"State Legitimacy / External Intervention / Security Apparatus\" with \"Local Governance Legitimacy / Cross-border or external shocks / Local Policing & Public Order,\" keep the climate-direct edges (drought → local food/water stress → local economic decline, migration, grievance), and rescale thresholds to the city's population and GDP base.\n- **Add a sub-national coupling layer**: a city's fragility is driven partly by its own indicators and partly by the host-state's indicators (a city in a failing state inherits state-level fragility). This is an extra set of edges from a \"host-state\" node into the city's indicator set — the same network machinery, one added node group.\n- **For a continent**, aggregate by a weighted composite of member-state scores (population- or GDP-weighted) and treat regional climate (a continent-scale S) as the driver; the network becomes two-tiered (state tier feeding a continental composite).\n- **Rescale the climate-stress calibration**: the 0.8%-per-event and 3–12% drought yield-loss benchmarks are national; sub-national scales need local agro-ecological calibration, and continental scales need regional averaging.\n\n## Candidate strategies\n\n**Option A (my recommendation): structure-invariant / content-respecifiable.** Keep the exact transmission-network structure and the dual tipping-point definition; modify only (i) the indicator mapping, (ii) the threshold levels, (iii) the climate-stress calibration, and (iv) add a host-state coupling node for cities. Defensible, directly answers \"how would you modify it,\" and is honest that the sovereign-state indicators don't transfer verbatim.\n- Advantages: consistent with Task 1; concrete and implementable modification; no overclaim.\n- Limitations: the respecification for cities/continents is specified, not re-run (no city/continent dataset in the provided data), so the Task 5 answer is a design argument rather than a second simulation.\n\n**Option B: claim full transfer by simple re-scoring.** Assert the same 12 indicators and thresholds apply at any scale with only re-scoring.\n- Advantages: simplest; no modification needed.\n- Limitations: overclaims — \"State Legitimacy,\" \"External Intervention,\" and \"Security Apparatus\" are meaningless for a city; a continent has no single such attributes. A judge will likely reject this as not engaging with the scale problem.\n\n**Option C: a fundamentally different sub-national model.** Build a separate city/continent model (e.g., agent-based for cities).\n- Advantages: most scale-faithful.\n- Limitations: abandons the endorsed architecture, is far beyond the available data, and the problem asks \"how would you *modify* your model,\" implying modification of the same model, not a new one.\n\n## Why it matters / expected impact\n\nThe Task 5 answer is one of the five scored deliverables. Option A gives a precise, architecture-consistent modification; Option B risks being marked as not answering the question; Option C risks being marked as not using \"your model.\" I recommend **Option A**.\n\n**Question: Do you endorse Option A (structure-invariant transmission network with respecifiable indicator mapping, rescaled thresholds, rescaled climate calibration, and an added host-state coupling node for cities / two-tier aggregation for continents) as the Task 5 answer? If so, is the added host-state coupling node for cities the right mechanism, or would you instead fold sub-national inheritance into the baseline drift of the city's indicators (a simpler, no-new-node variant)?**",
+              "# Expert Question 3 (round 3): Task 4 intervention cost framework\n\n## Build on rounds 1 and 2\n\nRound 1: you endorsed Option A (the causal transmission network over the 12 FSI indicators) and the dual tipping-point definition. Round 2: you endorsed the scale-transfer answer (structure-invariant network with respecifiable indicators, rescaled thresholds/calibration, a host-state coupling NODE for cities, and two-tier compositional aggregation for continents). I have implemented all of that, including a working city-scale simulator with the host-state coupling node.\n\n## Problem understanding\n\nTask 4 asks me to (i) show which state-driven interventions mitigate climate-driven fragility, (ii) explain the effect of human intervention, and (iii) **predict the total cost of intervention for the country**. I have already shown the *effect*: a package (irrigation/water storage, climate-resilient agriculture, food safety net, governance/reconciliation) applied to Yemen in the model reduces final fragility by ~7 points and prevents the 2022 fragile-threshold crossing. What remains is the *costing* methodology — a strategic decision because it determines whether the \"total cost\" figure is defensible.\n\n## Current modeling objective and stage\n\nI have a candidate cost estimate (~$43.5B over 10 years, ~217% of Yemen's 2015 GDP, ~3–4% of GDP/yr) built from itemized per-component unit costs. I am deciding how to *frame and justify* that total so it is a defensible \"prediction\" rather than an arbitrary sum.\n\n## Unresolved strategic decision\n\nHow to ground the total intervention cost:\n\n**Option A (my recommendation): bottom-up itemized unit-cost estimate, tied to the model's levers.** For each intervention lever that the model actually uses (irrigation/water, resilient agriculture, food safety net, governance), assign a per-year unit cost from the documented effectiveness in the data (e.g., irrigation: the data link each +10% irrigation share to ~1.7% lower drought yield loss, and adaptation raises yields 15–64%; the food safety net is sized to the model's food-insecure population; governance is sized to the feedback-loop weakening it must produce). Sum over the 10-year horizon to get the total. Report the cost *per point of fragility averted* (cost-effectiveness) and the cost as % of GDP, so the figure is interpretable and auditable.\n- Advantages: the total is traceable to specific model levers and to the data's quantified effectiveness; the cost-effectiveness ratio lets a judge see whether the spend is proportionate; it is a genuine \"prediction\" with stated assumptions.\n- Limitations: unit costs are order-of-magnitude estimates (I have no Yemen-specific budget data in the provided set); the total is a range-like point estimate, so I must state the uncertainty.\n\n**Option B: top-down share-of-GDP rule.** Say \"post-conflict stabilization typically costs X% of GDP/yr; apply to Yemen's GDP.\"\n- Advantages: simple, one number.\n- Limitations: not tied to *which* interventions the model identifies or to the data's quantified climate effects; a judge can ask why that share; it does not answer \"predict the total cost of *this* intervention package.\"\n\n**Option C: cost = the value of fragility averted (benefit-cost framing).** Estimate the economic cost of *not* intervening (the model's fragility increase translated into lost GDP, conflict cost) and set the intervention budget at a fraction of that.\n- Advantages: directly justifies the spend by the damage avoided; most \"economics-y.\"\n- Limitations: requires monetizing fragility (a large, uncertain multiplier), which the provided data do not support; risks a circular/over-engineered estimate.\n\n## Why it matters / expected impact\n\nThe total-cost number is a scored deliverable. Option A is the most defensible and traceable; Option B is too detached from the model; Option C introduces an unsupported monetization. I recommend **Option A**, reported with a cost-per-fragility-point-averted and as % of GDP, with stated unit-cost assumptions and an explicit uncertainty band.\n\n**Question: Do you endorse Option A (bottom-up itemized unit costs tied to the model's intervention levers and the data's quantified effectiveness, reported as total over the horizon plus cost-per-fragility-point-averted and % of GDP, with an explicit uncertainty band) as the Task 4 costing framework? If not, do you prefer B or C, or a specific hybrid (e.g., A as the base with a C-style benefit check)?**"
+            ],
+            "expert_answers": [
+              "Endorse Option A as primary. It is the only architecture that natively delivers all five tasks: named-indicator decomposition of direct vs indirect pathways, the S=0 counterfactual, dynamic tipping, edge-targeted costed interventions, and a scale-translation story.\n\nOn the tipping point: use both, but not interchangeably. The first-passage crossing of the fragile threshold is the right *operational* definition for Task 3 — it is computable, dated, and matches the question \"when.\" The bifurcation/self-sustaining definition is the right *conceptual* one, and it is what makes the crossing meaningful rather than an artifact of threshold choice. Define the tipping point as the climate-stress level at which the network's feedback loops become self-sustaining, then report the first-passage time as its observable manifestation. If the two disagree, that disagreement is itself a finding worth reporting.",
+              "Endorse Option A. The structure is scale-invariant; the indicator content, thresholds, and climate calibration are not. That is the honest and correct answer, and it directly satisfies \"how would you modify it.\"\n\nOn the mechanism: use the host-state coupling node, not baseline-drift folding. Folding inheritance into drift makes the city's fragility a fixed exogenous input — it cannot respond to the host state's own climate-driven deterioration, which is precisely the interesting sub-national pathway (a city destabilized because its host state is destabilized). A coupling node preserves the network's causal logic, keeps direct/indirect decomposition intact, and lets host-state fragility propagate dynamically. Keep it as a distinct node group with its own edges into the city's indicators.\n\nFor continents, the two-tier aggregation is right; do not add a coupling node there — the tiers are compositional, not causal.",
+              "Endorse Option A as the base costing framework. It is the only option whose total is traceable to the model's own levers and to the data's quantified effectiveness, and reporting cost-per-fragility-point-averted plus % of GDP makes the figure auditable rather than asserted.\n\nDo not adopt C as a co-equal method — monetizing fragility requires multipliers the provided data do not support, and it risks circularity. But a *bounded* C-style check is worth adding: state the damage-avoided figure only as an order-of-magnitude sanity bound (intervention cost should not exceed the plausible avoided loss), clearly labeled as a check, not as the estimate.\n\nKeep B out entirely.\n\nSo: A as the estimate, with a one-line benefit sanity bound. State unit-cost assumptions and the uncertainty band explicitly."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_206a3b5647e9",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8625,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8000000000000002,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260927_064902/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each task, accurately reflecting the original requirements. Specifically, Task 1 is well-defined as the foundational step that establishes the composite fragility index, classification thresholds, and climate-impact decomposition, which are crucial for subsequent tasks. The goals for Tasks 2-5 are explicitly stated and align with the problem requirements, ensuring a clear direction for the modeling process. However, the analysis could benefit from more detailed metrics for measuring success and explicit assumptions to enhance clarity. Overall, the problem definition is clear and well-structured.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated and cover the main aspects of the problem. Task 1 serves as the foundation, and Tasks 2-5 build upon it, ensuring a coherent flow. Each sub-task directly supports the final goal of understanding and mitigating climate change's impact on state fragility. The dependencies between tasks are well-identified, and there are no significant deviations from the actual goals. However, the analysis could be more detailed in explaining how the outputs of one task feed into the next, which would further enhance the coherence and completeness of the problem decomposition.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified, aligning well with the background literature and problem requirements, particularly in modeling climate as an enabler via feedback loops.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses a scientifically appropriate causal network and counterfactual decomposition to rigorously analyze climate impacts, with a stable mathematical structure and logical scalability.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a dynamic, interpretable framework that quantifies climate impacts, provides cost-benefit analyses for interventions, and extends to sub-national scales, effectively supporting decision-making with clear, actionable insights.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing system dynamics and network theory to capture complex feedback loops. It employs rigorous mathematical definitions for tipping points and stability, ensuring the approach is theoretically sound and grounded in the specific characteristics of state fragility and climate change.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative breakdowns, clear counterfactual comparisons, and explicit identification of model strengths and limitations, which effectively supports the interpretation of the model's inference process.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and structural biases such as expert-score subjectivity and saturation effects. While mathematical corrections are limited, the modeler provides uncertainty bands and clearly explains how these biases affect the results, ensuring a realistic interpretation.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8458333333333333,
+      "interaction_cost": 0.8838920737501668,
+      "interaction_penalty": 0.04419460368750834,
+      "net_utility": 0.8016387296458249,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2590,
+          "total_expert_latency_seconds": 5.44,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.922793984306909,
+          "latency_cost_component": 0.2959485865460476,
+          "interaction_cost": 0.8691175937227635,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 4860,
+          "total_expert_latency_seconds": 4.53,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9966663844439251,
+          "latency_cost_component": 0.27174223419096644,
+          "interaction_cost": 0.89866655377757,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-27T07:43:03.491341",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_206a3b5647e9",
+  "workflow": {
+    "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "name": "Adaptive Re-evaluation on Rejection",
+    "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+    "maximum_expert_interactions": 3,
+    "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+    "evolution_mode": "mutation",
+    "changed_components": [
+      "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+    ],
+    "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+    "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "max_exchanges": 3,
+    "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+    "actions": [
+      {
+        "action_id": "step_1_identify_decision_point",
+        "action_type": "agent_step",
+        "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+      },
+      {
+        "action_id": "step_2_prepare_expert_query",
+        "action_type": "expert_exchange",
+        "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+      },
+      {
+        "action_id": "step_3_integrate_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+      }
+    ],
+    "entry_action": "step_1_identify_decision_point",
+    "workflow_id": "interaction_workflow_206a3b5647e9",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 1,
+    "parent_workflow_ids": [
+      "interaction_workflow_888840ea0df8"
+    ],
+    "training_batch": [
+      "2017_A",
+      "2017_D"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_A",
+    "2018_E"
+  ],
+  "absolute_utility": 0.8489583333333333,
+  "interaction_cost": 0.8171463807581232,
+  "interaction_penalty": 0.04085731903790616,
+  "net_utility": 0.8081010142954271,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

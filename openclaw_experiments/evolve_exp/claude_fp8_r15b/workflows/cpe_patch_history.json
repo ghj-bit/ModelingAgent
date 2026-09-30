@@ -1,0 +1,882 @@
+[
+  {
+    "round": 1,
+    "candidate_workflow_id": "interaction_workflow_206a3b5647e9",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_888840ea0df8"
+    ],
+    "changed_components": [
+      "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.792108487647286
+    ],
+    "candidate_train_net_utility": 0.8080120580800412,
+    "train_pre_utility": 0.792108487647286,
+    "train_acceptance_reference_utility": 0.792108487647286,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8080120580800412,
+    "train_pre_net_utility": 0.792108487647286,
+    "train_post_net_utility": 0.8080120580800412,
+    "train_accepted": true,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 1,
+        "source_phase": "train_candidate",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8080120580800412,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": 0.8078438866782321,
+    "validation_accepted": true
+  },
+  {
+    "round": 2,
+    "candidate_workflow_id": "interaction_workflow_545116cad7f5",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Added a termination rule in Step 3 that mandates stopping the consultation immediately if the expert confirms the agent's primary recommendation without introducing new constraints or trade-offs."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation without adding new constraints or trade-offs, the agent must treat the strategic uncertainty as resolved and terminate the consultation without a further exchange, regardless of remaining budget.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that in both training tasks (2017_D and 2018_A), the expert consistently confirmed the agent's primary recommendation in all three exchanges. However, the agent continued to use the full 3-exchange budget, resulting in a high interaction cost (~0.88) and penalty. The evidence suggests that once the core framework and key assumptions are confirmed, subsequent exchanges often re-confirm already-settled decisions or address lower-impact details that do not significantly change the modeling direction. By explicitly treating a pure confirmation as a stop condition, the agent can save interactions for genuinely new strategic uncertainties, reducing cost without sacrificing decision quality.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8243764561867841
+    ],
+    "candidate_train_net_utility": 0.8101835856228297,
+    "train_pre_utility": 0.8243764561867841,
+    "train_acceptance_reference_utility": 0.8243764561867841,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8101835856228297,
+    "train_pre_net_utility": 0.8243764561867841,
+    "train_post_net_utility": 0.8101835856228297,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 2,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8243764561867841,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 3,
+    "candidate_workflow_id": "interaction_workflow_ad155a602d8c",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Refined Step 3 to require scanning confirmed feedback for implicit constraints or reporting requirements, ensuring these are incorporated before termination rather than assuming the decision is fully resolved by the confirmation alone."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must scan the reply for any implicit constraints, caveats, or specific reporting requirements not present in the original options; if such details exist, the agent must incorporate them into the model before terminating the consultation, and if none exist, the agent must terminate the consultation immediately.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that experts often confirm a primary option while adding specific nuances (e.g., 'report as a warning, not a tipping point' or 'state as a calibration assumption'). The previous mutation (Round 2) failed because it mandated immediate termination upon confirmation, which risks discarding these valuable implicit constraints. This patch refines the integration step to explicitly capture and apply these nuances before stopping, addressing the communication failure without introducing the premature termination that caused the Round 2 rejection.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8327976872787235
+    ],
+    "candidate_train_net_utility": 0.8308987612788128,
+    "train_pre_utility": 0.8327976872787235,
+    "train_acceptance_reference_utility": 0.8327976872787235,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8308987612788128,
+    "train_pre_net_utility": 0.8327976872787235,
+    "train_post_net_utility": 0.8308987612788128,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 3,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8327976872787235,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 4,
+    "candidate_workflow_id": "interaction_workflow_543472c24fa3",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Refined Step 3 to require verification that expert confirmations do not introduce new quantitative constraints, validation targets, or reporting requirements before terminating the consultation."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must verify that the reply does not introduce new quantitative constraints, validation targets, or reporting requirements; if such details are present, the agent must incorporate them into the model before terminating, otherwise the consultation ends immediately.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that expert confirmations often include implicit constraints (e.g., specific validation targets or reporting requirements) that the agent must incorporate. Round 2's termination rule was too aggressive, and Round 3's 'scan for implicit constraints' was rejected. This mutation refines the integration step to explicitly verify for new quantitative constraints and reporting requirements, ensuring the agent does not miss critical details while avoiding unnecessary exchanges.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8256829172006895
+    ],
+    "candidate_train_net_utility": 0.8140172915854198,
+    "train_pre_utility": 0.8256829172006895,
+    "train_acceptance_reference_utility": 0.8256829172006895,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8140172915854198,
+    "train_pre_net_utility": 0.8256829172006895,
+    "train_post_net_utility": 0.8140172915854198,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 4,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8256829172006895,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 5,
+    "candidate_workflow_id": "interaction_workflow_1f8a94471dca",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Added an 'Explicit Recommendation' subsection to Step 2 requiring the agent to state its preferred option and reasoning."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n### Explicit Recommendation\n- State the agent's preferred option and the specific reasoning for this choice.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that the agent often lists candidates but leaves the final choice implicit or relies on the expert to infer the preference. In the 2017_D and 2018_E examples, the agent's recommendations were clear in the text but not structurally highlighted. By explicitly forcing the agent to state its recommendation and reasoning in Step 2, the expert can provide more targeted feedback (confirmation or specific redirection) rather than having to synthesize a preference from the candidate list. This aligns with the 'high-impact strategic judgment' role of the expert and may reduce the number of exchanges needed to resolve ambiguity, potentially improving the net utility by lowering interaction costs or increasing the precision of the strategic alignment.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8267600703473827
+    ],
+    "candidate_train_net_utility": 0.7712426560876207,
+    "train_pre_utility": 0.8267600703473827,
+    "train_acceptance_reference_utility": 0.8267600703473827,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.7712426560876207,
+    "train_pre_net_utility": 0.8267600703473827,
+    "train_post_net_utility": 0.7712426560876207,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 5,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8267600703473827,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 6,
+    "candidate_workflow_id": "interaction_workflow_1ece1992dfe1",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Modified Step 3 to require the agent to identify and incorporate specific operational details, boundary conditions, or implementation constraints explicitly stated in the expert's confirmation, rather than merely verifying the absence of new quantitative constraints or reporting requirements."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must identify any specific operational details, boundary conditions, or implementation constraints explicitly stated in the reply that were not present in the candidate strategies; if such details exist, the agent must incorporate them directly into the modeling plan before proceeding autonomously.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that expert confirmations often contain specific operational guidance (e.g., 'keep the two layers distinct', 'state the upstream/downstream coordination explicitly') that is crucial for the quality of the final model but is not captured by the parent's generic 'update assumptions' instruction. Rounds 2, 3, and 4 attempted to address this by adding verification steps for 'new constraints' or 'reporting requirements' but failed the training gate, likely because they were too broad or focused on verification rather than active integration. Round 5 failed by adding an explicit recommendation step, which increased interaction cost without improving utility. This mutation focuses on the specific failure mode observed in the evidence: the agent needs to actively extract and apply the *operational* details provided in the confirmation to ensure the modeling direction is not just chosen but correctly implemented according to the expert's strategic intent.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8081010142954271
+    ],
+    "candidate_train_net_utility": 0.7927484485255654,
+    "train_pre_utility": 0.8081010142954271,
+    "train_acceptance_reference_utility": 0.8081010142954271,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.7927484485255654,
+    "train_pre_net_utility": 0.8081010142954271,
+    "train_post_net_utility": 0.7927484485255654,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 6,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_206a3b5647e9",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Adaptive Re-evaluation on Rejection",
+          "purpose": "Ensure that if the expert rejects the agent's preferred strategic path, the agent dynamically adjusts its decision framing for subsequent exchanges rather than persisting with a flawed premise or wasting the exchange budget on restatement.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Added a conditional re-evaluation rule in Step 3 that triggers when expert feedback rejects the primary recommendation, requiring the agent to exclude the rejected option and reframe the decision point for any subsequent exchange."
+          ],
+          "evolution_rationale": "The parent policy's rollouts show high success rates where the expert validated the agent's primary strategy (e.g., 2017_D), but the interaction cost remains high due to the rigid structure of always presenting the same format. In cases where an expert might reject a primary strategy (a risk in complex modeling tasks), the current policy lacks explicit guidance on how to pivot efficiently within the limited 3-exchange budget. By adding a specific rule for handling rejection, the agent can avoid the failure mode of restating a rejected premise or failing to leverage the expert's negative feedback to narrow the decision space, thereby improving the strategic utility of each exchange.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "Terminate interaction when the strategic uncertainty is resolved, the modeling direction is determined, or remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_206a3b5647e9",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 1,
+          "parent_workflow_ids": [
+            "interaction_workflow_888840ea0df8"
+          ],
+          "training_batch": [
+            "2017_A",
+            "2017_D"
+          ]
+        },
+        "selection_utility": 0.8081010142954271,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 7,
+    "candidate_workflow_id": "interaction_workflow_fb22cbc25c4f",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_206a3b5647e9"
+    ],
+    "changed_components": [
+      "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8265814540454914
+    ],
+    "candidate_train_net_utility": 0.8389048315246035,
+    "train_pre_utility": 0.8265814540454914,
+    "train_acceptance_reference_utility": 0.8265814540454914,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8389048315246035,
+    "train_pre_net_utility": 0.8265814540454914,
+    "train_post_net_utility": 0.8389048315246035,
+    "train_accepted": true,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 7,
+        "source_phase": "train_candidate",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Direct Confirmation Execution",
+          "purpose": "To maximize efficiency by treating expert confirmation as a final directive, eliminating redundant verification steps that do not alter the modeling path.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+          ],
+          "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_fb22cbc25c4f",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 7,
+          "parent_workflow_ids": [
+            "interaction_workflow_206a3b5647e9"
+          ],
+          "training_batch": [
+            "2017_D",
+            "2018_A"
+          ]
+        },
+        "selection_utility": 0.8389048315246035,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": 0.835902847972231,
+    "validation_accepted": true
+  },
+  {
+    "round": 8,
+    "candidate_workflow_id": "interaction_workflow_ae75bcbf51e7",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_fb22cbc25c4f"
+    ],
+    "changed_components": [
+      "Added a rule in Step 3 requiring the agent to identify and incorporate explicit operational details, boundary conditions, or implementation constraints stated in the expert's confirmation before proceeding autonomously."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. If the expert's reply includes explicit operational details, boundary conditions, or implementation constraints not present in the original candidate strategies, the agent must incorporate these specific directives into the modeling plan before proceeding autonomously.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy (Round 7) mandates immediate autonomous continuation upon confirmation, which risks ignoring specific operational details or boundary conditions the expert might include in the confirmation (as seen in the 2018_E rollout where the expert added a 'no-climate counterfactual' constraint). Previous attempts (Rounds 3, 4, 6) failed by requiring broad scans for implicit constraints or quantitative targets, which likely increased cognitive load or ambiguity. This mutation targets only *explicit* directives in the confirmation, a narrower and more actionable change that captures the value of expert refinement without the overhead of interpreting implicit nuances.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8186791411874248
+    ],
+    "candidate_train_net_utility": 0.7131590201484204,
+    "train_pre_utility": 0.8186791411874248,
+    "train_acceptance_reference_utility": 0.8186791411874248,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.7131590201484204,
+    "train_pre_net_utility": 0.8186791411874248,
+    "train_post_net_utility": 0.7131590201484204,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 8,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Direct Confirmation Execution",
+          "purpose": "To maximize efficiency by treating expert confirmation as a final directive, eliminating redundant verification steps that do not alter the modeling path.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+          ],
+          "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_fb22cbc25c4f",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 7,
+          "parent_workflow_ids": [
+            "interaction_workflow_206a3b5647e9"
+          ],
+          "training_batch": [
+            "2017_D",
+            "2018_A"
+          ]
+        },
+        "selection_utility": 0.8186791411874248,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 9,
+    "candidate_workflow_id": "interaction_workflow_49e2bcfad023",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_fb22cbc25c4f"
+    ],
+    "changed_components": [
+      "Added a rule in Step 3 requiring the agent to incorporate specific operational parameters, boundary conditions, or implementation constraints introduced by the expert's feedback into the modeling plan before proceeding autonomously."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. If the expert's feedback introduces specific operational parameters, boundary conditions, or implementation constraints that refine the chosen strategy, the agent must incorporate these directives into the modeling plan before proceeding autonomously.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's rollouts show that expert feedback often contains specific refinements (e.g., 'two-tier triggers', 'hysteresis rules', 'mildly front-loaded allocation') that are critical for high-quality modeling. Rounds 2, 3, 4, 6, and 8 attempted to address this by adding scanning or verification steps, but they either failed to improve utility or were rejected for being too similar to previous failures or adding unnecessary overhead. The current mutation explicitly mandates the incorporation of these specific directives into the modeling plan, ensuring that the strategic value of the expert's detailed guidance is captured without adding the overhead of a separate verification step or a new exchange. This directly addresses the gap where the agent might proceed autonomously but miss the nuanced constraints provided by the expert, thereby improving the rigor and practicality of the final model.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8216023304711454
+    ],
+    "candidate_train_net_utility": 0.8255743082483813,
+    "train_pre_utility": 0.8216023304711454,
+    "train_acceptance_reference_utility": 0.8216023304711454,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8255743082483813,
+    "train_pre_net_utility": 0.8216023304711454,
+    "train_post_net_utility": 0.8255743082483813,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 9,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Direct Confirmation Execution",
+          "purpose": "To maximize efficiency by treating expert confirmation as a final directive, eliminating redundant verification steps that do not alter the modeling path.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+          ],
+          "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_fb22cbc25c4f",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 7,
+          "parent_workflow_ids": [
+            "interaction_workflow_206a3b5647e9"
+          ],
+          "training_batch": [
+            "2017_D",
+            "2018_A"
+          ]
+        },
+        "selection_utility": 0.8216023304711454,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 10,
+    "candidate_workflow_id": "interaction_workflow_1981fc47866d",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_fb22cbc25c4f"
+    ],
+    "changed_components": [
+      "Added an 'Explicit Recommendation' subsection to Step 2 requiring the agent to state its preferred option and reasoning."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n### Explicit Recommendation\n- State the agent's preferred option and the specific reasoning for this choice.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy asks for candidate strategies but does not explicitly require the agent to state a preference. In the training evidence, the agent often formulated a primary recommendation (e.g., Option A in 2018_E, Option A in 2018_A) which the expert then confirmed. Making this explicit in the policy structure ensures the expert is always responding to a specific proposal, which can lead to more targeted feedback and potentially faster resolution. This differs from previous failed attempts (Rounds 3, 4, 6, 8, 9) which focused on post-confirmation processing (scanning for constraints, verifying details) that added complexity without improving utility. Round 5 attempted this change but was rejected as 'noise' or failed the gate; however, the current parent is the Round 7 policy (which removed post-confirmation scanning). Re-introducing the explicit recommendation in Step 2 is a distinct change from the current parent, which lacks it.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.7983150617521622
+    ],
+    "candidate_train_net_utility": 0.7951559068040922,
+    "train_pre_utility": 0.7983150617521622,
+    "train_acceptance_reference_utility": 0.7983150617521622,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.7951559068040922,
+    "train_pre_net_utility": 0.7983150617521622,
+    "train_post_net_utility": 0.7951559068040922,
+    "train_accepted": false,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 10,
+        "source_phase": "train_parent_1",
+        "workflow_id": "interaction_workflow_fb22cbc25c4f",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Direct Confirmation Execution",
+          "purpose": "To maximize efficiency by treating expert confirmation as a final directive, eliminating redundant verification steps that do not alter the modeling path.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Modified Step 3 to mandate immediate autonomous continuation upon expert confirmation of the primary recommendation, removing the requirement to scan for or incorporate implicit operational details or constraints before terminating the consultation."
+          ],
+          "evolution_rationale": "Departing from Round 6 (and Rounds 2-4), which failed by adding complex verification or scanning steps that increased interaction cost without improving report scores. The parent's evidence shows that expert confirmations are often direct and sufficient; the agent's tendency to seek further clarification or 'scan' for hidden details in confirmed options adds latency and token usage (penalty) without changing the final model structure. By treating confirmation as a hard stop for that decision point, the policy reduces interaction overhead, directly addressing the high interaction_cost observed in the parent's rollouts.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted when it asks a question the earlier ones did not, rather than restating one already asked; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_fb22cbc25c4f",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 7,
+          "parent_workflow_ids": [
+            "interaction_workflow_206a3b5647e9"
+          ],
+          "training_batch": [
+            "2017_D",
+            "2018_A"
+          ]
+        },
+        "selection_utility": 0.7983150617521622,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": null,
+    "validation_accepted": null
+  },
+  {
+    "round": 11,
+    "candidate_workflow_id": "interaction_workflow_2c4b2e458b98",
+    "evolution_mode": "mutation",
+    "training_parent_workflow_ids": [
+      "interaction_workflow_fb22cbc25c4f"
+    ],
+    "changed_components": [
+      "Refined the condition for a further exchange in Step 3 to require that the new question resolves a distinct, unresolved strategic decision not covered by the previous exchange, rather than merely being a question not previously asked."
+    ],
+    "candidate_policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "evolution_rationale": "The parent policy's evidence shows high interaction costs (average 0.876) and penalties, suggesting that exchanges are sometimes used for overlapping or redundant strategic clarifications. Rounds 2, 3, 4, 6, 8, and 9 attempted to modify Step 3 to handle confirmations or implicit constraints but were rejected, indicating that the core issue is not how to process replies but when to initiate a new exchange. The parent's rollouts (2018_A and 2017_A) show that the agent often asks follow-up questions that refine the same strategic decision (e.g., receiver definition, equivalence standard) rather than addressing a new one. By requiring that a further exchange must address a distinct, unresolved strategic decision, this policy reduces the likelihood of redundant consultations, thereby lowering interaction costs and improving net utility. This departs from Round 10 (which added an 'Explicit Recommendation' subsection) and Round 5 (same change) by focusing on the exchange trigger rather than the query structure.",
+    "predicted_effect": {},
+    "parent_train_net_utilities": [
+      0.8009535440606921
+    ],
+    "candidate_train_net_utility": 0.8185974809566614,
+    "train_pre_utility": 0.8009535440606921,
+    "train_acceptance_reference_utility": 0.8009535440606921,
+    "train_acceptance_rule": "must_beat_all_training_parents",
+    "train_post_utility": 0.8185974809566614,
+    "train_pre_net_utility": 0.8009535440606921,
+    "train_post_net_utility": 0.8185974809566614,
+    "train_accepted": true,
+    "training_elites_after_selection": [
+      {
+        "rank": 1,
+        "source_round": 11,
+        "source_phase": "train_candidate",
+        "workflow_id": "interaction_workflow_2c4b2e458b98",
+        "workflow": {
+          "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "name": "Distinct Decision Point Consultation",
+          "purpose": "Prevent redundant or overlapping exchanges by ensuring each consultation addresses a unique, unresolved strategic decision.",
+          "maximum_expert_interactions": 3,
+          "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "evolution_mode": "mutation",
+          "changed_components": [
+            "Refined the condition for a further exchange in Step 3 to require that the new question resolves a distinct, unresolved strategic decision not covered by the previous exchange, rather than merely being a question not previously asked."
+          ],
+          "evolution_rationale": "The parent policy's evidence shows high interaction costs (average 0.876) and penalties, suggesting that exchanges are sometimes used for overlapping or redundant strategic clarifications. Rounds 2, 3, 4, 6, 8, and 9 attempted to modify Step 3 to handle confirmations or implicit constraints but were rejected, indicating that the core issue is not how to process replies but when to initiate a new exchange. The parent's rollouts (2018_A and 2017_A) show that the agent often asks follow-up questions that refine the same strategic decision (e.g., receiver definition, equivalence standard) rather than addressing a new one. By requiring that a further exchange must address a distinct, unresolved strategic decision, this policy reduces the likelihood of redundant consultations, thereby lowering interaction costs and improving net utility. This departs from Round 10 (which added an 'Explicit Recommendation' subsection) and Round 5 (same change) by focusing on the exchange trigger rather than the query structure.",
+          "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+          "max_exchanges": 3,
+          "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+          "actions": [
+            {
+              "action_id": "step_1_identify_decision_point",
+              "action_type": "agent_step",
+              "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+            },
+            {
+              "action_id": "step_2_prepare_expert_query",
+              "action_type": "expert_exchange",
+              "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+            },
+            {
+              "action_id": "step_3_integrate_feedback",
+              "action_type": "agent_analysis",
+              "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+            }
+          ],
+          "entry_action": "step_1_identify_decision_point",
+          "workflow_id": "interaction_workflow_2c4b2e458b98",
+          "evolution_operator": "cpe_batch_reflection_patch",
+          "created_round": 11,
+          "parent_workflow_ids": [
+            "interaction_workflow_fb22cbc25c4f"
+          ],
+          "training_batch": [
+            "2018_A",
+            "2017_A"
+          ]
+        },
+        "selection_utility": 0.8185974809566614,
+        "selection_basis": "current_shared_training_batch_net_utility"
+      }
+    ],
+    "validation_utility": 0.8315812631517477,
+    "validation_accepted": false
+  }
+]

@@ -1,0 +1,655 @@
+{
+  "round": 6,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8189130756512677,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8458333333333332,
+    "modeling_rigorousness_evaluation": 0.8875,
+    "practicality_and_scientificity_evaluation": 0.8250000000000001,
+    "result_and_bias_analysis_evaluation": 0.8875
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a Smart Growth Index (SGI) for two mid-sized cities on different continents, per MM-Bench 2017_E. The core mechanism I will parameterize is:\n\nSGI = w_E · Economy + w_S · Social equity + w_T · Environment (each pillar 0–100), where each pillar is a weighted sum of sub-indicators tied to the ten smart-growth principles; a city's current growth plan and my redesigned plan are each scored on the same scale; and each individual initiative gets a marginal contribution score used for ranking (subproblem 4).\n\nThe problem statement leaves three structural/definitional constraints unsettled that I cannot derive and that determine how every later number is computed:\n\n1. **Hard vs soft pillar requirements.** Should a low score in any single pillar (say Environment < 40 out of 100) be treated as a *disqualifying failure* that caps the overall SGIndex regardless of the other pillars (lexicographic/veto logic), or as *traded off* purely through the additive weighting (so a strong Economy can compensate a weak Environment)? The text never settles this, and it changes both the evaluation of current plans and the initiative ranking.\n\n2. **Validity domain and normalization of the three pillar scores.** On what implicit 0–100 scale do the pillars live, and how should indicators of different units (e.g., % of trips by public transit vs. km of green belt) be folded in — linear min-max anchoring against reference best/worst cities, or against target-threshold anchors? I need the logical rule, not the constants.\n\n3. **Interpretation of the \"initiative ranking\" objective in subproblem 4.** Does the rank order follow each initiative's *absolute* contribution to the city's final SGI score, or its *marginal* (incremental) improvement over a no-action baseline — i.e., is \"most potential\" read as largest end-state effect or largest delta per unit of implementation? This changes which initiatives top the list and therefore the cross-city comparison.\n\nPlease state how these three should be read (veto vs additive; anchoring rule; absolute vs marginal ranking), because everything downstream is parameterized from these readings.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven your three readings — additive pillars with no veto, target-threshold anchoring, and marginal-over-baseline initiative ranking — I propose this specific structural allocation for the Smart Growth Index. Please accept or reject the configuration as a whole (I am not asking you to pick among alternatives).\n\n**Proposed structure:**\n\n1. **Pillar weights:** fixed across both cities at Economy : Social equity : Environment = 0.30 : 0.30 : 0.40. Rationale: the environment pillar carries the most binding smart-growth principles for a land-constrained mid-sized city (open-space preservation, walkability infrastructure, green corridors, pollution), while economy and equity are treated symmetrically since the ten principles give no priority between them. The weights are held identical across cities so that cross-city comparison is meaningful; city-specificity enters only through the indicator values.\n\n2. **Target-threshold anchoring:** each sub-indicator i in pillar p is scored as\n   s_i = clamp( (x_i − x_floor,i) / (x_target,i − x_floor,i), 0, 1 ),\n   where x_floor is the no-action 2050 extrapolation (business-as-usual value) and x_target is the smart-growth principle threshold for that city, expressed as a dimensionless fraction of the way from floor to target. Pillar score = 100 × Σ_j (a_j,i / Σ_j a_j,i) · s_j,i, with a_j,i sub-indicator weights summing to 1 within the pillar; overall SGI = 100 × (0.30·E + 0.30·S + 0.40·T), all on the same 0–100 scale. Floor = BAU-2050 value, target = principle threshold, so the baseline city plan is not automatically 0 — its score reflects how far BAU-2050 already sits between floor and target — and a redesigned plan's gain is the marginal delta the initiative portfolio adds.\n\n3. **Marginal ranking for subproblem 4:** each initiative k gets ΔSGI_k = SGI(with k active, other redesigned initiatives held at their baseline contributions) − SGI(with k at floor), computed with the same anchored scale; initiatives rank by descending ΔSGI_k. This makes the ranking additive in the sense that the full redesigned plan's SGI ≈ baseline + Σ_k ΔSGI_k, so subproblem 5's +50% growth capacity check can be read directly off which initiatives' floor values shift under the higher population.\n\n4. **City pair and continent:** I will take a mid-sized African city (100k–500k population) and a mid-sized European city so that the two growth plans differ sharply in dominant constraints (land availability vs. built-environment retrofit; growth rate vs. retrofit cost) while sharing the same index structure.\n\nDo you accept this four-part structure (weights 0.30/0.30/0.40, floor-to-target anchoring formula, marginal ΔSGI ranking with additive decomposition, and an Africa + Europe city pair for maximum structural contrast)? If you reject any part, name which and what reading you would substitute.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my proposed four-part structure in exchange 2 without specifying which part. I am proceeding on the most plausible fallback: keep the additive pillar logic and target-threshold anchoring from exchange 1, but (a) treat the 0.30/0.30/0.40 pillar weights as a proposal requiring a stated justification rather than a fixed allocation — the likely objection is that fixing weights a priori over-specifies the metric when the ten principles give no numeric priority, and (b) treat the marginal ΔSGI ranking with additive decomposition (full-plan SGI ≈ baseline + Σ ΔSGI_k) as the default reading, since the additive structure from exchange 1 implies it.\n\nUnder that fallback structure, what is the specific case, boundary condition, or failure mode that would break it — the one I must name and discuss in the bias-and-robustness section of the final report? For example: a city whose BAU-2050 extrapolation already exceeds a principle target (so the anchored score saturates at 1 and the initiative's marginal delta is zero even though it is clearly still valuable), or a high-growth scenario in which the floor itself shifts upward fast enough that two initiatives' marginal contributions reorder, making the ranking unstable to the population assumption? Name the sharpest counterexample and state what the model does wrong in it, so I can bound the metric's validity in the report."
+        ],
+        "expert_answers": [
+          "1. **Veto vs additive:** The text gives no basis for a veto. It asks for a metric \"considering\" the three E's and a ranking of initiatives by \"potential\" — both are comparative, compensatory readings. Read it as additive/trade-off, with pillar weights as the only lever. A cap would need a stated threshold the problem never supplies.\n\n2. **Anchoring rule:** Anchor against target-thresholds, not best/worst peer cities. The problem frames success as adherence to smart-growth principles and to each city's own growth needs — an absolute standard, not a relative field position. Min-max against reference cities would make scores move when unrelated cities change, which the problem's city-specific framing cannot support.\n\n3. **Ranking:** Read \"most potential\" as marginal improvement over the no-action baseline, not absolute end-state contribution. Subproblem 4 asks what each initiative contributes *within the redesigned plan*, and subproblem 5 asks how the plan absorbs added growth — both are about change induced, not standing level.",
+          "reject",
+          "The sharpest failure mode is **non-additivity from indicator interaction**, not saturation. Your additive decomposition SGI ≈ baseline + Σ ΔSGI_k holds only if initiatives act on disjoint sub-indicators. They do not: transit-oriented densification and green-corridor preservation both move the same land-use and walkability indicators, and their combined effect is sub-additive (or super-additive) — the marginal ΔSGI of each computed with others \"held at baseline\" double-counts or under-counts the shared indicator. In that case the ranking reorders depending on the order initiatives are added, and Σ ΔSGI_k ≠ full-plan SGI, so subproblem 5's growth check read off the sum is wrong. Name this: the metric's validity is bounded to initiative portfolios with near-disjoint indicator footprints; overlapping land-use initiatives break both the ranking and the additive growth decomposition."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_e0f19556bdd2",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8895833333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9249999999999999,
+        "modeling_rigorousness_evaluation": 0.875,
+        "practicality_and_scientificity_evaluation": 0.8583333333333334,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-problem, explicitly linking them to the three E's and ten principles. The definition of the Smart Growth Index (SGI) as a central metric is well-articulated, including its construction logic and normalization rules. The goals for researching current plans, developing new plans, and ranking initiatives are explicit and directly address the problem requirements. The treatment of the 50% population growth as a stress scenario is a clear and logical interpretation of the requirement. Overall, the problem definition is highly clear and accurate.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically structured and cover all aspects of the problem. Subproblem 1 (SGI definition) is a prerequisite for Subproblems 2, 3, and 4, establishing clear dependencies. Subproblem 2 evaluates current plans, Subproblem 3 develops new plans and addresses the population growth constraint, and Subproblem 4 ranks initiatives. This sequence ensures a coherent flow from metric definition to application and comparison. All key parts of the problem requirements are covered without deviation. The integration of the population growth requirement into Subproblem 3 is appropriate, ensuring it is considered in the plan development and evaluation. The coverage is complete and well-organized.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, interpretable, and provides sufficient depth to explain the model's logic and limitations effectively.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is very thorough, identifying key structural and data biases and providing clear guidance on how to interpret results to mitigate their impact.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with sensitivity analyses for weights and plan coverage, ensuring robustness and consistency with the problem context.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate and sophisticated methods, such as Shapley values for initiative ranking and context-specific plan construction, scientifically reflecting the complex interactions in urban planning.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a quantifiable framework for urban planning that translates abstract principles into actionable metrics. It provides clear decision-support tools, such as initiative ranking via Shapley values and capacity stress tests, which are directly applicable to real-world policy making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model adheres to strong scientific principles, utilizing rigorous normalization techniques and advanced game theory (Shapley values) to handle complex interactions. The assumptions are clearly defined and justified, and the mathematical framework is robust, ensuring the validity and reliability of the results.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2017_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a Smart Growth Index (SGI) for two mid-sized cities on different continents, per MM-Bench 2017_E. The core mechanism I will parameterize is:\n\nSGI = w_E · Economy + w_S · Social equity + w_T · Environment (each pillar 0–100), where each pillar is a weighted sum of sub-indicators tied to the ten smart-growth principles; a city's current growth plan and my redesigned plan are each scored on the same scale; and each individual initiative gets a marginal contribution score used for ranking (subproblem 4).\n\nThe problem statement leaves three structural/definitional constraints unsettled that I cannot derive and that determine how every later number is computed:\n\n1. **Hard vs soft pillar requirements.** Should a low score in any single pillar (say Environment < 40 out of 100) be treated as a *disqualifying failure* that caps the overall SGIndex regardless of the other pillars (lexicographic/veto logic), or as *traded off* purely through the additive weighting (so a strong Economy can compensate a weak Environment)? The text never settles this, and it changes both the evaluation of current plans and the initiative ranking.\n\n2. **Validity domain and normalization of the three pillar scores.** On what implicit 0–100 scale do the pillars live, and how should indicators of different units (e.g., % of trips by public transit vs. km of green belt) be folded in — linear min-max anchoring against reference best/worst cities, or against target-threshold anchors? I need the logical rule, not the constants.\n\n3. **Interpretation of the \"initiative ranking\" objective in subproblem 4.** Does the rank order follow each initiative's *absolute* contribution to the city's final SGI score, or its *marginal* (incremental) improvement over a no-action baseline — i.e., is \"most potential\" read as largest end-state effect or largest delta per unit of implementation? This changes which initiatives top the list and therefore the cross-city comparison.\n\nPlease state how these three should be read (veto vs additive; anchoring rule; absolute vs marginal ranking), because everything downstream is parameterized from these readings.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven your three readings — additive pillars with no veto, target-threshold anchoring, and marginal-over-baseline initiative ranking — I propose this specific structural allocation for the Smart Growth Index. Please accept or reject the configuration as a whole (I am not asking you to pick among alternatives).\n\n**Proposed structure:**\n\n1. **Pillar weights:** fixed across both cities at Economy : Social equity : Environment = 0.30 : 0.30 : 0.40. Rationale: the environment pillar carries the most binding smart-growth principles for a land-constrained mid-sized city (open-space preservation, walkability infrastructure, green corridors, pollution), while economy and equity are treated symmetrically since the ten principles give no priority between them. The weights are held identical across cities so that cross-city comparison is meaningful; city-specificity enters only through the indicator values.\n\n2. **Target-threshold anchoring:** each sub-indicator i in pillar p is scored as\n   s_i = clamp( (x_i − x_floor,i) / (x_target,i − x_floor,i), 0, 1 ),\n   where x_floor is the no-action 2050 extrapolation (business-as-usual value) and x_target is the smart-growth principle threshold for that city, expressed as a dimensionless fraction of the way from floor to target. Pillar score = 100 × Σ_j (a_j,i / Σ_j a_j,i) · s_j,i, with a_j,i sub-indicator weights summing to 1 within the pillar; overall SGI = 100 × (0.30·E + 0.30·S + 0.40·T), all on the same 0–100 scale. Floor = BAU-2050 value, target = principle threshold, so the baseline city plan is not automatically 0 — its score reflects how far BAU-2050 already sits between floor and target — and a redesigned plan's gain is the marginal delta the initiative portfolio adds.\n\n3. **Marginal ranking for subproblem 4:** each initiative k gets ΔSGI_k = SGI(with k active, other redesigned initiatives held at their baseline contributions) − SGI(with k at floor), computed with the same anchored scale; initiatives rank by descending ΔSGI_k. This makes the ranking additive in the sense that the full redesigned plan's SGI ≈ baseline + Σ_k ΔSGI_k, so subproblem 5's +50% growth capacity check can be read directly off which initiatives' floor values shift under the higher population.\n\n4. **City pair and continent:** I will take a mid-sized African city (100k–500k population) and a mid-sized European city so that the two growth plans differ sharply in dominant constraints (land availability vs. built-environment retrofit; growth rate vs. retrofit cost) while sharing the same index structure.\n\nDo you accept this four-part structure (weights 0.30/0.30/0.40, floor-to-target anchoring formula, marginal ΔSGI ranking with additive decomposition, and an Africa + Europe city pair for maximum structural contrast)? If you reject any part, name which and what reading you would substitute.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my proposed four-part structure in exchange 2 without specifying which part. I am proceeding on the most plausible fallback: keep the additive pillar logic and target-threshold anchoring from exchange 1, but (a) treat the 0.30/0.30/0.40 pillar weights as a proposal requiring a stated justification rather than a fixed allocation — the likely objection is that fixing weights a priori over-specifies the metric when the ten principles give no numeric priority, and (b) treat the marginal ΔSGI ranking with additive decomposition (full-plan SGI ≈ baseline + Σ ΔSGI_k) as the default reading, since the additive structure from exchange 1 implies it.\n\nUnder that fallback structure, what is the specific case, boundary condition, or failure mode that would break it — the one I must name and discuss in the bias-and-robustness section of the final report? For example: a city whose BAU-2050 extrapolation already exceeds a principle target (so the anchored score saturates at 1 and the initiative's marginal delta is zero even though it is clearly still valuable), or a high-growth scenario in which the floor itself shifts upward fast enough that two initiatives' marginal contributions reorder, making the ranking unstable to the population assumption? Name the sharpest counterexample and state what the model does wrong in it, so I can bound the metric's validity in the report."
+            ],
+            "expert_answers": [
+              "1. **Veto vs additive:** The text gives no basis for a veto. It asks for a metric \"considering\" the three E's and a ranking of initiatives by \"potential\" — both are comparative, compensatory readings. Read it as additive/trade-off, with pillar weights as the only lever. A cap would need a stated threshold the problem never supplies.\n\n2. **Anchoring rule:** Anchor against target-thresholds, not best/worst peer cities. The problem frames success as adherence to smart-growth principles and to each city's own growth needs — an absolute standard, not a relative field position. Min-max against reference cities would make scores move when unrelated cities change, which the problem's city-specific framing cannot support.\n\n3. **Ranking:** Read \"most potential\" as marginal improvement over the no-action baseline, not absolute end-state contribution. Subproblem 4 asks what each initiative contributes *within the redesigned plan*, and subproblem 5 asks how the plan absorbs added growth — both are about change induced, not standing level.",
+              "reject",
+              "The sharpest failure mode is **non-additivity from indicator interaction**, not saturation. Your additive decomposition SGI ≈ baseline + Σ ΔSGI_k holds only if initiatives act on disjoint sub-indicators. They do not: transit-oriented densification and green-corridor preservation both move the same land-use and walkability indicators, and their combined effect is sub-additive (or super-additive) — the marginal ΔSGI of each computed with others \"held at baseline\" double-counts or under-counts the shared indicator. In that case the ranking reorders depending on the order initiatives are added, and Σ ΔSGI_k ≠ full-plan SGI, so subproblem 5's growth check read off the sum is wrong. Name this: the metric's validity is bounded to initiative portfolios with near-disjoint indicator footprints; overlapping land-use initiatives break both the ranking and the additive growth decomposition."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e0f19556bdd2",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p1_20260930_061454/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-problem, explicitly linking them to the three E's and ten principles. The definition of the Smart Growth Index (SGI) as a central metric is well-articulated, including its construction logic and normalization rules. The goals for researching current plans, developing new plans, and ranking initiatives are explicit and directly address the problem requirements. The treatment of the 50% population growth as a stress scenario is a clear and logical interpretation of the requirement. Overall, the problem definition is highly clear and accurate.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured and cover all aspects of the problem. Subproblem 1 (SGI definition) is a prerequisite for Subproblems 2, 3, and 4, establishing clear dependencies. Subproblem 2 evaluates current plans, Subproblem 3 develops new plans and addresses the population growth constraint, and Subproblem 4 ranks initiatives. This sequence ensures a coherent flow from metric definition to application and comparison. All key parts of the problem requirements are covered without deviation. The integration of the population growth requirement into Subproblem 3 is appropriate, ensuring it is considered in the plan development and evaluation. The coverage is complete and well-organized.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and provides sufficient depth to explain the model's logic and limitations effectively.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying key structural and data biases and providing clear guidance on how to interpret results to mitigate their impact.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with sensitivity analyses for weights and plan coverage, ensuring robustness and consistency with the problem context.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate and sophisticated methods, such as Shapley values for initiative ranking and context-specific plan construction, scientifically reflecting the complex interactions in urban planning.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a quantifiable framework for urban planning that translates abstract principles into actionable metrics. It provides clear decision-support tools, such as initiative ranking via Shapley values and capacity stress tests, which are directly applicable to real-world policy making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model adheres to strong scientific principles, utilizing rigorous normalization techniques and advanced game theory (Shapley values) to handle complex interactions. The assumptions are clearly defined and justified, and the mathematical framework is robust, ensuring the validity and reliability of the results.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2017_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260930_061454",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260930_061454/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a metric to score smart-growth success of two mid-sized cities across the three E's (Economically prosperous, socially Equitable, Environmentally Sustainable), following the ten principles of smart growth. I plan a two-level metric: (a) ten principle scores, each the mean of 2-4 indicators (indicators on a 0-100 scale), and (b) three E-scores, each a weighted mean of the principle scores, with a city-level Smart Growth Index as a weighted mean of the three E-scores. The problem statement leaves the structural reading of \"success of smart growth\" unsettled in one way I cannot resolve myself:\n\nWhich logical boundary defines a city's smart-growth success: (i) achievement — the level of the score itself, where a high score is good in absolute terms; (ii) trajectory — the change in the score from the baseline year to the plan horizon, so progress under the growth plan matters more than the starting level; or (iii) a combination of level and trajectory, with the level carrying a minimum standard a city must meet?\n\nThis determines how I normalize each indicator (against an absolute reference value or against the city's own baseline), how I score the current plan (Question 2), and how I compare the two cities of different baselines (Questions 3-4). I am not asking for any numerical weight, rate, or empirical constant — only for the interpretation of the objective the text does not explicitly settle.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your reply — the plan's success is read as trajectory (change of the metric from baseline year to 2050), with the level retained only as a floor — I propose this one specific structure for the smart-growth success metric, and ask you to accept or reject it:\n\n1. Two-level aggregation: 10 principle scores (one per smart-growth principle), each the unweighted mean of 2–4 indicators; 3 E-scores, each the weighted mean of principle scores with fixed cross-principle weights (e.g. Environment: principles 6 and 2 with weights 0.6/0.4); and a city Smart Growth Index (SGI) = weighted mean of the three E-scores with fixed weights (e.g. Economy 0.4, Equity 0.35, Environment 0.25).\n2. All indicators are on a 0–100 scale, normalized against fixed absolute reference points (best-practice / threshold values), so that scores are comparable across cities; a score of 100 means the reference is met.\n3. Success of a growth plan is the change in SGI and E-scores from 2025 to 2050 (delta), reported together with the 2050 level, which must also stay above a common floor (e.g. no E-score below 50) or the plan is flagged as unbalanced.\n4. In the +50% population scenario (Question 5), the metric is re-evaluated at the stressed population to test whether the floor still holds; capacity headroom is reported as the population level at which any E-score would first cross the floor.\n\nAccept or reject this structural configuration.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy proposed metric structure was rejected, so I will fall back to the most plausible reading of your Exchange-1 reply: success of a growth plan = change of the smart-growth score (delta, 2025→2050), reported alongside the 2050 level, with the level kept only as an unbalance check rather than an absolute floor, and each city scored on the same indicator set so the two cities' deltas can be compared directly.\n\nAssuming that fallback, which specific case, boundary condition, or failure mode would break this mechanism — for example a population-growth path, a city characteristic, or a way the delta could improve while the city is actually failing its residents — and where in my final report must that limitation be addressed (bias analysis, robustness discussion, or a stated model limitation)?"
+            ],
+            "expert_answers": [
+              "The text does not settle this, and it cannot be settled from the statement alone. It hinges on a magnitude the problem never supplies: the baseline gap between the two cities' starting conditions. If the two selected cities begin at similar levels, achievement (i) is defensible; if they begin far apart, trajectory (ii) is the only reading that makes the comparison meaningful, since a high-scoring city could otherwise \"win\" while stagnating. The problem's own framing — \"measure the success of the current plan\" and \"evaluate the success of your plans\" — points toward trajectory, but the ranking task in Question 4 and the 50% growth question in Question 5 pull toward a level-plus-minimum-standard reading (iii). Without knowing the baseline disparity, the choice is a modeling judgment, not a textual one.",
+              "reject",
+              "The mechanism breaks on a city whose baseline is already near the reference ceiling: delta is bounded by remaining headroom, so a high-achieving city's genuine improvement scores near zero while a low-baseline city's modest effort scores large — the ranking inverts. Equally, delta can rise while residents fail: a city can lift its score by displacing low-income residents across its boundary (equity indicators improve inside the city line, worsen outside), or by greenfield annexation that dilutes per-capita indicators. A third case: a shrinking or stagnant city where the +50% path never materializes, so the 2050 delta is measured against a population the plan never served. Address this in the stated model limitations, with the headroom-bounded delta and boundary-displacement effects named explicitly, and carry the sensitivity of the two-city comparison to baseline disparity into the robustness discussion."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e0f19556bdd2",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9499999999999998,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p1_20260930_061454/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each of the five sub-tasks, accurately mapping them to the specific requirements of the problem statement. Each task explicitly states its objective (e.g., defining a metric, researching current plans, developing new plans, ranking initiatives, and stress-testing for population growth). The goals are explicit, such as creating a \"reproducible scoring system\" or providing a \"2025-2050 plan,\" which ensures the analysis is focused and actionable. The identification of key components, such as the three E's and the ten principles, is precise and directly addresses the core theoretical framework required by the prompt. There is no ambiguity in what each sub-problem aims to achieve, making the overall problem definition completely clear and well-structured.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition into five sub-tasks perfectly aligns with the five numbered requirements in the problem statement, ensuring complete coverage without deviation. The tasks are logically interrelated: Task 1 establishes the metric used in Tasks 2, 3, and 4; Task 2 provides the baseline for Task 3; and Task 5 builds upon the plan developed in Task 3. This dependency structure ensures that each sub-task supports the final goal of implementing smart growth theories. The scope of each task is appropriately bounded, covering all necessary aspects like geography, economic opportunities, and specific population scenarios. There are no missing key parts, and the modeler correctly identifies the need for cross-city comparison and stress testing, demonstrating a comprehensive understanding of the problem's requirements.",
+                "score": 10
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, with transparent logic linking principles to scores, and provides interpretable insights into city-specific planning strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific methodological and data biases (headroom, boundary, weights) and providing concrete corrections and sensitivity tests to mitigate their impact.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clearly stated and logically structured, particularly the trajectory-based success metric. However, the specific coefficients in the population stress test degradation functions lack empirical justification or sensitivity analysis, relying on qualitative assertions.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods, including a composite metric aligned with smart growth principles and a robust ranking mechanism. The structure logically reflects the problem, and the inclusion of weight sensitivity analysis enhances the scientific validity of the approach.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear, data-driven framework for evaluating and prioritizing urban planning initiatives. It effectively translates abstract smart growth principles into measurable metrics and provides actionable insights for decision-making, including stress-testing for future growth scenarios.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, utilizing established MCDM techniques and clear theoretical mappings between indicators and sustainability goals. While the linear assumptions and fixed weights are simplifications, the overall structure is logical, transparent, and consistent with scientific modeling practices in urban planning.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8895833333333334,
+      "interaction_cost": 0.850258531943612,
+      "interaction_penalty": 0.0425129265971806,
+      "net_utility": 0.8470704067361527,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2153,
+          "total_expert_latency_seconds": 3.88,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9011069118507946,
+          "latency_cost_component": 0.2518734490157148,
+          "interaction_cost": 0.8604427647403179,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1395,
+          "total_expert_latency_seconds": 5.2700000000000005,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8501857478672651,
+          "latency_cost_component": 0.29169776766904176,
+          "interaction_cost": 0.8400742991469061,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2019_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\n# Modeling Context\n\nI am building an ecosystem-services valuation model for cost-benefit analysis\nof land-use development projects of varying scale (small community projects to\nlarge national projects). The intended mechanism: convert each project's land-\nuse change into an annual ecosystem-service value change (area x per-hectare\nunit values from the Costanza tables), capitalize it to a net present value\nover the project's service horizon, and fold that ecological cost into the\nproject's cost-benefit ratio. The problem statement leaves several structural\ninterpretations unsettled.\n\n## The Question\n\nThe problem asks how \"environmental degradation be accounted for in these\nproject costs\" and when \"ecosystem services are accounted for in the cost-\nbenefit ratio,\" but it never fixes the logical interpretation of that\naccounting. Three structural readings are open:\n\n(a) Ecological service loss enters the cost side as an opportunity cost — the\nforgone annual service flow capitalized at the social discount rate over the\nservice horizon (permanent land conversion = capitalized at 1/r forever;\ntemporary disturbance = over the recovery horizon).\n\n(b) It enters as an abatement/mitigation cost — the cost of replacing the\nlost service — which is only defined when a substitute exists and is undefined\nfor non-substitutable services.\n\n(c) It is excluded from the ratio and reported only as a separate, non-\ncompensated external cost alongside the ratio.\n\nWhich of these readings is the correct structural interpretation for the\n\"true and comprehensive valuation\" the problem requires — and, if (a), does\npermanent conversion of a service-bearing landscape get valued as a perpetual\nannuity (capitalized at the social discount rate), or bounded by a finite\nservice horizon? This choice fixes how every downstream cost-benefit number\nis computed; I am not asking for any discount rate, value magnitude, or\nempirical constant.",
+          "# Expert Question 2 (Operator 2: judgment)\n\n# Modeling Context\n\nPer your answer to Question 1, the ecological cost enters the cost-benefit\nratio as the opportunity cost of the forgone ecosystem-service flow, with\npermanent land conversion capitalized as a perpetual annuity. To implement\nthat, the model must assign each Costanza service a capitalization rule:\n\n**Proposed structural allocation (one coherent structure):**\n\n- **Permanent class** (services tied to standing natural capital that a land\n  conversion destroys in perpetuity — e.g., climate regulation, carbon\n  sequestration, water purification, biodiversity/habitat support,\n  flood/erosion regulation, nutrient and pollination support where habitat is\n  converted): value loss = A x v / r, the perpetual annuity of the forgone\n  per-hectare flow at the social discount rate r.\n- **Recovery class** (services interrupted by construction or temporary\n  disturbance that regenerate once the landscape recovers — e.g., the\n  productivity and food-production flows during a recovery period H): value\n  loss = A x v x (1 - (1+r)^-H) / r, a finite annuity over the recovery\n  horizon H, after which the flow resumes.\n- **Direct-benefit class** (services a project deliberately replaces or\n  enhances — e.g., cultivated food production on new farmland, managed\n  forestry on replanted area, water supply on a managed reservoir): enter as\n  a capitalized *benefit* (gain) on the benefit side of the ratio, using the\n  same annuity form over the project's service life.\n\nEach project's ecological cost is the sum over services of (permanent class\npermanently lost) + (recovery class during H); each project's ecological\nbenefit is the direct-benefit class. The cost-benefit ratio then becomes\n(B_project + B_eco) / (C_project + C_eco), where C_eco carries the capitalized\nservice loss.\n\n**The question:** Do you accept this three-class structural allocation —\npermanent annuity for standing-capital services, finite recovery annuity for\ninterrupted-then-regenerated services, and a mirrored capitalized-benefit\nform for deliberately created services?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\n# Modeling Context\n\nWith your acceptance of the three-class structure, the model now values each\nland-use project as: permanent-class service loss capitalized as a perpetual\nannuity A x v / r; recovery-class interruption as a finite annuity over\nrecovery horizon H; and deliberately created service flows as capitalized\nbenefits of the same form, all folded into a single cost-benefit ratio\n(B + B_eco) / (C + C_eco).\n\n## The Question\n\nName the specific project case, boundary condition, or failure mode in which\nthis mechanism breaks — that is, in which the single cost-benefit ratio\nproduces a decision or valuation that is wrong or misleading for the class of\nprojects described (from a small community road to a transnational pipeline).\nI need the breaking case itself, not a fix: for example, a condition on r, on\nH, on service substitutability, on spatial offset of loss vs. gain, or on\nproject scale under which the capitalized single-ratio form misprices the\nproject or flips its accept/reject decision against what the valuation logic\nintended."
+        ],
+        "expert_answers": [
+          "(a), with permanent conversion valued as a perpetual annuity capitalized at the social discount rate. The problem's phrase \"true and comprehensive valuation\" and its framing of cumulative, ongoing degradation point to opportunity cost of the forgone service flow, not replacement cost (undefined for non-substitutable services) and not a side-reported externality (which would leave the ratio not comprehensive). Permanent conversion removes the service in perpetuity, so the annuity is unbounded; a finite horizon would understate the loss.",
+          "accept",
+          "The breaking case is spatial offset between loss and gain. When a project destroys a service-bearing landscape at one site and creates the same service class elsewhere (e.g., a pipeline or highway whose permanent-class loss is at the right-of-way while its direct-benefit gain is a distant mitigation wetland), the single ratio sums A×v/r losses and gains as if they were commensurable and co-located. They are not: the lost service was delivered to the local beneficiaries who now lose it, while the created service accrues to different beneficiaries at a different location. The ratio can flip accept/reject — a project with large local permanent loss and an equal-area offset gain nets to near zero and passes — even though the local population's service flow is destroyed. The mechanism misprices whenever loss and gain are spatially non-substitutable."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_e0f19556bdd2",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8333333333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.7666666666666666,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.7916666666666667,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly stated, well-justified with standard literature (Costanza), and explicitly acknowledge limitations, providing a solid foundation for the model.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate economic methods, logically structures service impacts, and critically addresses the spatial offset limitation, ensuring a realistic and rigorous reflection of the problem.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is practical, using established valuation data and clear financial metrics to provide actionable cost-benefit analyses for diverse project scales, with a useful distinction between net and local views for decision-making.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, integrating ecological service classifications with rigorous financial mathematics and peer-reviewed valuation data, though reliance on a single historical dataset slightly limits its temporal robustness.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed numerical outputs, logical explanations for the inference process, and a balanced discussion of the model's strengths and limitations, effectively supporting decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key data and model biases, and using sensitivity analysis to assess their impact, with clear recommendations for future corrections, effectively reducing the risk of biased conclusions.",
+            "score": 8
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the core goal of creating a valuation model to integrate ecosystem services into cost-benefit analysis. The scope is well-defined, focusing on monetizing land-use changes. While the primary modeling objective is explicit, the definition could be slightly broader to explicitly include the strategic implications and temporal adaptability of the model as part of the overall goal, though these are less critical than the core valuation task.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks logically cover the model construction and cost-benefit analysis for various project sizes. However, the decomposition fails to explicitly include sub-tasks for analyzing the implications for planners/managers and for discussing how the model should evolve over time, which are specific requirements in the problem statement. This results in a partial deviation from the complete scope of the problem.",
+            "score": 6
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 2,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\n# Modeling Context\n\nI am building an ecosystem-services valuation model for cost-benefit analysis\nof land-use development projects of varying scale (small community projects to\nlarge national projects). The intended mechanism: convert each project's land-\nuse change into an annual ecosystem-service value change (area x per-hectare\nunit values from the Costanza tables), capitalize it to a net present value\nover the project's service horizon, and fold that ecological cost into the\nproject's cost-benefit ratio. The problem statement leaves several structural\ninterpretations unsettled.\n\n## The Question\n\nThe problem asks how \"environmental degradation be accounted for in these\nproject costs\" and when \"ecosystem services are accounted for in the cost-\nbenefit ratio,\" but it never fixes the logical interpretation of that\naccounting. Three structural readings are open:\n\n(a) Ecological service loss enters the cost side as an opportunity cost — the\nforgone annual service flow capitalized at the social discount rate over the\nservice horizon (permanent land conversion = capitalized at 1/r forever;\ntemporary disturbance = over the recovery horizon).\n\n(b) It enters as an abatement/mitigation cost — the cost of replacing the\nlost service — which is only defined when a substitute exists and is undefined\nfor non-substitutable services.\n\n(c) It is excluded from the ratio and reported only as a separate, non-\ncompensated external cost alongside the ratio.\n\nWhich of these readings is the correct structural interpretation for the\n\"true and comprehensive valuation\" the problem requires — and, if (a), does\npermanent conversion of a service-bearing landscape get valued as a perpetual\nannuity (capitalized at the social discount rate), or bounded by a finite\nservice horizon? This choice fixes how every downstream cost-benefit number\nis computed; I am not asking for any discount rate, value magnitude, or\nempirical constant.",
+              "# Expert Question 2 (Operator 2: judgment)\n\n# Modeling Context\n\nPer your answer to Question 1, the ecological cost enters the cost-benefit\nratio as the opportunity cost of the forgone ecosystem-service flow, with\npermanent land conversion capitalized as a perpetual annuity. To implement\nthat, the model must assign each Costanza service a capitalization rule:\n\n**Proposed structural allocation (one coherent structure):**\n\n- **Permanent class** (services tied to standing natural capital that a land\n  conversion destroys in perpetuity — e.g., climate regulation, carbon\n  sequestration, water purification, biodiversity/habitat support,\n  flood/erosion regulation, nutrient and pollination support where habitat is\n  converted): value loss = A x v / r, the perpetual annuity of the forgone\n  per-hectare flow at the social discount rate r.\n- **Recovery class** (services interrupted by construction or temporary\n  disturbance that regenerate once the landscape recovers — e.g., the\n  productivity and food-production flows during a recovery period H): value\n  loss = A x v x (1 - (1+r)^-H) / r, a finite annuity over the recovery\n  horizon H, after which the flow resumes.\n- **Direct-benefit class** (services a project deliberately replaces or\n  enhances — e.g., cultivated food production on new farmland, managed\n  forestry on replanted area, water supply on a managed reservoir): enter as\n  a capitalized *benefit* (gain) on the benefit side of the ratio, using the\n  same annuity form over the project's service life.\n\nEach project's ecological cost is the sum over services of (permanent class\npermanently lost) + (recovery class during H); each project's ecological\nbenefit is the direct-benefit class. The cost-benefit ratio then becomes\n(B_project + B_eco) / (C_project + C_eco), where C_eco carries the capitalized\nservice loss.\n\n**The question:** Do you accept this three-class structural allocation —\npermanent annuity for standing-capital services, finite recovery annuity for\ninterrupted-then-regenerated services, and a mirrored capitalized-benefit\nform for deliberately created services?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\n# Modeling Context\n\nWith your acceptance of the three-class structure, the model now values each\nland-use project as: permanent-class service loss capitalized as a perpetual\nannuity A x v / r; recovery-class interruption as a finite annuity over\nrecovery horizon H; and deliberately created service flows as capitalized\nbenefits of the same form, all folded into a single cost-benefit ratio\n(B + B_eco) / (C + C_eco).\n\n## The Question\n\nName the specific project case, boundary condition, or failure mode in which\nthis mechanism breaks — that is, in which the single cost-benefit ratio\nproduces a decision or valuation that is wrong or misleading for the class of\nprojects described (from a small community road to a transnational pipeline).\nI need the breaking case itself, not a fix: for example, a condition on r, on\nH, on service substitutability, on spatial offset of loss vs. gain, or on\nproject scale under which the capitalized single-ratio form misprices the\nproject or flips its accept/reject decision against what the valuation logic\nintended."
+            ],
+            "expert_answers": [
+              "(a), with permanent conversion valued as a perpetual annuity capitalized at the social discount rate. The problem's phrase \"true and comprehensive valuation\" and its framing of cumulative, ongoing degradation point to opportunity cost of the forgone service flow, not replacement cost (undefined for non-substitutable services) and not a side-reported externality (which would leave the ratio not comprehensive). Permanent conversion removes the service in perpetuity, so the annuity is unbounded; a finite horizon would understate the loss.",
+              "accept",
+              "The breaking case is spatial offset between loss and gain. When a project destroys a service-bearing landscape at one site and creates the same service class elsewhere (e.g., a pipeline or highway whose permanent-class loss is at the right-of-way while its direct-benefit gain is a distant mitigation wetland), the single ratio sums A×v/r losses and gains as if they were commensurable and co-located. They are not: the lost service was delivered to the local beneficiaries who now lose it, while the created service accrues to different beneficiaries at a different location. The ratio can flip accept/reject — a project with large local permanent loss and an equal-area offset gain nets to near zero and passes — even though the local population's service flow is destroyed. The mechanism misprices whenever loss and gain are spatially non-substitutable."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e0f19556bdd2",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8041666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6666666666666666,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r1p2_20260930_061454/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, well-justified with standard literature (Costanza), and explicitly acknowledge limitations, providing a solid foundation for the model.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate economic methods, logically structures service impacts, and critically addresses the spatial offset limitation, ensuring a realistic and rigorous reflection of the problem.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, using established valuation data and clear financial metrics to provide actionable cost-benefit analyses for diverse project scales, with a useful distinction between net and local views for decision-making.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, integrating ecological service classifications with rigorous financial mathematics and peer-reviewed valuation data, though reliance on a single historical dataset slightly limits its temporal robustness.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed numerical outputs, logical explanations for the inference process, and a balanced discussion of the model's strengths and limitations, effectively supporting decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases, and using sensitivity analysis to assess their impact, with clear recommendations for future corrections, effectively reducing the risk of biased conclusions.",
+                "score": 8
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the core goal of creating a valuation model to integrate ecosystem services into cost-benefit analysis. The scope is well-defined, focusing on monetizing land-use changes. While the primary modeling objective is explicit, the definition could be slightly broader to explicitly include the strategic implications and temporal adaptability of the model as part of the overall goal, though these are less critical than the core valuation task.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks logically cover the model construction and cost-benefit analysis for various project sizes. However, the decomposition fails to explicitly include sub-tasks for analyzing the implications for planners/managers and for discussing how the model should evolve over time, which are specific requirements in the problem statement. This results in a partial deviation from the complete scope of the problem.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2019_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260930_061454",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260930_061454/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building an ecosystem-services valuation model that converts a land use\nproject's changed land area (by biome) into an annual ecosystem-service value\nloss or gain, then folds that annual stream into the project's cost-benefit\nratio. The problem statement settles neither of the two structural choices below,\nand both are required before I can parameterize the core mechanism. I ask for the\nlogical interpretation, not magnitudes.\n\n1. **Nature of the service value in the benefit/cost ratio.** When a project\n   converts a hectare of forest to built-up land, the annual unit value of the\n   foregone services is a perpetual flow, not a one-time cost. What is the\n   correct logical reading of how this flow enters the project's cost-benefit\n   ratio: (a) it is a capitalized (discounted, present-value) stream added as a\n   cost term against the project's capitalized benefits; (b) it is carried as an\n   undiscouted annual cost compared with the project's annual net benefits; or\n   (c) it is a soft constraint/violation penalty layered on top of the monetary\n   ratio? Which reading does \"the true and comprehensive valuation of the\n   project\" require, and what is the valid domain of the decision variable (e.g.,\n   a single project's net benefit ratio, vs. an annualized regional aggregate)?\n\n2. **Boundary of \"land use change\" for valuation.** The statement says projects\n   \"limit or remove\" services. Logically, what is the valid domain of the\n   change: only the permanent land-cover conversion (hectares of one biome\n   becoming another), or does it also include temporary/reversible occupancy and\n   partial-intensity degradation of a biome that remains in place? In other words,\n   is the model's input a change of state (before/after biome), or a rate of\n   service-flow change over time on unchanged land?\n\nPlease answer the interpretation of each, so I know which domain the objective\nfunction lives in before I set any unit values or weights.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven Exchange 1's rulings — capitalized present-value cost term, decision\nvariable is the single project's NPV, and the input domain is before/after biome\nconversion — I propose this one coherent structural configuration for the model.\nAccept or reject it as a whole.\n\n**Proposed structure:**\n\n1. **Transition table, not a lookup-and-kill.** For every ordered biome pair\n   (B_from, B_to), define a service loss as\n   L(B_from, B_to) = Σ_s w_s · [u_s(B_from) − max(0, u_s(B_to))], summed over\n   service classes s, where u_s(biome) is the per-hectare annual unit value from\n   the Costanza-style table and w_s is a structural weight for service class s.\n   The max(0,·) term means converting to a land use that still provides some of\n   service s only loses the net difference; converting to a land use that\n   provides more of a service (e.g., cropland→pasture for provisioning) yields a\n   negative loss, i.e., a gain, so the table is signed and can net.\n\n2. **Service-class weights come from the table's own structure.** w_s is set as\n   the share of the total per-hectare value that service class s carries on\n   average across the biomes in the table (the Costanza 1997 table's\n   provisioning/regulation/supporting/cultural split), so the weighting is\n   derived from the unit-value table rather than invented. No separate\n   importance weighting layer is added on top.\n\n3. **Capitalization as a perpetual annuity.** The annual loss stream\n   L·A (hectares converted, L as above) is capitalized as PV = (L·A)/δ, using a\n   single constant social discount rate δ and assuming the conversion is\n   permanent, so the loss runs forever. If a project only reverts after T years,\n   PV = (L·A)·(1 − (1+δ)^−T)/δ.\n\n4. **Cost-benefit ratio form.** The project's comprehensive cost-benefit ratio is\n   CBR = (B − PV_mitigation) / PV_ESloss, where B is the project's conventional\n   net benefits (capitalized), PV_mitigation is the capitalized cost of any\n   compensatory measures, and PV_ESloss is the capitalized ecosystem-service\n   loss from item 3. A project is comprehensive-net-positive iff CBR > 1 and the\n   NPV analog B − PV_mitigation − PV_ESloss > 0.\n\n5. **Cumulative regional layer is descriptive, not a decision rule.** For\n   \"many projects across a region,\" the model sums PV_ESloss over projects by\n   biome to report cumulative service loss, but the decision rule (item 4) still\n   applies per project; the regional sum is reported to show how small projects\n   aggregate, per the problem's cumulative-degradation point.\n\nPlease accept or reject this configuration as a whole.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2 was rejected, so I am using the most plausible fallback structure:\nkeep the before/after biome-transition loss L(B_from, B_to) = Σ_s [u_s(B_from) −\nu_s(B_to)] (per-hectare annual unit values from the Costanza-style table, no\nextra weighting layer), capitalize the permanent loss as a perpetual annuity\nPV = (L·A)/δ with a single constant discount rate δ, and enter it as a cost term\nin the project's cost-benefit ratio CBR = (B − PV_mitigation)/(PV_ESloss) with\ncomprehensive-net-positive iff CBR > 1 and NPV = B − PV_mitigation − PV_ESloss >\n0.\n\nName the specific case, boundary condition, or failure mode that breaks this\nmechanism — i.e., a project or state in which it returns a verdict (accept /\ncomprehensive-net-positive / cumulative-loss figure) that is logically wrong\ngiven its own premises. One concrete case is enough; describe it precisely enough\nthat I can state it as a named limitation in the report. Do not prescribe a fix."
+            ],
+            "expert_answers": [
+              "1. **(a)** — capitalized present-value stream as a cost term. A perpetual annual service flow is only commensurable with the project's capitalized benefits if both are discounted to present value; comparing an undiscounted annual cost to a capitalized benefit mixes units, and a soft penalty is not a valuation. The decision variable is the single project's net present value (or its benefit/cost ratio), not a regional annual aggregate.\n\n2. **Change of state** — before/after biome conversion is the valid domain. Temporary occupancy and partial-intensity degradation are rate-of-flow changes on land whose biome is unchanged; they require a separate flow-degradation function and cannot be expressed as a biome-transition input.",
+              "reject",
+              "**Case: restoration or reversion project (B_to richer than B_from).**\n\nTake a project whose land-use change is *upward* in service provision — e.g., converting degraded cropland to wetland/forest, or a project that reverts built-up land to a biome with higher per-hectare unit values. Here L(B_from, B_to) = Σ_s [u_s(B_from) − u_s(B_to)] is **negative**, so PV_ESloss = (L·A)/δ is negative. The mechanism then returns CBR = (B − PV_mitigation)/(negative) and NPV = B − PV_mitigation − (negative) = B − PV_mitigation + |PV_ESloss|.\n\nTwo logically wrong verdicts follow from its own premises: (1) a project with positive conventional net benefits and a genuine service *gain* is scored as CBR < 1 (the negative denominator flips the accept/reject sign), so a beneficial project is rejected; (2) the \"cumulative regional loss\" sum nets restoration gains against conversion losses, so a region that offsets its degradation reports a reduced or zero cumulative loss even though the problem's premise is that cumulative degradation is the harm. The unsign-restricted L, combined with dividing by PV_ESloss rather than subtracting it, is the failure mode."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e0f19556bdd2",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8625,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8666666666666667,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.7833333333333333,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_6/train_parent_1/runs/round_6/r2p2_20260930_061454/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, logically structured, and effectively interprets the model's impact on decision-making across different scales.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying multiple specific biases and providing effective structural or reporting corrections to mitigate their impact.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model offers a clear, closed-form decision rule that integrates ecosystem values into standard CBA, supports sensitivity analysis, and is computationally efficient, making it highly feasible for practical land-use planning.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses established ecological valuation data and correct financial mathematics, rigorously addressing logical flaws in decision rules. While scientifically sound in structure, its reliance on static historical data limits its dynamic scientific accuracy.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, explicitly justified with literature sources, and logically consistent with the problem's scope. The exclusion of out-of-scope variables and the sub-linear benefit assumption demonstrate high rigor and realism.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (capitalized PV, linear valuation) that scientifically reflect the problem. The structure is robust, reproducible, and validated through adversarial testing, ensuring the model realistically captures the economic impact of land use changes.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task. Task 1 specifies the valuation mechanism and inputs/outputs. Task 2 defines the scale and type of projects for CBA. Tasks 3 and 4 clearly state the objectives for evaluation and limitation analysis. The goals are explicit, well-structured, and directly aligned with the problem requirements, leaving no ambiguity about the intended outcomes of each step.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically connected and cover the main requirements: building the model, performing CBA at various scales, and evaluating effectiveness. However, Task 4's focus on a specific \"failure mode\" and \"expert consultation\" is somewhat narrow and may not fully address the broader question of how the model needs to change over time, which is only implicitly covered. The coverage is mostly complete but slightly deviates by over-emphasizing a specific limitation narrative rather than a comprehensive temporal analysis.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8333333333333334,
+      "interaction_cost": 0.8515517753390125,
+      "interaction_penalty": 0.04257758876695063,
+      "net_utility": 0.7907557445663828,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1659,
+          "total_expert_latency_seconds": 3.3400000000000003,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8705213827901057,
+          "latency_cost_component": 0.23323956073388452,
+          "interaction_cost": 0.8482085531160424,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1913,
+          "total_expert_latency_seconds": 4.25,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8872374939049567,
+          "latency_cost_component": 0.26348603249384467,
+          "interaction_cost": 0.8548949975619826,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T06:26:07.334455",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_e0f19556bdd2",
+  "workflow": {
+    "name": "Structural-Only Grounding Policy",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The previous proposal (Round 1) was rejected for being too similar to the parent (similarity 0.9851). The parent's main weakness, observed in the 2014_C and 2016_C rollouts, was that Exchange 1 often asked for empirical magnitudes (e.g., 'typical decay rate', 'order of magnitude of influence') that the expert could not and should not supply, leading to wasted exchanges or 'reject' responses in Exchange 2 that lacked specificity. This patch explicitly forbids asking for empirical magnitudes in Exchange 1, shifting the focus to 'structural' or 'definitional' constraints (e.g., hard vs. soft constraints, logical boundaries). This differentiates the behavior significantly from the parent's 'foundational magnitudes' instruction while maintaining the 1-2-3 operator sequence. It addresses the 'too similar' rejection by changing the core instruction of Exchange 1 from 'magnitudes' to 'logical/structural boundaries'.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_e0f19556bdd2",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 2,
+    "parent_workflow_ids": [
+      "interaction_workflow_c8ac03cd254d"
+    ],
+    "training_batch": [
+      "2016_C",
+      "2014_C"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_E",
+    "2019_E"
+  ],
+  "absolute_utility": 0.8614583333333334,
+  "interaction_cost": 0.8509051536413123,
+  "interaction_penalty": 0.042545257682065615,
+  "net_utility": 0.8189130756512677,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

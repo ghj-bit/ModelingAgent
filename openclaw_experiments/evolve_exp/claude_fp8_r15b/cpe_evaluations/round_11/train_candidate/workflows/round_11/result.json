@@ -1,0 +1,653 @@
+{
+  "round": 11,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8185974809566614,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.9125,
+    "modeling_rigorousness_evaluation": 0.8583333333333334,
+    "practicality_and_scientificity_evaluation": 0.8416666666666667,
+    "result_and_bias_analysis_evaluation": 0.8375
+  },
+  "problem_results": [
+    {
+      "problem_id": "2018_A",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Strategic decision: modeling framework for HF ocean-surface reflection\n\n## Problem understanding\n- Task 2018_A: model HF (3–30 MHz) skywave multi-hop propagation over the ocean for a\n  100 W constant-carrier signal from a coastal point source, operating below the MUF\n  (per the provided data: f ≈ 0.85 × MUF, daytime mid-latitude MUF in the low–mid HF band).\n- Part I deliverables: (a) strength of the **first reflection off a turbulent ocean**\n  (i.e., after the initial ionospheric reflection the signal reaches the sea once) and a\n  comparison with a calm ocean; (b) maximum number of calm-ocean hops n before received\n  strength falls below a usable SNR of 10 dB. Parts II–IV extend to terrain contrast,\n  a moving shipboard receiver, and a short IEEE synopsis.\n- Key physics per the data: seawater's complex permittivity (Debye model, Meissner 2004)\n  is very large at HF, so Fresnel reflection is strong near −1; turbulence perturbs the\n  local permittivity/conductivity and the surface height/angle, adding small-angle\n  scattering and roughness attenuation.\n\n## Decision point\nWhich framework should define \"reflection strength\" and the per-hop budget:\n\n**Option A — Geometric optics + Fresnel reflection coefficients.**\nPer-hop power factor = |Γ(f, θ, ε_eff)|² (vertical/polarized Fresnel at the grazing\nangle set by hop geometry), with turbulence modeled as a small-angle roughness\nattenuation (IRI-style σ_s² = 2kσ_h·cosθ) and an effective-permittivity perturbation.\n- Advantages: transparent, directly uses the provided dielectric data, cheap and\n  analytically checkable; standard in MUF/skywave literature.\n- Limitations: near-grazing Fresnel reflection of a point source also needs diffraction\n  correction (Fresnel-zone / curvature factors); single-scale Gaussian roughness is an\n  approximation to real ocean spectra.\n\n**Option B — Full HF propagation prediction (ITU-R P.1546-style).**\nUse an ITU-R P.1546-based path-loss/field-strength prediction with terrain roughness\nmodels, calibrating the turbulent-vs-calm contrast to empirical roughness data.\n- Advantages: captures integrated multipath, absorption, and roughness physics.\n- Limitations: heavy black box; the problem is explicitly about building the\n  reflection model itself; no measured roughness dataset is provided, so calibration\n  would rest on assumed sea-state parameters.\n\n**Option C — Electromagnetic surface scattering (Rice/PIESPEK full-wave).**\nFull-wave scattering from a statistically rough conductive sea surface\n(Brekhovskikh/IRI + small-roughness expansion), per-hop loss from a two-scale\nspectrum.\n- Advantages: physically most complete for the reflection event.\n- Limitations: computationally heavy, and its added fidelity is not resolvable within\n  the uncertainty of the assumed sea state (height 0.5–3 m, significant wave slope).\n\n## Why this matters\nThe choice fixes the meaning of \"strength\" in Part I, the per-hop loss law used for the\nhop-count n in the SNR≥10 dB budget, and the extension story in Parts II–IV. It is the\nframework decision with the largest downstream impact.\n\n## Recommendation\nOption A (Fresnel + roughness attenuation, with a curvature/Fresnel-zone correction),\nvalidated by bounding the roughness term with Options B/C magnitudes where cheap to do so.",
+          "# Expert Question 2 — Strategic decision: physical meaning of \"first reflection strength\" and the per-hop budget\n\n## Situation (builds on Round 1: Option A framework confirmed)\nFramework Option A is implemented: per-hop power factor =\nL_gh(θ, f) · |Γ(ε_seawater)|² · R_rough(σ_h, f, θ) · L_iono, with the Brekhovskikh\nFresnel-zone/curvature correction K = nπ/(1 + h_f1/d), Debye-model seawater\n(|ε| ≈ 1.1×10³ at 6.8 MHz, σ ≈ 0.41 S/m, |Γ| ≈ 1.004).\n\nComputed intermediate values (f = 6.8 MHz = 0.85 × MUF(8 MHz), H_F2 = 300 km,\nnominal hop ground distance d = 4000 km, grazing ≈ 8.5°):\n- per-hop loss (calm): −8.4 dB; (turbulent): −8.3 dB\n- strength \"after the first turbulent-ocean reflection\": ~58 dBm (i.e., the signal\n  is still amplified relative to the 100 W basis — 100 W into one 4000 km hop is\n  not attenuating, because the two-way geometric factor over a 4000 km ground\n  segment is only ≈ 10 dB and K_curv ≈ +8 dB cancels most of it)\n- consequence: the SNR ≥ 10 dB hop-count budget gives n_max ≈ 21 calm hops (~84 000 km).\n\n## The problem\nThe per-hop budget is *amplification*, not attenuation: the signal never crosses the\n10 dB SNR threshold within any plausible number of hops, so Part I(b)'s question\n(\"maximum number of hops before strength falls below usable SNR\") has no finite\nanswer under a pure far-field geometric budget, and the turbulent-vs-calm contrast\ncomputed so far is ≈ 0 dB — which contradicts the empirical statement in the\nproblem background that turbulent-ocean reflections are attenuated more.\n\n## Decision point\nHow to fix the physical picture so that both (a) a finite, meaningful hop count n\nand (b) a real turbulent-vs-calm contrast emerge. Candidate strategies:\n\n**Option 1 — Near-field (Fresnel-integral) per-hop loss with an absolute\nreflection-plane field strength.**\nEach ocean reflection is modeled at the actual reflection point: incident\nfield from a 100 W source over the source-to-ionosphere leg (near-field,\nFresnel integral over the ionospheric layer), then |Γ|² R_rough for the ocean\nbounce. The \"first reflection strength\" = field at the reflection plane after the\nbounce (in µV/m or W into a 1 m² patch / mW/m²); the per-hop budget then uses the\n*local* reflection loss (|Γ|²R_rough + ionospheric absorption + spreading over the\nactual two legs), which does include genuine attenuation from spreading on the\nsource leg. The hop count is the number of bounces until the field at the *final*\nocean bounce falls to the SNR threshold, assuming the receiver sits at the last\nbounce point.\n- Advantages: physically consistent, gives finite n and a nonzero\n  turbulence contrast (dominated by R_rough and |ε_eff| perturbation).\n- Limitations: \"strength at the reflection plane\" is a somewhat unusual reporting\n  convention; requires picking a patch/reference area.\n\n**Option 2 — Receiver at the end of the path (point-to-point link budget).**\n\"First reflection strength\" = signal received after the complete\nsource → iono → ocean → iono → receiver path (one ocean reflection = a 2-hop\ncircuit), i.e., the field at a receiver placed at the far end. The hop count n is\nthe maximum circuit length with n ocean bounces and SNR ≥ 10 dB.\n- Advantages: matches how a shipboard receiver (Part III) would measure signal;\n  standard link-budget framing for an IEEE synopsis.\n- Limitations: the Part I(a) phrasing (\"strength of the first reflection\") is\n  then interpreted as received strength after the round trip, not the field at\n  the bounce; hop count grows as √(path length) rather than per bounce.\n\n**Option 3 — Keep the current per-hop far-field factor but add an empirical\nturbulent-attenuation calibration** (e.g., +3–6 dB/hop for sea state 6, cited\nfrom HF sea-surface reflection experiments) on top of the computed R_rough.\n- Advantages: smallest change; preserves current hop bookkeeping.\n- Limitations: the base model still says the calm signal is amplified per hop, so\n  n is unbounded even after calibration unless the calibration exceeds ~8 dB/hop,\n  which is not supported by measurements (typical roughness loss is 1–4 dB).\n\n## Recommendation\nOption 2, with Option 1's reflection-plane field strength also reported as an\nintermediate quantity: report (a) the field at the first ocean reflection plane\n(µV/m into a reference patch) for calm vs turbulent, and (b) the maximum hop count\nn as the largest n such that the end-to-end received SNR (receiver at the far end\nof the nth hop) stays ≥ 10 dB. This answers both parts of Part I with finite,\ncomparable numbers and connects directly to Part III.",
+          "# Expert Question 3 — Final strategic decision: physical meaning of the \"usable SNR\" reference and the turbulence parameterization\n\n## Situation (builds on Rounds 1–2)\nRounds 1–2 settled: Option A framework; end-to-end image-source link budget. The\nmodel is now self-consistent: per-bounce loss\nL_hop = (leg2/(4π d)) · K_curv · A_iono · |Γ|² · R_rough with the Brekhovskikh\ncurvature factor K_curv (≈ +10.4 dB for a 4000 km hop at 6.8 MHz — the classic\nskywave \"extra gain\" that lets HF exceed line-of-sight free space), giving\nL_hop ≈ 3–7.5 dB/bounce, finite hop counts (n ≈ 15–120 depending on ionospheric\nabsorption), and a first-reflection received strength of tens of dBm into an\nisotropic-equivalent patch.\n\nTwo residual strategic uncertainties remain before the final numbers are frozen:\n\n## Decision point A — What \"falls below a usable SNR threshold of 10 dB\" references\nThe raw budget gives SNRs of 100+ dB because the 100 W carrier is compared against\nthermal noise only. Real HF circuits are limited by interference and antenna/system\neffects. Options:\n  A1: Keep SNR = P_rx / N_thermal (thermal-noise reference, B = 3 kHz). Then\n  n_max is large (tens to ~120) and the answer is \"the signal stays usable for a\n  very large number of hops; the binding limit is ionospheric variability, not\n  the 10 dB threshold.\"\n  A2: Reference the threshold to a practical received-signal floor:\n  P_usable = noise + typical HF interference + receiver sensitivity margin,\n  i.e. a minimum received field strength (≈ −120 to −110 dBm for HF voice),\n  so the question becomes \"how many hops before P_rx < P_min_practical.\"\n  A3: Hybrid — report both: the thermal-SNR hop count (A1) as the strict answer\n  to the stated threshold, and the practical-floor hop count (A2) as the\n  engineering interpretation, with the caveat that the stated 10 dB SNR with\n  thermal noise alone is not the actual limiting regime for HF.\n## Recommendation: A3 (answer the question as stated, flag the practical floor).\n\n## Decision point B — Turbulent-vs-calm parameterization\nWith rms wave height 0.15 m (calm) vs 0.9 m (turbulent) and the small-roughness\nspecular attenuation exp[−(2kσ_h s_h cosθ)²], the contrast at 6.8 MHz, 8.5°\ngrazing computes to ≈ 0 dB (σ_h·cosθ is still far below the Rayleigh criterion\nkσ_h s_h ≪ 1). To make the contrast physically meaningful:\n  B1: Use a two-scale (Brekhovskikh) model: long waves tilt the local surface\n  (changing the local Fresnel coefficient and the effective grazing angle),\n  short waves give the specular attenuation; the turbulence penalty then\n  emerges from (i) the ε_eff conductivity perturbation (bubble/foam entrainment,\n  −20 % assumed) and (ii) scattering into a wider angular sector (energy diverted\n  from the specular direction), parameterized by the wave slope spectrum.\n  B2: Keep the single-scale IRI form but parameterize the turbulence penalty\n  directly from the empirical literature on HF sea-surface reflection\n  (documented 1–4 dB roughness loss for sea states 4–6), i.e. treat the\n  single-scale computation as a lower bound and the literature range as the\n  working estimate.\n  B3: Full two-scale spectrum (PM spectrum) with Monte Carlo over sea states.\n  Most physical, but the added fidelity is within the uncertainty of the\n  assumed sea state (no measured roughness data is provided).\n## Recommendation: B2, with the B1 decomposition explained qualitatively\n(conductivity perturbation + specular attenuation + angular spreading), the\ncomputed small-roughness value as the lower bound, and a 1–4 dB turbulence\npenalty as the working estimate. This keeps the model defensible without\nclaiming precision the assumed sea state cannot support.\n\n## Why it matters\nA sets the headline hop-count answer for Part I(b) and Part III; B sets the\ncalm-vs-turbulent contrast that Part I(a) asks for. Both are final-number\ndecisions; everything else (geometry, dielectric, Fresnel, budget bookkeeping)\nis settled."
+        ],
+        "expert_answers": [
+          "Option A is the correct framework. The problem asks you to *build* the reflection model, not to run an existing prediction tool, so Option B's black box is disqualified and Option C's full-wave fidelity is unresolvable given the assumed sea state. Option A directly consumes the provided Debye permittivity data, yields a transparent per-hop power factor |Γ(f,θ,ε_eff)|², and lets turbulence enter as a bounded roughness attenuation plus permittivity perturbation. Add the Fresnel-zone/curvature correction for near-grazing point-source geometry. Use Options B and C only to bound the roughness term's magnitude, not to define the model.",
+          "Option 2 is correct. \"Strength of the first reflection\" should mean the received field after the complete source→ionosphere→ocean→ionosphere→receiver circuit, since that is the only physically measurable quantity and it matches how Part III's shipboard receiver is defined. Report Option 1's reflection-plane field as a supporting intermediate, not as the headline result.\n\nThe current per-hop amplification is an artifact of applying a far-field geometric factor to a 4000 km segment without the source-leg spreading and ionospheric absorption that actually bound the budget. Once those are included, per-hop loss is genuinely negative, n is finite, and the turbulent-vs-calm contrast emerges from R_rough plus the ε_eff perturbation — consistent with the background's empirical statement. Do not adopt Option 3; an unsupported empirical calibration would paper over the modeling error rather than fix it.",
+          "Decision point A: adopt A3. Report the strict thermal-noise SNR hop count as the literal answer to the stated 10 dB threshold, and the practical-floor hop count (minimum usable received field, ≈ −120 to −110 dBm) as the engineering interpretation, flagging that interference, not thermal noise, binds real HF circuits.\n\nDecision point B: adopt B2. Use the single-scale small-roughness specular attenuation as a lower bound, explain the B1 decomposition qualitatively (ε_eff/conductivity perturbation, specular attenuation, angular spreading), and take the documented 1–4 dB sea-state roughness penalty as the working turbulent-vs-calm contrast. Reject B3: its extra fidelity is unresolvable given the assumed sea state."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_2c4b2e458b98",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8875,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9166666666666666,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8583333333333334,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively solves the problem with a practical, closed-form approach, providing clear insights and robust results suitable for decision-making and publication.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, employing correct electromagnetic theory, physical constants, and justified assumptions, with a clear distinction between theoretical limits and empirical adjustments.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing quantitative comparisons, physical interpretations, and a balanced view of model limitations and practical implications.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key model and data biases, and providing context or corrections to ensure the results remain reliable despite simplifications.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with specific physical parameters and literature-based values, effectively addressing the complexities of ocean turbulence and ionospheric propagation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods like the image source method and link budget, correctly identifying key physical mechanisms and extending logically to terrain and moving receiver scenarios with sound scientific reasoning.",
+            "score": 9
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for all four parts. Task 1 explicitly identifies key parameters (100W, MUF, SNR threshold) and the specific comparison required. Tasks 2-4 accurately reflect the requirements for terrain comparison, moving receiver modeling, and report writing. The goals are explicit, unambiguous, and directly address the problem statement without deviation or missing critical elements.",
+            "score": 10
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks completely cover the problem requirements with no missing key parts. The logical flow is strong, with Task 1 providing the foundation for Tasks 2 and 3. Dependencies are correctly identified, such as using the ocean model for the moving ship scenario. All specific constraints (turbulent/calm, terrain types, moving receiver, publication format) are addressed in the respective tasks, ensuring full alignment with the final goal.",
+            "score": 10
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2018_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Strategic decision: modeling framework for HF ocean-surface reflection\n\n## Problem understanding\n- Task 2018_A: model HF (3–30 MHz) skywave multi-hop propagation over the ocean for a\n  100 W constant-carrier signal from a coastal point source, operating below the MUF\n  (per the provided data: f ≈ 0.85 × MUF, daytime mid-latitude MUF in the low–mid HF band).\n- Part I deliverables: (a) strength of the **first reflection off a turbulent ocean**\n  (i.e., after the initial ionospheric reflection the signal reaches the sea once) and a\n  comparison with a calm ocean; (b) maximum number of calm-ocean hops n before received\n  strength falls below a usable SNR of 10 dB. Parts II–IV extend to terrain contrast,\n  a moving shipboard receiver, and a short IEEE synopsis.\n- Key physics per the data: seawater's complex permittivity (Debye model, Meissner 2004)\n  is very large at HF, so Fresnel reflection is strong near −1; turbulence perturbs the\n  local permittivity/conductivity and the surface height/angle, adding small-angle\n  scattering and roughness attenuation.\n\n## Decision point\nWhich framework should define \"reflection strength\" and the per-hop budget:\n\n**Option A — Geometric optics + Fresnel reflection coefficients.**\nPer-hop power factor = |Γ(f, θ, ε_eff)|² (vertical/polarized Fresnel at the grazing\nangle set by hop geometry), with turbulence modeled as a small-angle roughness\nattenuation (IRI-style σ_s² = 2kσ_h·cosθ) and an effective-permittivity perturbation.\n- Advantages: transparent, directly uses the provided dielectric data, cheap and\n  analytically checkable; standard in MUF/skywave literature.\n- Limitations: near-grazing Fresnel reflection of a point source also needs diffraction\n  correction (Fresnel-zone / curvature factors); single-scale Gaussian roughness is an\n  approximation to real ocean spectra.\n\n**Option B — Full HF propagation prediction (ITU-R P.1546-style).**\nUse an ITU-R P.1546-based path-loss/field-strength prediction with terrain roughness\nmodels, calibrating the turbulent-vs-calm contrast to empirical roughness data.\n- Advantages: captures integrated multipath, absorption, and roughness physics.\n- Limitations: heavy black box; the problem is explicitly about building the\n  reflection model itself; no measured roughness dataset is provided, so calibration\n  would rest on assumed sea-state parameters.\n\n**Option C — Electromagnetic surface scattering (Rice/PIESPEK full-wave).**\nFull-wave scattering from a statistically rough conductive sea surface\n(Brekhovskikh/IRI + small-roughness expansion), per-hop loss from a two-scale\nspectrum.\n- Advantages: physically most complete for the reflection event.\n- Limitations: computationally heavy, and its added fidelity is not resolvable within\n  the uncertainty of the assumed sea state (height 0.5–3 m, significant wave slope).\n\n## Why this matters\nThe choice fixes the meaning of \"strength\" in Part I, the per-hop loss law used for the\nhop-count n in the SNR≥10 dB budget, and the extension story in Parts II–IV. It is the\nframework decision with the largest downstream impact.\n\n## Recommendation\nOption A (Fresnel + roughness attenuation, with a curvature/Fresnel-zone correction),\nvalidated by bounding the roughness term with Options B/C magnitudes where cheap to do so.",
+              "# Expert Question 2 — Strategic decision: physical meaning of \"first reflection strength\" and the per-hop budget\n\n## Situation (builds on Round 1: Option A framework confirmed)\nFramework Option A is implemented: per-hop power factor =\nL_gh(θ, f) · |Γ(ε_seawater)|² · R_rough(σ_h, f, θ) · L_iono, with the Brekhovskikh\nFresnel-zone/curvature correction K = nπ/(1 + h_f1/d), Debye-model seawater\n(|ε| ≈ 1.1×10³ at 6.8 MHz, σ ≈ 0.41 S/m, |Γ| ≈ 1.004).\n\nComputed intermediate values (f = 6.8 MHz = 0.85 × MUF(8 MHz), H_F2 = 300 km,\nnominal hop ground distance d = 4000 km, grazing ≈ 8.5°):\n- per-hop loss (calm): −8.4 dB; (turbulent): −8.3 dB\n- strength \"after the first turbulent-ocean reflection\": ~58 dBm (i.e., the signal\n  is still amplified relative to the 100 W basis — 100 W into one 4000 km hop is\n  not attenuating, because the two-way geometric factor over a 4000 km ground\n  segment is only ≈ 10 dB and K_curv ≈ +8 dB cancels most of it)\n- consequence: the SNR ≥ 10 dB hop-count budget gives n_max ≈ 21 calm hops (~84 000 km).\n\n## The problem\nThe per-hop budget is *amplification*, not attenuation: the signal never crosses the\n10 dB SNR threshold within any plausible number of hops, so Part I(b)'s question\n(\"maximum number of hops before strength falls below usable SNR\") has no finite\nanswer under a pure far-field geometric budget, and the turbulent-vs-calm contrast\ncomputed so far is ≈ 0 dB — which contradicts the empirical statement in the\nproblem background that turbulent-ocean reflections are attenuated more.\n\n## Decision point\nHow to fix the physical picture so that both (a) a finite, meaningful hop count n\nand (b) a real turbulent-vs-calm contrast emerge. Candidate strategies:\n\n**Option 1 — Near-field (Fresnel-integral) per-hop loss with an absolute\nreflection-plane field strength.**\nEach ocean reflection is modeled at the actual reflection point: incident\nfield from a 100 W source over the source-to-ionosphere leg (near-field,\nFresnel integral over the ionospheric layer), then |Γ|² R_rough for the ocean\nbounce. The \"first reflection strength\" = field at the reflection plane after the\nbounce (in µV/m or W into a 1 m² patch / mW/m²); the per-hop budget then uses the\n*local* reflection loss (|Γ|²R_rough + ionospheric absorption + spreading over the\nactual two legs), which does include genuine attenuation from spreading on the\nsource leg. The hop count is the number of bounces until the field at the *final*\nocean bounce falls to the SNR threshold, assuming the receiver sits at the last\nbounce point.\n- Advantages: physically consistent, gives finite n and a nonzero\n  turbulence contrast (dominated by R_rough and |ε_eff| perturbation).\n- Limitations: \"strength at the reflection plane\" is a somewhat unusual reporting\n  convention; requires picking a patch/reference area.\n\n**Option 2 — Receiver at the end of the path (point-to-point link budget).**\n\"First reflection strength\" = signal received after the complete\nsource → iono → ocean → iono → receiver path (one ocean reflection = a 2-hop\ncircuit), i.e., the field at a receiver placed at the far end. The hop count n is\nthe maximum circuit length with n ocean bounces and SNR ≥ 10 dB.\n- Advantages: matches how a shipboard receiver (Part III) would measure signal;\n  standard link-budget framing for an IEEE synopsis.\n- Limitations: the Part I(a) phrasing (\"strength of the first reflection\") is\n  then interpreted as received strength after the round trip, not the field at\n  the bounce; hop count grows as √(path length) rather than per bounce.\n\n**Option 3 — Keep the current per-hop far-field factor but add an empirical\nturbulent-attenuation calibration** (e.g., +3–6 dB/hop for sea state 6, cited\nfrom HF sea-surface reflection experiments) on top of the computed R_rough.\n- Advantages: smallest change; preserves current hop bookkeeping.\n- Limitations: the base model still says the calm signal is amplified per hop, so\n  n is unbounded even after calibration unless the calibration exceeds ~8 dB/hop,\n  which is not supported by measurements (typical roughness loss is 1–4 dB).\n\n## Recommendation\nOption 2, with Option 1's reflection-plane field strength also reported as an\nintermediate quantity: report (a) the field at the first ocean reflection plane\n(µV/m into a reference patch) for calm vs turbulent, and (b) the maximum hop count\nn as the largest n such that the end-to-end received SNR (receiver at the far end\nof the nth hop) stays ≥ 10 dB. This answers both parts of Part I with finite,\ncomparable numbers and connects directly to Part III.",
+              "# Expert Question 3 — Final strategic decision: physical meaning of the \"usable SNR\" reference and the turbulence parameterization\n\n## Situation (builds on Rounds 1–2)\nRounds 1–2 settled: Option A framework; end-to-end image-source link budget. The\nmodel is now self-consistent: per-bounce loss\nL_hop = (leg2/(4π d)) · K_curv · A_iono · |Γ|² · R_rough with the Brekhovskikh\ncurvature factor K_curv (≈ +10.4 dB for a 4000 km hop at 6.8 MHz — the classic\nskywave \"extra gain\" that lets HF exceed line-of-sight free space), giving\nL_hop ≈ 3–7.5 dB/bounce, finite hop counts (n ≈ 15–120 depending on ionospheric\nabsorption), and a first-reflection received strength of tens of dBm into an\nisotropic-equivalent patch.\n\nTwo residual strategic uncertainties remain before the final numbers are frozen:\n\n## Decision point A — What \"falls below a usable SNR threshold of 10 dB\" references\nThe raw budget gives SNRs of 100+ dB because the 100 W carrier is compared against\nthermal noise only. Real HF circuits are limited by interference and antenna/system\neffects. Options:\n  A1: Keep SNR = P_rx / N_thermal (thermal-noise reference, B = 3 kHz). Then\n  n_max is large (tens to ~120) and the answer is \"the signal stays usable for a\n  very large number of hops; the binding limit is ionospheric variability, not\n  the 10 dB threshold.\"\n  A2: Reference the threshold to a practical received-signal floor:\n  P_usable = noise + typical HF interference + receiver sensitivity margin,\n  i.e. a minimum received field strength (≈ −120 to −110 dBm for HF voice),\n  so the question becomes \"how many hops before P_rx < P_min_practical.\"\n  A3: Hybrid — report both: the thermal-SNR hop count (A1) as the strict answer\n  to the stated threshold, and the practical-floor hop count (A2) as the\n  engineering interpretation, with the caveat that the stated 10 dB SNR with\n  thermal noise alone is not the actual limiting regime for HF.\n## Recommendation: A3 (answer the question as stated, flag the practical floor).\n\n## Decision point B — Turbulent-vs-calm parameterization\nWith rms wave height 0.15 m (calm) vs 0.9 m (turbulent) and the small-roughness\nspecular attenuation exp[−(2kσ_h s_h cosθ)²], the contrast at 6.8 MHz, 8.5°\ngrazing computes to ≈ 0 dB (σ_h·cosθ is still far below the Rayleigh criterion\nkσ_h s_h ≪ 1). To make the contrast physically meaningful:\n  B1: Use a two-scale (Brekhovskikh) model: long waves tilt the local surface\n  (changing the local Fresnel coefficient and the effective grazing angle),\n  short waves give the specular attenuation; the turbulence penalty then\n  emerges from (i) the ε_eff conductivity perturbation (bubble/foam entrainment,\n  −20 % assumed) and (ii) scattering into a wider angular sector (energy diverted\n  from the specular direction), parameterized by the wave slope spectrum.\n  B2: Keep the single-scale IRI form but parameterize the turbulence penalty\n  directly from the empirical literature on HF sea-surface reflection\n  (documented 1–4 dB roughness loss for sea states 4–6), i.e. treat the\n  single-scale computation as a lower bound and the literature range as the\n  working estimate.\n  B3: Full two-scale spectrum (PM spectrum) with Monte Carlo over sea states.\n  Most physical, but the added fidelity is within the uncertainty of the\n  assumed sea state (no measured roughness data is provided).\n## Recommendation: B2, with the B1 decomposition explained qualitatively\n(conductivity perturbation + specular attenuation + angular spreading), the\ncomputed small-roughness value as the lower bound, and a 1–4 dB turbulence\npenalty as the working estimate. This keeps the model defensible without\nclaiming precision the assumed sea state cannot support.\n\n## Why it matters\nA sets the headline hop-count answer for Part I(b) and Part III; B sets the\ncalm-vs-turbulent contrast that Part I(a) asks for. Both are final-number\ndecisions; everything else (geometry, dielectric, Fresnel, budget bookkeeping)\nis settled."
+            ],
+            "expert_answers": [
+              "Option A is the correct framework. The problem asks you to *build* the reflection model, not to run an existing prediction tool, so Option B's black box is disqualified and Option C's full-wave fidelity is unresolvable given the assumed sea state. Option A directly consumes the provided Debye permittivity data, yields a transparent per-hop power factor |Γ(f,θ,ε_eff)|², and lets turbulence enter as a bounded roughness attenuation plus permittivity perturbation. Add the Fresnel-zone/curvature correction for near-grazing point-source geometry. Use Options B and C only to bound the roughness term's magnitude, not to define the model.",
+              "Option 2 is correct. \"Strength of the first reflection\" should mean the received field after the complete source→ionosphere→ocean→ionosphere→receiver circuit, since that is the only physically measurable quantity and it matches how Part III's shipboard receiver is defined. Report Option 1's reflection-plane field as a supporting intermediate, not as the headline result.\n\nThe current per-hop amplification is an artifact of applying a far-field geometric factor to a 4000 km segment without the source-leg spreading and ionospheric absorption that actually bound the budget. Once those are included, per-hop loss is genuinely negative, n is finite, and the turbulent-vs-calm contrast emerges from R_rough plus the ε_eff perturbation — consistent with the background's empirical statement. Do not adopt Option 3; an unsupported empirical calibration would paper over the modeling error rather than fix it.",
+              "Decision point A: adopt A3. Report the strict thermal-noise SNR hop count as the literal answer to the stated 10 dB threshold, and the practical-floor hop count (minimum usable received field, ≈ −120 to −110 dBm) as the engineering interpretation, flagging that interference, not thermal noise, binds real HF circuits.\n\nDecision point B: adopt B2. Use the single-scale small-roughness specular attenuation as a lower bound, explain the B1 decomposition qualitatively (ε_eff/conductivity perturbation, specular attenuation, angular spreading), and take the documented 1–4 dB sea-state roughness penalty as the working turbulent-vs-calm contrast. Reject B3: its extra fidelity is unresolvable given the assumed sea state."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_2c4b2e458b98",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9333333333333332,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p1_20260927_142829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the problem with a practical, closed-form approach, providing clear insights and robust results suitable for decision-making and publication.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, employing correct electromagnetic theory, physical constants, and justified assumptions, with a clear distinction between theoretical limits and empirical adjustments.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing quantitative comparisons, physical interpretations, and a balanced view of model limitations and practical implications.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key model and data biases, and providing context or corrections to ensure the results remain reliable despite simplifications.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with specific physical parameters and literature-based values, effectively addressing the complexities of ocean turbulence and ionospheric propagation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods like the image source method and link budget, correctly identifying key physical mechanisms and extending logically to terrain and moving receiver scenarios with sound scientific reasoning.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for all four parts. Task 1 explicitly identifies key parameters (100W, MUF, SNR threshold) and the specific comparison required. Tasks 2-4 accurately reflect the requirements for terrain comparison, moving receiver modeling, and report writing. The goals are explicit, unambiguous, and directly address the problem statement without deviation or missing critical elements.",
+                "score": 10
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks completely cover the problem requirements with no missing key parts. The logical flow is strong, with Task 1 providing the foundation for Tasks 2 and 3. Dependencies are correctly identified, such as using the ocean model for the moving ship scenario. All specific constraints (turbulent/calm, terrain types, moving receiver, publication format) are addressed in the respective tasks, ensuring full alignment with the final goal.",
+                "score": 10
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2018_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260927_142829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260927_142829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Core reflection-loss formulation\n\n## Problem understanding\n- 2018_MCM-style task: HF (3–30 MHz) ground-wave/skywave signal from a 100 W land-based\n  constant-carrier source, below the MUF. Required: (Part I) strength of the first\n  reflection off a turbulent ocean vs a calm ocean (after one ionospheric reflection),\n  and the maximum number of subsequent calm-ocean hops before SNR drops below 10 dB;\n  (Part II) contrast with mountainous/rugged vs smooth terrain; (Part III) extension to\n  a moving shipboard receiver on a turbulent ocean and duration of the same multi-hop\n  path; (Part IV) 1–2 page IEEE Communications Magazine synopsis.\n- Available empirical data: Meissner et al. (2004) modified-Debye seawater complex\n  permittivity (|ε_r| ~ 10^2–10^3 at 3–30 MHz, strongly lossy, high permittivity →\n  Fresnel coefficient near −1 at grazing incidence), and FOT ≈ 0.85 × MUF with\n  foE ≈ 4 MHz, foF2 ≈ 5–12 MHz.\n\n## Decision point\nHow to model the ocean-surface reflection coefficient and the turbulent-vs-calm\ncontrast, since this single choice drives every Part (per-hop loss, hop count,\nterrain contrast, moving-ship path lifetime).\n\nWhy it matters: the per-hop dB loss directly sets the maximum hop count n; the\nturbulence increment sets the headline \"turbulent vs calm\" comparison; and the same\nkernel must be deformable into (a) rough terrain and (b) a moving rough surface. A\nwrong kernel here changes the headline numbers by factors of 2 in dB.\n\n## Candidate strategies\n\n**A. Plane-wave Fresnel kernel + small-roughness perturbation (recommended)**\n- Smooth-interface Fresnel reflection coefficient computed from the complex seawater\n  permittivity (Debye model, Meissner 2004) as a function of grazing angle;\n  turbulence modeled as (i) first-order (small-slope) roughness depolarization/\n  backscatter loss scaling with wave-slope variance (e.g., Pierson–Moskowitz spectrum\n  at a sea-state height), plus (ii) a perturbation of effective local ε and σ from\n  the turbulent mixing described in the problem statement.\n- Advantages: closed form, fully analytic per-hop budget, directly extensible to\n  rugged terrain (replace surface slope statistics) and to a moving receiver\n  (Doppler + time-varying slope field); cheap enough for sensitivity sweeps.\n- Limitations: first-order in slope; breaks down at steep wave slopes (sea state ≥ 5);\n  ignores multiple scattering and wave-blocking shadowing, which are second-order at\n  the gentle grazing incidence of multi-hop skywave.\n\n**B. Full statistical scattering (IEM / small-roughness theory of the sea surface,\n  e.g., composite-surface or full integral-equation-method treatment)**\n- Advantages: more physically complete, captures slope-distribution tails and\n  depolarization self-consistently.\n- Limitations: requires a full wave-spectrum + IEM implementation, heavy numerical\n  load per hop, difficult to deform into terrain/moving-receiver parts; at the mild\n  sea states implied by the problem the correction is small and the extra fidelity\n  is not visible in a 10 dB SNR budget decision.\n\n**C. Empirical black-box loss model (lookup tables of per-hop dB loss from sea state\n  and range)**\n- Advantages: fastest.\n- Limitations: no physics to carry into Parts II–III; not defensible for an IEEE\n  Communications Magazine note; fails the \"develop a mathematical model\" requirement.\n\n## Recommendation\nOption A: Fresnel kernel from the Debye seawater permittivity + first-order roughness\nloss from a Pierson–Moskowitz wave spectrum, with the turbulence effect split into a\nreflectivity term (slope statistics) and an effective-ε term (mixed-layer\npermittivity perturbation).\n\nPlease confirm, reject, or modify.",
+              "# Expert Question 2 — Noise floor, receiver convention, and per-hop geometry\n\n## Build on reply 1\nOption A confirmed: Fresnel kernel from Debye/Meissner seawater permittivity +\nfirst-order small-slope roughness loss from a Pierson–Moskowitz spectrum, with the\nroughness term kept explicitly first-order and its sea-state validity limit stated.\nProceeding with that kernel.\n\n## Current stage\nKernel is settled. The remaining decisions that fix the headline Part I number\n(maximum hop count n at SNR ≥ 10 dB) are the receiver-noise convention and the hop\ngeometry, because the per-hop dB loss budget must close against a concrete noise\nfloor.\n\n## Decision point\nWhich receiver/SNR convention and which per-hop geometry to fix the budget against:\n\n1. **Noise floor / receiver convention.** \"10 dB usable SNR\" needs a noise floor.\n   Candidate (a): narrowband 100 Hz bandwidth (typical HF SSB/CW usable band),\n   thermal noise only, N = kTB (T = 290 K) ≈ −144 dBm → required received power\n   ≈ −134 dBm.\n   Candidate (b): 3 kHz band with a realistic HF-band noise figure (e.g., 10 dB NF\n   + quiet-band ambient ≈ −140 dBm/Hz floor) → N ≈ −117 dBm → required ≈ −107 dBm.\n   The two differ by ~27 dB, i.e. several hops.\n\n2. **Per-hop geometry.** Ionospheric hop altitude (E vs F2 layer), earth curvature,\n   and resulting grazing incidence at the ocean:\n   Candidate (a): single F2 hop at h = 300 km, great-circle hops of ~2000 km each,\n   grazing angle at the sea surface ≈ 5–10° — the standard long-hop picture.\n   Candidate (b): mixed E-layer first hop (h = 110 km) then F2 hops, shorter hops,\n   steeper grazing — higher per-hop Fresnel loss but shorter path.\n\n3. **First-reflection definition check.** The problem says the \"first reflection off\n   the ocean\" already includes one ionospheric reflection. I will report the received\n   power at the first ocean-reflection point (i.e., after TX → ionosphere → ocean)\n   and then count calm-ocean ocean-reflections 2..n for the SNR budget. Confirm this\n   reading.\n\n## Candidate strategies\n- **A (recommended):** narrowband 100 Hz, thermal noise, 10 dB margin already in the\n  10 dB SNR threshold; F2-only hops at 300 km with ~2000 km ground distances;\n  grazing angle from great-circle geometry with earth radius 6371 km. Clean,\n  standard HF long-range picture; defensible in the synopsis; all parameters trace to\n  the given data (FOT = 0.85·MUF with foF2 ≈ 5–12 MHz).\n- **B:** 3 kHz realistic noise floor. More \"practical\" for an SSB ship receiver, but\n  the 3 kHz ambient-band noise floor in a quiet ocean band is itself an ungiven\n  empirical input; it would push the hop count down by ~3–4 and the answer becomes\n  dominated by an assumed NF rather than by the physics the problem asks for.\n- **C:** Mixed E+F2 hops. Closer to real operation but adds an ungrounded E-layer\n  absorption parameter and changes the grazing angles non-trivially; the problem's\n  focus is the ocean surface, not the ionosphere.\n\n## Recommendation\nOption A: 100 Hz thermal-noise floor, F2-only geometry (h = 300 km, R_E = 6371 km,\n~2000 km hops), confirm the first-reflection reading in point 3. Sensitivity over\nbandwidth (100 Hz–3 kHz) and hop length reported in the limitations section.\n\nPlease confirm, reject, or modify.",
+              "# Expert Question 3 — Part III moving-ship parameterization\n\n## Build on replies 1–2\n- Reply 1: Option A kernel (Fresnel/Debye + first-order Pierson–Moskowitz slope\n  loss, validity limit stated).\n- Reply 2: 100 Hz thermal floor (−144 dBm), F2-only geometry (h = 300 km, R_E =\n  6371 km, ~2000 km hops), 10 dB SNR threshold applied to received power\n  (required = N + 10 dB, kept separate), first-reflection reading confirmed.\n\n## Current stage\nPart I and II can be built. Part III (moving shipboard receiver on a turbulent\nocean: how the model changes, and how long the same multi-hop path stays usable)\nneeds one last convention decision before I write the code.\n\n## Decision point\nHow to parameterize the ship's motion and the time-varying turbulent surface, and\nwhat defines \"remaining in communication on the same multi-hop path\":\n\n1. **Ship state.** Candidate (a): constant speed 15 kn (~7.7 m/s) on a fixed\n   great-circle course through the path corridor. Candidate (b): include typical\n   ocean-sway-induced antenna motion (1–2 m vertical bobbing) as an extra\n   time-varying term.\n\n2. **Moving-surface physics.** The sea-slope field advects past the ship at ship\n   speed; I will model the received grazing angle and roughness loss as a function\n   of ship position, with the Pierson–Moskowitz spectrum frozen in the wave frame\n   (Doppler shift of the slope statistics at 7.7 m/s is negligible for the\n   reflection coefficient; include the carrier Doppler as a constant frequency\n   offset). Candidate: treat the path as a static corridor and let the ship's\n   departure from the reflection geometry (grazing angle drifting as the ship\n   moves along/away from the reflection points) define the end of communication.\n\n3. **Termination criterion.** \"Remaining in communication on the same multi-hop\n   path\" = time until the ship's position makes the per-hop SNR of the *existing*\n   hop chain (same reflection points) fall below 10 dB, because the grazing angles\n   at the ocean reflection points change as the ship moves. Re-planning a new path\n   is explicitly excluded (that is a different path, not \"the same path\").\n\n## Candidate strategies\n- **A (recommended):** constant 15 kn great-circle course; frozen-spectrum\n  advection; carrier Doppler as constant offset (Δf = v·cosθ/λ ≈ ±0.077 Hz at\n  10 MHz — negligible for a narrowband carrier, stated as such); termination when\n  the SNR of the fixed hop chain (fixed reflection points) drops below 10 dB at\n  the ship's new position. Simple, fully determined, directly answers \"how long.\"\n- **B:** add antenna vertical bobbing (1–2 m, wave period 8–12 s). Physically\n  richer, but the bobbing amplitude at 2000 km range changes the path length by a\n  negligible fraction (phase jitter only); it would add a time-domain simulation\n  whose output is indistinguishable from A in the 10 dB budget.\n- **C:** full time-dependent stochastic sea state (evolving PM spectrum,\n  Newman-Pierson-Moskowitz time series) recomputed per hop per time step. Overkill;\n  at 15 kn the surface statistics the ship samples are statistically stationary,\n  so only the geometry (grazing angles) changes meaningfully.\n\n## Recommendation\nOption A, with the bobbing mentioned in one sentence as a second-order effect in\nthe limitations.\n\nPlease confirm, reject, or modify."
+            ],
+            "expert_answers": [
+              "Confirm Option A. The Fresnel kernel from the Debye/Meissner seawater permittivity is the correct physical core: at 3–30 MHz the near-unity, near-−1 grazing-angle reflection coefficient is what actually sets per-hop loss, and it is analytic and defensible. Adding a first-order (small-slope) roughness loss from a Pierson–Moskowitz spectrum is the right way to generate the turbulent-vs-calm increment, since the problem's own mechanism—altered local permittivity/permeability and changing reflection height and angle—maps directly onto slope statistics plus an effective-ε perturbation. It also deforms cleanly into rugged terrain (swap slope statistics) and a moving receiver (time-varying slope field plus Doppler), which Parts II–III require. Reject B as over-engineered for a 10 dB budget at gentle grazing incidence, and C as failing the modeling requirement. One modification: keep the roughness term explicitly first-order and state its sea-state validity limit.",
+              "Confirm Option A, with one modification.\n\n- **Noise floor:** 100 Hz thermal noise (N = kTB, T = 290 K ≈ −144 dBm) is the right choice — it keeps the hop count governed by the ocean-reflection physics the problem asks about, not by an assumed noise figure. State the 3 kHz case only as a sensitivity bound.\n- **Geometry:** F2-only, h = 300 km, R_E = 6371 km, ~2000 km hops, grazing angle from great-circle geometry. Confirm.\n- **Modification:** Do not fold the 10 dB margin into the noise floor. Treat the 10 dB SNR threshold as the criterion applied to the received-power-to-noise ratio, so required received power = N + 10 dB. Keep the two separate in the budget.\n- **Point 3:** Confirmed. Report received power after TX → ionosphere → ocean as the first ocean reflection; count calm-ocean reflections 2..n for the SNR budget.",
+              "Confirm Option A, with one modification.\n\n- **Ship state:** constant 15 kn on a fixed great-circle course is correct. Mention antenna bobbing only as a second-order phase-jitter effect, not a budget term.\n- **Moving surface:** frozen PM spectrum advected at ship speed, carrier Doppler as a constant offset, is right. State explicitly that the slope statistics are stationary in the wave frame, so only geometry changes the reflection coefficient.\n- **Termination criterion:** confirmed — time until the fixed hop chain's SNR falls below 10 dB at the ship's new position, with no re-planning.\n- **Modification:** the dominant geometric effect is the change in *grazing angle* at the ocean reflection points as the ship moves along the corridor, not the ship's own displacement from a reflection point. Parameterize the path lifetime by the grazing-angle drift rate, and report it as the time for the accumulated per-hop loss increment to consume the remaining SNR margin."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_2c4b2e458b98",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p1_20260927_142829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each part of the problem. Task 1 explicitly identifies the key components: the 100W signal, the specific reflection sequence (ionosphere then ocean), the comparison between turbulent and calm oceans, and the multi-hop limit based on the 10 dB SNR threshold. It also correctly identifies the need for a reflection kernel and loss budget. Tasks 2, 3, and 4 accurately reflect the requirements for terrain comparison, shipboard dynamics, and the final synopsis. The goals are explicit and directly address the mathematical modeling requirements without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all four parts of the problem requirements comprehensively. Task 1 addresses the core physical modeling and calculation. Task 2 handles the comparative analysis with terrain. Task 3 incorporates the dynamic element of the moving ship. Task 4 ensures the deliverable format is met. The sub-tasks are logically ordered, with Task 1 providing the foundation for the comparisons in Task 2 and the dynamic adjustments in Task 3. There are no missing key parts or deviations from the actual goals; the coverage is complete and the dependencies between tasks (e.g., using Part I findings in Part II) are implicitly respected by the structure.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with physical consistency and stated validity limits.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (Fresnel + FSPL) and a rational structure that accurately reflects the dominant physical mechanisms of HF propagation.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, logically sound, and effectively explains the physical reasoning behind the model outputs, highlighting key insights and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is comprehensive, identifying specific model and data biases, quantifying their potential impact, and demonstrating that the core conclusions are robust against these uncertainties.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the problem by identifying dominant loss factors, providing clear operational insights (max hops, communication time), and demonstrating robustness through sensitivity analysis. It offers practical guidance for system design by highlighting that sea state is a minor factor compared to FSPL and ionospheric effects.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, using standard and appropriate physical models (Debye, Fresnel, PM spectrum) with correct application of assumptions. It accurately reflects the underlying physics of HF propagation over seawater, providing a theoretically sound basis for the conclusions drawn.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8875,
+      "interaction_cost": 0.8827595337785236,
+      "interaction_penalty": 0.04413797668892618,
+      "net_utility": 0.8433620233110738,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3614,
+          "total_expert_latency_seconds": 4.859999999999999,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9618960836614786,
+          "latency_cost_component": 0.280952138296593,
+          "interaction_cost": 0.8847584334645915,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3319,
+          "total_expert_latency_seconds": 5.640000000000001,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9519015852311391,
+          "latency_cost_component": 0.30080817431813167,
+          "interaction_cost": 0.8807606340924556,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2017_A",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 — Framing of the Option Assessment (Requirement 1)\n\n## Problem Understanding\n\nI am solving MCM/ICM-style problem 2017_A: the Kariba Dam needs a decision among\n(1) repair, (2) rebuild, or (3) remove it and replace it with 10–20 smaller dams\nupstream along the Zambezi. The new system must match Kariba's overall water\nmanagement capability (total storage ≈ 180 km³, mean inflow ≈ 51.5 km³/yr, peak\nfloods ~5,000–20,000 m³/s pre-dam, dry-season flows ~200–800 m³/s). I will do the\nRequirement 2 quantitative analysis (dam count/placement, flow-modulation\nstrategy, flood/drought handling) autonomously with a water-balance model.\n\n## Decision Point\n\nBefore I build the models, I need direction on how Requirement 1 (the ≤2-page\nassessment of all three options) should be structured so it stays consistent with\nthe Requirement 2 analysis that follows. Specifically, which of these framings do\nyou prefer?\n\n## Candidate Strategies\n\n**A. Structured decision-matrix screening for all three options.**\nDefine common criteria (upfront/long-term cost, risk reduction, water-management\nflexibility, construction risk, disruption to hydropower), score each option\nqualitatively against Kariba's role (flood control, irrigation, hydropower),\npresent a transparent cost-benefit matrix, and let Requirement 2's quantitative\nresults (storage/cost/attenuation of the multi-dam system) feed the Option 3 row.\nAdvantages: balanced, comparable, transparent; consistent story across both\nrequirements. Limitations: Option 3's numbers come from my own model, which the\nbrief must acknowledge.\n\n**B. Qualitative cost-benefit narrative with the quantitative deep-dive reserved\nentirely for Requirement 2.**\nKeep Requirement 1 a purely descriptive brief (pros/cons of repair vs. rebuild vs.\nmulti-dam, referencing well-known costs and risks), and defer every number to the\nmain report. Advantages: shortest, least risk of inconsistency. Limitations: less\nrigorous; weak linkage between the brief and the detailed analysis.\n\n**C. Full quantitative cost-benefit (life-cycle cost) comparison of all three\noptions in Requirement 1 itself.**\nAdvantages: most decision-useful. Limitations: needs cost data the problem does\nnot provide and far exceeds two pages; scope creep into data I cannot justify.\n\nPlease recommend A, B, or C (or a modification), so my brief assessment matches\nthe depth and framing of the detailed analysis.",
+          "# Expert Question 2 — Storage Allocation Across the 10–20 Dam System (Requirement 2)\n\n## Problem Understanding\n\nFollowing your Round-1 guidance, Requirement 1 will be a qualitative-to-semi-\nquantitative decision matrix across the three options, with Option 3's entries\nflagged provisional. Now I am starting Requirement 2: replace Kariba with 10–20\nsmaller dams along the upper Zambezi such that the system has the *same overall\nwater management capability* as Kariba — total storage ≈ 180 km³, mean inflow\n≈ 51.5 km³/yr, peak floods ~5,000–20,000 m³/s, dry-season flows ~200–800 m³/s —\nwhile protecting the Lake Kariba region (flood control, irrigation, hydropower).\n\nThe key design question is how to distribute the ~180 km³ among the 10–20 dams.\n\n## Decision Point\n\nGeometrically, reservoir volume scales roughly as width × height × length; for a\nfixed corridor, splitting one large pool into N pools of the same total depth\nloses cross-valley volume, so a true series of 10–20 *equal* small dams would\nlikely store far less than 180 km³. I therefore need direction on which of two\narchitectures to target, since it determines everything downstream (placement,\ncost, modulation strategy).\n\n## Candidate Strategies\n\n**A. Hybrid: one primary large upstream storage plus a cascade of 9–19 smaller\ncontrol dams.**\nThe primary reservoir (placed at a wide gorge upstream) carries the bulk of the\n180 km³ and reproduces Kariba's bulk storage, hydropower head, and irrigation\nsupply; the downstream cascade of smaller dams provides staged flood\nattenuation, local regulation, and protection of the Lake Kariba region\n(the former reservoir zone becomes a series of managed pools). Advantages:\nachieves the 180 km³ benchmark realistically; preserves hydropower; staged\nflood control; defensible engineering. Limitations: less \"distributed\" in spirit;\nthe primary dam still needs maintenance (partially echoes the original problem).\n\n**B. Fully distributed: 10–20 dams of comparable size, each ≤ ~10–20 km³, with\nthe total reaching 180 km³ only through a broad reservoir corridor.**\nAdvantages: no single point of failure; maximum local regulation; matches the\nproblem's \"series of 10–20 smaller dams\" most literally. Limitations: very hard\nto justify 180 km³ total from 10–20 small dams in the narrow upper Zambezi\nvalley; hydropower (needs high head and large flow) is diluted across many low-\nhead sites; cost per km³ of storage is higher.\n\n**C. Fully distributed with relaxed storage: accept that total storage falls\nbelow 180 km³ (e.g., 60–100 km³) and compensate with stronger flow-modulation\nrules.**\nAdvantages: honest geometry; cheaper. Limitations: violates the problem's\n\"same overall water management capabilities\" benchmark, so the system no longer\nmatches Kariba — a risky deviation from the stated requirement.\n\nPlease recommend A, B, or C (or a modification). This choice fixes the dam\ncount/placement model and the flow-modulation strategy I will build next.",
+          "# Expert Question 3 — Control Philosophy for the Cascade's Flow-Modulation Strategy (Requirement 2)\n\n## Problem Understanding\n\nRounds 1–2 are settled: (1) Requirement 1 = qualitative-to-semi-quantitative\ndecision matrix, Option 3 entries provisional; (2) Requirement 2 = hybrid\narchitecture — one primary upstream reservoir carrying ~50–70% of the ~180 km³\n(placed at a wide gorge for bulk storage, high-head hydropower, irrigation),\nplus a downstream cascade of 9–19 smaller control dams whose staged storage\nbrings the *system total* to the 180 km³ benchmark, with the former Lake Kariba\nzone becoming managed pools. Inflows: mean 51.5 km³/yr (~1,313 m³/s);\nseasonal peaks ~5,000–20,000 m³/s (Feb–Mar); dry-season lows ~200–800 m³/s\n(Oct–Nov); design flood on the order of the ~10,000 m³/s 1958 maximum.\n\nI will now build (a) a monthly water-balance simulation of the cascade and (b)\nthe flow-modulation strategy: release rules for normal cycles, flood, and\nprolonged drought, plus restrictions on where and for how long the river can be\nexposed to the most detrimental extremes.\n\n## Decision Point\n\nWhich control philosophy should the release rules for the cascade be built on?\nThis choice determines the rules, the safety margins, and how I justify them.\n\n## Candidate Strategies\n\n**A. Reserve-based staged control (dead-storage floors + flood pools per dam,\nreleases driven by forecast inflow and downstream water-level thresholds).**\nEach cascade dam holds a non-spillable reserve (dry-season supply) below a\nflood-pool ceiling; during flood forecasts, upstream dams draw down and hold\nfloodwater while downstream dams pre-emptively drop levels to create routing\ncapacity, so flood peaks are cut stepwise as they travel downstream. Drought\nrules tap reserves in reverse cascade order to hold minimum environmentally and\noperationally critical downstream flows. Advantages: explicit safety margins,\ndirectly implements \"staged attenuation,\" clear rules for managers, easy to\nvalidate in simulation. Limitations: requires an inflow-forecast assumption;\nreserve sizing trades cost (lost generation/irrigation during held floodwater)\nagainst safety.\n\n**B. Target-outflow (regulated-hydrograph) control: the cascade is operated to\nrelease a prescribed target hydrograph at the system outlet regardless of\ninflow shape.**\nAdvantages: simplest management interface; guarantees a known downstream\nflood ceiling. Limitations: ignores where in the cascade the water is stored;\nduring a large flood the system may simply pass what its conveyance allows;\nless transparent per-dam safety story; can mask dangerous drawdowns upstream.\n\n**C. Cost-optimized stochastic control (minimize expected lifecycle cost\nsubject to probabilistic flood/drought constraints, e.g., dynamic programming\nover an inflow distribution).**\nAdvantages: theoretically optimal; directly balances \"safety and costs\" as the\nproblem asks. Limitations: needs an inflow distribution and cost model the\nproblem does not supply; results are hard to present as actionable per-dam\nrules; risk of an answer that looks like a black box to ZRA managers.\n\nPlease recommend A, B, or C (or a modification). My expectation is A — if so, I\nwill also take from you no further strategic input, and will handle all\nparameter choices (reserve fractions, alert thresholds, exposure durations)\nautonomously from the simulated results."
+        ],
+        "expert_answers": [
+          "**Recommend A**, with one modification: keep the matrix qualitative-to-semi-quantitative, using only the problem's given figures (storage ≈180 km³, inflow ≈51.5 km³/yr, flow ranges) plus clearly labeled order-of-magnitude estimates, and flag Option 3's cost/storage entries as provisional pending Requirement 2.\n\nRationale: Requirement 1 asks for a \"brief assessment... with sufficient detail to provide an overview of potential costs and benefits,\" and it must sit alongside a detailed Option 3 analysis. A common-criteria matrix makes the three options genuinely comparable, keeps the brief within two pages, and creates a single consistent frame so Requirement 2's model outputs slot directly into the Option 3 row rather than contradicting a separate narrative. B wastes the linkage and reads as filler; C demands cost data the problem never supplies and blows the page limit.",
+          "**Recommend A**, with one modification: treat the primary upstream reservoir as carrying roughly half to two-thirds of the 180 km³, and let the downstream cascade of 9–19 control dams make up the remainder through staged storage, so the *system total* — not any single dam — meets the benchmark.\n\nRationale: the problem's binding constraint is \"same overall water management capabilities,\" which is a system-level, not per-dam, requirement. Option B cannot plausibly reach 180 km³ in the narrow upper Zambezi valley and dilutes hydropower head; Option C openly violates the stated benchmark. A hybrid satisfies the benchmark, preserves high-head hydropower and irrigation supply, and gives you a genuine cascade for staged flood attenuation and protection of the former Lake Kariba zone — which is exactly what Requirement 2's modulation strategy needs. Flag the primary dam's residual maintenance exposure in the brief.",
+          "**Recommend A**, with one modification: layer a target-outflow ceiling on top of the reserve-based rules. Operate each dam on dead-storage floors and flood-pool ceilings, but constrain the cascade's aggregate release so the outlet hydrograph never exceeds a prescribed safe ceiling.\n\nRationale: A directly implements the staged attenuation your hybrid architecture was chosen for, gives ZRA managers explicit, per-dam, auditable rules, and makes safety margins visible — which is what Requirement 2's emergency guidance demands. B alone discards the spatial storage story and can hide dangerous upstream drawdowns; C needs an inflow distribution and cost model the problem never supplies and yields opaque rules. The modification borrows B's one genuine strength — a guaranteed downstream flood ceiling — without losing A's per-dam transparency, and it gives you a clean way to present both normal-cycle and extreme-flow guidance."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_2c4b2e458b98",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8374999999999999,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9083333333333333,
+        "modeling_rigorousness_evaluation": 0.8166666666666667,
+        "practicality_and_scientificity_evaluation": 0.825,
+        "result_and_bias_analysis_evaluation": 0.8
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing quantitative evidence, transparent logic, and a balanced assessment of strengths and weaknesses that effectively supports decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying data, structural, and subjective biases, and providing reasonable justifications or corrections to mitigate their impact on the final recommendation.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are explicit and logically justified for the most part, but cost estimates lack source data, and the specific geometric distribution of storage relies on unverified expert input rather than physical constraints.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (linear reservoirs, water balance) and a rational control strategy. It effectively reflects the problem's constraints, though the hydrological input simplification limits the precision of extreme event analysis.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model provides a concrete, implementable solution with clear operational strategies for flood and drought management, directly supporting ZRA decision-making with reliable predictions and a feasible engineering design.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses physically-based hydrological simulations and standard reservoir management rules, providing a theoretically justified framework, though the geometric simplifications for dam volume reduce some scientific precision.",
+            "score": 8
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, aligning them with the problem requirements. Task 1 focuses on the brief assessment of three options, while Tasks 2 and 3 detail the design and operational strategy for Option 3. The goals are explicit, including specific metrics like capacity and flow ranges, ensuring a clear direction for the modeling process.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are well-structured and cover all aspects of the problem requirements. Task 1 handles the comparative assessment, while Tasks 2 and 3 address the detailed design and operational strategy for Option 3. The logical flow from design to operation is sound, and all key components such as capacity, placement, and emergency handling are included without deviation.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 3,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2017_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260927_142829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260927_142829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Overall modeling framework for the 2017_A Kariba / multiple-dam problem\n\n## Current understanding\n- Lake Kariba: ~180 km³ storage, ~5,400 km² surface, 128 m arch dam on the upper Zambezi; catchment ~679,000 km².\n- Mean annual inflow ~51.5 km³/yr (~1,314 m³/s); seasonal cycle peaks ~5,000–20,000 m³/s (Feb–Mar), lows ~200–800 m³/s (Oct–Nov); recorded max ~10,000 m³/s (Victoria Falls, 1958).\n- Task: Requirement 1 = brief cost/benefit assessment of (1) repair, (2) rebuild, (3) replace Kariba with 10–20 smaller dams. Requirement 2 = detailed design of Option 3: same overall water management capability as Kariba, same or greater protection/water-management for Lake Kariba, recommended number and placement of dams, plus a flow-modulation strategy balancing safety and cost, covering normal cycles, flood and prolonged low-water emergencies, and extreme discharges from maximum to minimum, with restrictions on where and how long river reaches may be exposed to extreme conditions.\n\n## Modeling objective and stage\nFramework selection, before building the models. I have not yet fixed the structure of the two requirements.\n\n## Unresolved strategic decision\nFor Requirement 2, how should the 10–20 smaller dams be conceptualized?\n\n- **Option A — Cascaded storage:** 10–20 individual dams placed along the river, each impounding its own reach, with total system storage ≈ 180 km³. Requires huge individual reservoirs (~10–18 km³ each, 50–200 km long reaches), and each dam's release becomes the next dam's inflow, so the system is a tightly coupled series that is hard to operate for flood attenuation.\n- **Option B — Distributed cascade:** 10–20 smaller (15–40 m) dams with modest individual storage, whose sum of active (operable) storage equals Kariba's, with the original Kariba reservoir retained as a managed basin; the cascade adds flood-attenuation and water-management redundancy and staged power generation.\n- **Option C — Hybrid:** the \"same capability\" benchmark is defined on *active (usable) storage and flood-control capacity* rather than total gross storage; a few large basins near the Victoria Falls/Kariba site plus several smaller regulation dams upstream of them.\n\n## Why it matters\nThe choice fixes the water-balance model, the flood-attenuation analysis, the number/placement recommendation, and the cost model. A wrong framework means the entire downstream analysis must be redone.\n\n## Requested guidance\nWhich of A, B, C (or a corrected variant) best fits the MCM 2017 intent — \"same overall water management capabilities as the existing Kariba Dam while providing the same or greater levels of protection and water management options for Lake Kariba\" — and what single quantitative benchmark (total storage, active storage, flood-control capacity, or a combination) should the design be checked against?",
+              "# Expert Question 2 — Flow-modulation strategy: safety-vs-cost operating rule and exposure limits\n\n## Builds on Reply 1\nYou confirmed the hybrid framework and set the benchmark as *active storage + co-equal flood-control capacity*. I built the design to that: 12 dams, 192 km³ active (≥ 143 Kariba active, +34%), and a daily water-balance cascade whose downstream flood peak is 4,000 m³/s (≤ Kariba's 6,000 m³/s attenuation, 33% safer). Both benchmarks pass.\n\n## Current stage\nThe cascade layout and benchmark check are done. I am now fixing the *operating policy* (the flow-modulation strategy ZRA managers would actually run) and the exposure restrictions. This is where the safety-vs-cost trade-off lives, and I want your judgment on the policy shape before I finalize it.\n\n## Unresolved strategic decision\nThe strategy must \"provide a reasonable balance between safety and costs.\" The tension: opening floodgates wide early is safe but wastes dry-season water and power head (cost); holding pools full is cheap (more power/irrigation) but leaves less flood drawdown room (safety risk). Three candidate operating rules:\n\n- **Rule A — Pre-flood prefill discipline:** force all pools to ≤40% of active storage by 1 December every year (end of dry season), guaranteeing maximum drawdown room for the Feb–Mar flood. Cost: ~60 km³ of water/yr held back from power/irrigation in the pre-flood window.\n- **Rule B — Probabilistic trigger:** hold pools full until the upstream gauge reads ≥5,000 m³/s for 6 h, then open floodgates to rated capacity. Cheaper (no forced drawdown), but relies on forecast/gauge lead time and gives less margin if a flood arrives faster than the drawdown can respond.\n- **Rule C — Tiered:** Rule A prefill for the 4 large basins (which carry the flood-control duty) but Rule B for the 8 small regulators (which mainly do irrigation/seasonal regulation). Balances the two.\n\n## Why it matters\nThe chosen rule fixes the dry-season release schedule, the power/irrigation yield, the flood margin, and the exposure-restriction numbers (how long reaches can sit at extreme high or low flow). It is the core of the Requirement 2 strategy section.\n\n## Requested guidance\nWhich operating rule (A, B, or C) best embodies \"a reasonable balance between safety and costs\" for a system whose whole point is to *improve* on Kariba's single-point flood protection, and what single exposure limit (e.g., maximum hours at peak flood per 30-day window, or maximum consecutive days at low flow for irrigation intakes) should anchor the restrictions?",
+              "# Expert Question 3 — Meaning of \"same or greater protection for Lake Kariba\" in the hybrid design\n\n## Builds on Replies 1 and 2\nReply 1 fixed the framework (hybrid; benchmark = active storage + co-equal flood-control). Reply 2 fixed the operating policy (tiered Rule C) and the anchor exposure limit (60 consecutive days at low flow for irrigation intakes). The cascade layout, benchmark check, and flow-modulation strategy are now complete and internally consistent.\n\n## Current stage\nFinalizing the analysis. One requirement phrase is still under-specified in my model: *\"providing the same or greater levels of protection and water management options for Lake Kariba that are in place with the existing dam.\"* In my hybrid design the old Lake Kariba basin is retained as a managed reservoir (D1/D2 sit at its upstream edge, D3/D4 downstream), fed by the upstream cascade rather than by the single upstream catchment inflow the real Kariba sees.\n\n## Unresolved strategic decision\nWhat does \"protection ... for Lake Kariba\" concretely require of the new system, and how should I demonstrate \"same or greater\" in the analysis? Two candidate interpretations:\n\n- **Interpretation 1 — Level/stability protection:** the new system must keep Lake Kariba's water level within the same operating band the current dam maintains (no deeper drawdown in drought, no higher flood level than the current crest), i.e., the lake's *level variability* under the cascade feed must be no worse than under the current single-dam operation. Demonstrated by comparing the simulated lake-level range (or storage range) in the hybrid vs. the current Kariba operating band.\n\n- **Interpretation 2 — Supply-security protection:** \"protection\" means the lake must receive at least as much *reliable* (dry-season) inflow as today, so downstream of the lake (power, irrigation, ecosystem) sees no reduction in guaranteed supply. Demonstrated by comparing the dry-season minimum release into the lake basin under the cascade vs. the current Kariba dry-season release.\n\n## Why it matters\nThis determines the final validation metric and the closing argument of Requirement 2. If I pick the wrong interpretation, the \"same or greater protection\" claim is not actually demonstrated.\n\n## Requested guidance\nWhich interpretation (1, 2, or both) is the intended reading of \"same or greater levels of protection and water management options for Lake Kariba,\" and what single comparison should the analysis present to demonstrate it?"
+            ],
+            "expert_answers": [
+              "**Option C (hybrid) best fits the 2017_A intent.** The problem's phrase \"same overall water management capabilities\" and \"same or greater levels of protection\" is a *functional* benchmark, not a volumetric one. Option A is physically implausible (10–18 km³ reservoirs along a single river reach) and operationally self-defeating for flood attenuation. Option B understates the requirement by discarding the \"same capability\" test.\n\n**Single benchmark:** check the design against **active (operable) storage plus flood-control capacity**, expressed as a combined criterion — total system active storage ≥ Kariba's active storage, *and* system peak-attenuation capability ≥ Kariba's. Gross storage is the wrong metric because Kariba's dead storage contributes nothing to water management.\n\nUse active storage as the primary scalar benchmark; treat flood-control capacity as a co-equal constraint, not a secondary one.",
+              "**Rule C (tiered) best embodies the required balance.** The four large basins carry the flood-control duty, so they must hold guaranteed drawdown room — Rule A's prefill discipline is justified there because flood protection is the system's stated purpose and the cost is bounded and predictable. The eight small regulators do irrigation and seasonal regulation, not flood attenuation; forcing them to prefill wastes yield for no safety gain, so Rule B's trigger logic fits them. Rule A alone over-pays for safety on units that don't provide it; Rule B alone leaves the flood-control basins dependent on forecast lead time, which contradicts the \"same or greater protection\" benchmark.\n\n**Anchor exposure limit:** maximum consecutive days at low flow for irrigation intakes — the binding ecological and agricultural constraint. Cap it at a fixed number of consecutive days below the intake-minimum stage, with the tiered rule's dry-season release schedule set to satisfy that cap. Peak-flood duration is self-limiting (events pass); prolonged low flow is the slow, cumulative harm the restrictions must bound.",
+              "**Both, with Interpretation 1 as the primary reading.** The phrase pairs \"protection\" with \"water management options *for Lake Kariba*\" — the object of protection is the lake itself, so the intended meaning is that the lake's own operating condition must be no worse than today. That is Interpretation 1: level/stability protection. Interpretation 2 protects users *downstream of* the lake, which the phrase does not name; it is a consequence, not the benchmark.\n\n**Single comparison to present:** plot simulated Lake Kariba level (or storage) range under the cascade feed against the current dam's operating band over the same inflow record, and show the hybrid's band is contained within — or narrower than — the existing one, with no deeper drought drawdown and no higher flood level.\n\nReport Interpretation 2 only as a supporting check, not the headline."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_2c4b2e458b98",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8541666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9166666666666666,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.75
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r1p2_20260927_142829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for both tasks, accurately reflecting the problem requirements. Task 1 is well-defined with specific criteria (cost, benefits, risk) and a clear output format (decision-ready comparison). Task 2 explicitly lists the three main deliverables: dam placement, flow modulation strategy, and exposure restrictions. The goals are explicit and directly address the ZRA's needs. However, the definition could be slightly more robust by explicitly mentioning the constraint that the new system must match Kariba's specific water management capabilities (e.g., storage volume, power generation capacity) as a primary design parameter, rather than just stating it as a general goal. Overall, the definition is very clear and accurate.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks cover all aspects of the problem requirements without deviation. Task 1 addresses the brief assessment, and Task 2 comprehensively covers the detailed analysis of Option 3, including the specific sub-components of the flow strategy (normal, emergency, extreme) and the restrictions on river exposure. The tasks are logically distinct but related, with Task 1 providing context for the decision and Task 2 providing the deep dive. There are no missing key parts; the modeler has successfully decomposed the complex Requirement 2 into manageable deliverables (a, b, c) that align perfectly with the prompt's demands. The coverage is complete and coherent.",
+                "score": 10
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed operational strategies, clear economic comparisons, and transparent limitations that effectively support decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies key biases like deterministic assumptions and proxy data, but lacks quantitative correction methods or sensitivity analyses to rigorously mitigate their impact on results.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, providing specific, actionable design parameters for the dam cascade, clear economic comparisons via NPV, and detailed operational strategies for flood and drought management that directly support ZRA decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing correct physical formulas for power and water balance, rigorous comparison of operating bands for safety, and a dynamic simulation approach that accurately reflects hydrological principles and engineering constraints.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with specific data points and calibration methods. The modeler acknowledges limitations and ensures consistency with the background problem, providing a robust foundation for the analysis.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model chooses appropriate methods (NPV for screening, discrete-time simulation for dynamics) that realistically reflect the problem. The operating strategy is logically structured to balance safety and cost, and the model structure accurately represents the physical system.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2017_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 — Framing of the Option Assessment (Requirement 1)\n\n## Problem Understanding\n\nI am solving MCM/ICM-style problem 2017_A: the Kariba Dam needs a decision among\n(1) repair, (2) rebuild, or (3) remove it and replace it with 10–20 smaller dams\nupstream along the Zambezi. The new system must match Kariba's overall water\nmanagement capability (total storage ≈ 180 km³, mean inflow ≈ 51.5 km³/yr, peak\nfloods ~5,000–20,000 m³/s pre-dam, dry-season flows ~200–800 m³/s). I will do the\nRequirement 2 quantitative analysis (dam count/placement, flow-modulation\nstrategy, flood/drought handling) autonomously with a water-balance model.\n\n## Decision Point\n\nBefore I build the models, I need direction on how Requirement 1 (the ≤2-page\nassessment of all three options) should be structured so it stays consistent with\nthe Requirement 2 analysis that follows. Specifically, which of these framings do\nyou prefer?\n\n## Candidate Strategies\n\n**A. Structured decision-matrix screening for all three options.**\nDefine common criteria (upfront/long-term cost, risk reduction, water-management\nflexibility, construction risk, disruption to hydropower), score each option\nqualitatively against Kariba's role (flood control, irrigation, hydropower),\npresent a transparent cost-benefit matrix, and let Requirement 2's quantitative\nresults (storage/cost/attenuation of the multi-dam system) feed the Option 3 row.\nAdvantages: balanced, comparable, transparent; consistent story across both\nrequirements. Limitations: Option 3's numbers come from my own model, which the\nbrief must acknowledge.\n\n**B. Qualitative cost-benefit narrative with the quantitative deep-dive reserved\nentirely for Requirement 2.**\nKeep Requirement 1 a purely descriptive brief (pros/cons of repair vs. rebuild vs.\nmulti-dam, referencing well-known costs and risks), and defer every number to the\nmain report. Advantages: shortest, least risk of inconsistency. Limitations: less\nrigorous; weak linkage between the brief and the detailed analysis.\n\n**C. Full quantitative cost-benefit (life-cycle cost) comparison of all three\noptions in Requirement 1 itself.**\nAdvantages: most decision-useful. Limitations: needs cost data the problem does\nnot provide and far exceeds two pages; scope creep into data I cannot justify.\n\nPlease recommend A, B, or C (or a modification), so my brief assessment matches\nthe depth and framing of the detailed analysis.",
+              "# Expert Question 2 — Storage Allocation Across the 10–20 Dam System (Requirement 2)\n\n## Problem Understanding\n\nFollowing your Round-1 guidance, Requirement 1 will be a qualitative-to-semi-\nquantitative decision matrix across the three options, with Option 3's entries\nflagged provisional. Now I am starting Requirement 2: replace Kariba with 10–20\nsmaller dams along the upper Zambezi such that the system has the *same overall\nwater management capability* as Kariba — total storage ≈ 180 km³, mean inflow\n≈ 51.5 km³/yr, peak floods ~5,000–20,000 m³/s, dry-season flows ~200–800 m³/s —\nwhile protecting the Lake Kariba region (flood control, irrigation, hydropower).\n\nThe key design question is how to distribute the ~180 km³ among the 10–20 dams.\n\n## Decision Point\n\nGeometrically, reservoir volume scales roughly as width × height × length; for a\nfixed corridor, splitting one large pool into N pools of the same total depth\nloses cross-valley volume, so a true series of 10–20 *equal* small dams would\nlikely store far less than 180 km³. I therefore need direction on which of two\narchitectures to target, since it determines everything downstream (placement,\ncost, modulation strategy).\n\n## Candidate Strategies\n\n**A. Hybrid: one primary large upstream storage plus a cascade of 9–19 smaller\ncontrol dams.**\nThe primary reservoir (placed at a wide gorge upstream) carries the bulk of the\n180 km³ and reproduces Kariba's bulk storage, hydropower head, and irrigation\nsupply; the downstream cascade of smaller dams provides staged flood\nattenuation, local regulation, and protection of the Lake Kariba region\n(the former reservoir zone becomes a series of managed pools). Advantages:\nachieves the 180 km³ benchmark realistically; preserves hydropower; staged\nflood control; defensible engineering. Limitations: less \"distributed\" in spirit;\nthe primary dam still needs maintenance (partially echoes the original problem).\n\n**B. Fully distributed: 10–20 dams of comparable size, each ≤ ~10–20 km³, with\nthe total reaching 180 km³ only through a broad reservoir corridor.**\nAdvantages: no single point of failure; maximum local regulation; matches the\nproblem's \"series of 10–20 smaller dams\" most literally. Limitations: very hard\nto justify 180 km³ total from 10–20 small dams in the narrow upper Zambezi\nvalley; hydropower (needs high head and large flow) is diluted across many low-\nhead sites; cost per km³ of storage is higher.\n\n**C. Fully distributed with relaxed storage: accept that total storage falls\nbelow 180 km³ (e.g., 60–100 km³) and compensate with stronger flow-modulation\nrules.**\nAdvantages: honest geometry; cheaper. Limitations: violates the problem's\n\"same overall water management capabilities\" benchmark, so the system no longer\nmatches Kariba — a risky deviation from the stated requirement.\n\nPlease recommend A, B, or C (or a modification). This choice fixes the dam\ncount/placement model and the flow-modulation strategy I will build next.",
+              "# Expert Question 3 — Control Philosophy for the Cascade's Flow-Modulation Strategy (Requirement 2)\n\n## Problem Understanding\n\nRounds 1–2 are settled: (1) Requirement 1 = qualitative-to-semi-quantitative\ndecision matrix, Option 3 entries provisional; (2) Requirement 2 = hybrid\narchitecture — one primary upstream reservoir carrying ~50–70% of the ~180 km³\n(placed at a wide gorge for bulk storage, high-head hydropower, irrigation),\nplus a downstream cascade of 9–19 smaller control dams whose staged storage\nbrings the *system total* to the 180 km³ benchmark, with the former Lake Kariba\nzone becoming managed pools. Inflows: mean 51.5 km³/yr (~1,313 m³/s);\nseasonal peaks ~5,000–20,000 m³/s (Feb–Mar); dry-season lows ~200–800 m³/s\n(Oct–Nov); design flood on the order of the ~10,000 m³/s 1958 maximum.\n\nI will now build (a) a monthly water-balance simulation of the cascade and (b)\nthe flow-modulation strategy: release rules for normal cycles, flood, and\nprolonged drought, plus restrictions on where and for how long the river can be\nexposed to the most detrimental extremes.\n\n## Decision Point\n\nWhich control philosophy should the release rules for the cascade be built on?\nThis choice determines the rules, the safety margins, and how I justify them.\n\n## Candidate Strategies\n\n**A. Reserve-based staged control (dead-storage floors + flood pools per dam,\nreleases driven by forecast inflow and downstream water-level thresholds).**\nEach cascade dam holds a non-spillable reserve (dry-season supply) below a\nflood-pool ceiling; during flood forecasts, upstream dams draw down and hold\nfloodwater while downstream dams pre-emptively drop levels to create routing\ncapacity, so flood peaks are cut stepwise as they travel downstream. Drought\nrules tap reserves in reverse cascade order to hold minimum environmentally and\noperationally critical downstream flows. Advantages: explicit safety margins,\ndirectly implements \"staged attenuation,\" clear rules for managers, easy to\nvalidate in simulation. Limitations: requires an inflow-forecast assumption;\nreserve sizing trades cost (lost generation/irrigation during held floodwater)\nagainst safety.\n\n**B. Target-outflow (regulated-hydrograph) control: the cascade is operated to\nrelease a prescribed target hydrograph at the system outlet regardless of\ninflow shape.**\nAdvantages: simplest management interface; guarantees a known downstream\nflood ceiling. Limitations: ignores where in the cascade the water is stored;\nduring a large flood the system may simply pass what its conveyance allows;\nless transparent per-dam safety story; can mask dangerous drawdowns upstream.\n\n**C. Cost-optimized stochastic control (minimize expected lifecycle cost\nsubject to probabilistic flood/drought constraints, e.g., dynamic programming\nover an inflow distribution).**\nAdvantages: theoretically optimal; directly balances \"safety and costs\" as the\nproblem asks. Limitations: needs an inflow distribution and cost model the\nproblem does not supply; results are hard to present as actionable per-dam\nrules; risk of an answer that looks like a black box to ZRA managers.\n\nPlease recommend A, B, or C (or a modification). My expectation is A — if so, I\nwill also take from you no further strategic input, and will handle all\nparameter choices (reserve fractions, alert thresholds, exposure durations)\nautonomously from the simulated results."
+            ],
+            "expert_answers": [
+              "**Recommend A**, with one modification: keep the matrix qualitative-to-semi-quantitative, using only the problem's given figures (storage ≈180 km³, inflow ≈51.5 km³/yr, flow ranges) plus clearly labeled order-of-magnitude estimates, and flag Option 3's cost/storage entries as provisional pending Requirement 2.\n\nRationale: Requirement 1 asks for a \"brief assessment... with sufficient detail to provide an overview of potential costs and benefits,\" and it must sit alongside a detailed Option 3 analysis. A common-criteria matrix makes the three options genuinely comparable, keeps the brief within two pages, and creates a single consistent frame so Requirement 2's model outputs slot directly into the Option 3 row rather than contradicting a separate narrative. B wastes the linkage and reads as filler; C demands cost data the problem never supplies and blows the page limit.",
+              "**Recommend A**, with one modification: treat the primary upstream reservoir as carrying roughly half to two-thirds of the 180 km³, and let the downstream cascade of 9–19 control dams make up the remainder through staged storage, so the *system total* — not any single dam — meets the benchmark.\n\nRationale: the problem's binding constraint is \"same overall water management capabilities,\" which is a system-level, not per-dam, requirement. Option B cannot plausibly reach 180 km³ in the narrow upper Zambezi valley and dilutes hydropower head; Option C openly violates the stated benchmark. A hybrid satisfies the benchmark, preserves high-head hydropower and irrigation supply, and gives you a genuine cascade for staged flood attenuation and protection of the former Lake Kariba zone — which is exactly what Requirement 2's modulation strategy needs. Flag the primary dam's residual maintenance exposure in the brief.",
+              "**Recommend A**, with one modification: layer a target-outflow ceiling on top of the reserve-based rules. Operate each dam on dead-storage floors and flood-pool ceilings, but constrain the cascade's aggregate release so the outlet hydrograph never exceeds a prescribed safe ceiling.\n\nRationale: A directly implements the staged attenuation your hybrid architecture was chosen for, gives ZRA managers explicit, per-dam, auditable rules, and makes safety margins visible — which is what Requirement 2's emergency guidance demands. B alone discards the spatial storage story and can hide dangerous upstream drawdowns; C needs an inflow distribution and cost model the problem never supplies and yields opaque rules. The modification borrows B's one genuine strength — a guaranteed downstream flood ceiling — without losing A's per-dam transparency, and it gives you a clean way to present both normal-cycle and extreme-flow guidance."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_2c4b2e458b98",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8208333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.7333333333333334,
+            "practicality_and_scientificity_evaluation": 0.7999999999999999,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_r15b/cpe_evaluations/round_11/train_candidate/runs/round_11/r2p2_20260927_142829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing quantitative evidence, transparent logic, and a balanced assessment of strengths and weaknesses that effectively supports decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying data, structural, and subjective biases, and providing reasonable justifications or corrections to mitigate their impact on the final recommendation.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are explicit and logically justified for the most part, but cost estimates lack source data, and the specific geometric distribution of storage relies on unverified expert input rather than physical constraints.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (linear reservoirs, water balance) and a rational control strategy. It effectively reflects the problem's constraints, though the hydrological input simplification limits the precision of extreme event analysis.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides a concrete, implementable solution with clear operational strategies for flood and drought management, directly supporting ZRA decision-making with reliable predictions and a feasible engineering design.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses physically-based hydrological simulations and standard reservoir management rules, providing a theoretically justified framework, though the geometric simplifications for dam volume reduce some scientific precision.",
+                "score": 8
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, aligning them with the problem requirements. Task 1 focuses on the brief assessment of three options, while Tasks 2 and 3 detail the design and operational strategy for Option 3. The goals are explicit, including specific metrics like capacity and flow ranges, ensuring a clear direction for the modeling process.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are well-structured and cover all aspects of the problem requirements. Task 1 handles the comparative assessment, while Tasks 2 and 3 address the detailed design and operational strategy for Option 3. The logical flow from design to operation is sound, and all key components such as capacity, placement, and emergency handling are included without deviation.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        }
+      ],
+      "refined_report_utility": 0.8374999999999999,
+      "interaction_cost": 0.8733412279550159,
+      "interaction_penalty": 0.0436670613977508,
+      "net_utility": 0.7938329386022491,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2738,
+          "total_expert_latency_seconds": 5.33,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9293158141183318,
+          "latency_cost_component": 0.2932110756323722,
+          "interaction_cost": 0.8717263256473327,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2933,
+          "total_expert_latency_seconds": 4.88,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9373903256567478,
+          "latency_cost_component": 0.2814935225855862,
+          "interaction_cost": 0.8749561302626991,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-27T14:58:58.852799",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_2c4b2e458b98",
+  "workflow": {
+    "interaction_policy": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "name": "Distinct Decision Point Consultation",
+    "purpose": "Prevent redundant or overlapping exchanges by ensuring each consultation addresses a unique, unresolved strategic decision.",
+    "maximum_expert_interactions": 3,
+    "termination_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+    "evolution_mode": "mutation",
+    "changed_components": [
+      "Refined the condition for a further exchange in Step 3 to require that the new question resolves a distinct, unresolved strategic decision not covered by the previous exchange, rather than merely being a question not previously asked."
+    ],
+    "evolution_rationale": "The parent policy's evidence shows high interaction costs (average 0.876) and penalties, suggesting that exchanges are sometimes used for overlapping or redundant strategic clarifications. Rounds 2, 3, 4, 6, 8, and 9 attempted to modify Step 3 to handle confirmations or implicit constraints but were rejected, indicating that the core issue is not how to process replies but when to initiate a new exchange. The parent's rollouts (2018_A and 2017_A) show that the agent often asks follow-up questions that refine the same strategic decision (e.g., receiver definition, equivalence standard) rather than addressing a new one. By requiring that a further exchange must address a distinct, unresolved strategic decision, this policy reduces the likelihood of redundant consultations, thereby lowering interaction costs and improving net utility. This departs from Round 10 (which added an 'Explicit Recommendation' subsection) and Round 5 (same change) by focusing on the exchange trigger rather than the query structure.",
+    "policy_text": "# Human Expert Interaction\n\n## Principle\n\nThe agent should solve the modeling problem autonomously by default, including routine modeling decisions, implementation, analysis, and validation.\n\nThe agent must request human expert feedback only when strategic uncertainty may significantly affect the modeling direction, framework selection, or core assumptions.\n\nHuman interaction is used only for resolving high-impact strategic decisions, not for routine execution tasks.\n\n---\n\n## Trigger Conditions\n\nThe agent must request expert feedback when:\n\n- the modeling objective or requirements are ambiguous;\n- multiple fundamentally different modeling approaches exist;\n- critical assumptions require domain expertise;\n- key decisions may significantly change the modeling direction;\n- the choice of modeling framework or problem formulation has major downstream impact.\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- parameter tuning or optimization details;\n- standard mathematical derivations;\n- computation, data processing, or routine validation.\n\n---\n\n# Interaction Workflow\n\nWhen strategic uncertainty is identified, the agent must follow this workflow:\n\n## Step 1: Identify Decision Point\n\nSummarize:\n\n- current understanding of the problem;\n- modeling objective and current stage;\n- unresolved strategic decision;\n- potential impact of the decision.\n\n---\n\n## Step 2: Prepare Expert Query\n\nProvide:\n\n### Problem Understanding\n- Current problem interpretation.\n- Modeling objective.\n- Relevant constraints.\n\n### Decision Point\n- The specific uncertainty requiring expert judgment.\n- Why it matters.\n\n### Candidate Strategies\nFor each option:\n- approach description;\n- advantages;\n- limitations;\n- expected impact.\n\n---\n\n## Step 3: Integrate Feedback\n\nAfter receiving feedback, the agent must:\n\n- evaluate the feedback;\n- update assumptions or modeling strategy;\n- continue the remaining process autonomously.\n\nThe agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point.\n\n---\n\n# Interaction Constraints\n\nMaximum expert interactions: 3.\n\nTerminate interaction when:\n\n- the strategic uncertainty is resolved;\n- the modeling direction is determined;\n- remaining decisions can be handled autonomously.",
+    "max_exchanges": 3,
+    "stop_condition": "The strategic uncertainty is resolved; the modeling direction is determined; remaining decisions can be handled autonomously.",
+    "actions": [
+      {
+        "action_id": "step_1_identify_decision_point",
+        "action_type": "agent_step",
+        "rule": "Step 1: Identify Decision Point. Summarize: - current understanding of the problem; - modeling objective and current stage; - unresolved strategic decision; - potential impact of the decision. ---"
+      },
+      {
+        "action_id": "step_2_prepare_expert_query",
+        "action_type": "expert_exchange",
+        "rule": "Step 2: Prepare Expert Query. Provide: ### Problem Understanding - Current problem interpretation. - Modeling objective. - Relevant constraints. ### Decision Point - The specific uncertainty requiring expert judgment. - Why it matters. ### Candidate Strategies For each option: - approach description; - advantages; - limitations; - expected impact. ---"
+      },
+      {
+        "action_id": "step_3_integrate_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Step 3: Integrate Feedback. After receiving feedback, the agent must: - evaluate the feedback; - update assumptions or modeling strategy; - continue the remaining process autonomously. The agent should not request further feedback unless a new strategic uncertainty emerges. A further exchange is warranted only when it resolves a distinct, unresolved strategic decision that was not covered by the previous exchange; stop when no such question would change the decision. If the expert's feedback rejects the agent's primary recommendation, the agent must immediately re-evaluate the remaining candidates and, if the decision remains unresolved, use the next exchange to present the revised decision point with the rejected option explicitly excluded. If the expert's feedback confirms the agent's primary recommendation, the agent must proceed autonomously without further consultation, treating the confirmation as the final strategic directive for the current decision point. ---"
+      }
+    ],
+    "entry_action": "step_1_identify_decision_point",
+    "workflow_id": "interaction_workflow_2c4b2e458b98",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 11,
+    "parent_workflow_ids": [
+      "interaction_workflow_fb22cbc25c4f"
+    ],
+    "training_batch": [
+      "2018_A",
+      "2017_A"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2018_A",
+    "2017_A"
+  ],
+  "absolute_utility": 0.8624999999999999,
+  "interaction_cost": 0.8780503808667697,
+  "interaction_penalty": 0.04390251904333849,
+  "net_utility": 0.8185974809566614,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

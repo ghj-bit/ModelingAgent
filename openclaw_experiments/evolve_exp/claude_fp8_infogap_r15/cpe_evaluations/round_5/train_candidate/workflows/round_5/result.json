@@ -1,0 +1,635 @@
+{
+  "round": 5,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7747651461274914,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.7249999999999999,
+    "modeling_rigorousness_evaluation": 0.875,
+    "practicality_and_scientificity_evaluation": 0.7958333333333334,
+    "result_and_bias_analysis_evaluation": 0.875
+  },
+  "problem_results": [
+    {
+      "problem_id": "2019_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nProblem MM-Bench 2019_C models the spread of synthetic-opioid (fentanyl-family) and\nheroin *drug-identification counts* at county level across five states, 2010–2017,\nand asks us to (i) identify where each substance likely *started* in each state,\n(ii) name drug-identification threshold levels that the U.S. government should\nworry about, and (iii) predict where/when those thresholds will be crossed.\nThree structural interpretations the text leaves open, all of which change the\nmechanism we are about to parameterize:\n\n1. **Interpretation of the observation.** Are drug-identification counts a\n   legitimate proxy for the prevalence/size of the local illicit-opioid market,\n   or are they counts of *lab-processed law-enforcement submissions* (i.e., a\n   measure of enforcement/lab activity filtered through an underlying prevalence\n   process)? In other words: do we model the counts directly as the state\n   variable (birth-death / SIR-style epidemic in counties), or as noisy\n   observations of a latent prevalence that we must separate from a\n   reporting/enforcement layer? The answer fixes whether the \"threshold levels\"\n   of Part 1 attach to the observed counts or to a latent prevalence index.\n\n2. **Definition of the spread mechanism between counties/states.** The problem\n   says \"spread ... in and between the five states and their counties.\" Do we\n   treat inter-county spread as a genuine spatial-diffusion (distance/contact)\n   process — meaning the between-state and within-state channels are different\n   operators with different kernels — or is the county a bookkeeping unit and\n   the real spreading entity moves along a shared network (highways, supply\n   routes), so that the \"location where use started\" is a source/seed node of\n   that network rather than a literal geographic ignition point? This decides\n   whether \"where it started\" is recoverable from the 2010 counts alone (seed\n   detection) or only from a fitted diffusion kernel.\n\n3. **Reading of the threshold question.** \"At what drug identification\n   threshold levels do these occur\" — is the threshold (a) an *absolute* count\n   level (e.g., N fentanyl identifications per county-year, a fixed line drawn\n   on the raw data), (b) a *relative* level (e.g., a county whose count exceeds\n   k times the state median or crosses a growth-rate regime change), or (c) a\n   *population-normalized* level (count per 100k residents, requiring the ACS\n   population column)? The three readings produce different threshold values,\n   different \"when will it occur\" predictions, and different policy targets.\n   Which reading does the problem intend, or if it allows all three, which one\n   should carry the primary answer in the memo?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nExchange 1 established that the text supplies no measurement model, no contact\nstructure, and no declared threshold units, so I must choose and commit. I\npropose the following three-part structure; please accept or reject the whole\nconfiguration:\n\n**(a) Two-layer model — observation layer over a latent prevalence.**\nLet E_{c,y} be the observed drug-identification count for county c, year y, and\nlet H_{c,y} be a latent county-level \"market size / addiction prevalence\" index.\nWe model E_{c,y} = λ_{c,y} · X_{c,y}, where X_{c,y} is a Poisson observation\nnoise term (log link) and λ_{c,y} is a deterministic reporting/enforcement\nintensity. The *spread mechanism* then operates on H, not on E: H evolves as a\nspatial epidemic (below). Observed-count thresholds from Part 1 are read\nthrough this layer; a county whose H crosses a latent threshold will appear in\nE when λ·H exceeds the absolute count line. This keeps the \"where/when it\nstarts\" question on the latent H (the true ignition) while the reported\nthresholds stay on E (the observable).\n\n**(b) Two-stage spread mechanism.** Within a state, H_{c,y+1} receives\ninfection from neighboring counties H_{n,y} with a kernel that is 1 (infection)\nif H_{n,y} > 0, 0 otherwise, weighted by a within-state adjacency coefficient\nβ_w. Between states, each county also receives a \"regional inflow\" term from a\nstate-level H_s,y aggregate, weighted by β_b < β_w (long-range, weaker). This\ngives a birth-death/SIR-like process on the county graph with two distinct\nspreading channels. The state-level aggregate H_s,y = sum_c H_{c,y}/pop_s\ncarries the between-state signal; β_w and β_b are the two structural\nparameters, and the ratio β_w/β_b determines whether spread is local (cluster\naround seeds) or network-driven (uniform infiltration).\n\n**(c) Relative, state-normalized threshold.** The primary threshold is a\n*relative* one: a county is \"alert\" when its population-normalized latent H\n(hat H_{c,y} = H_{c,y} / pop_c) exceeds k · median_s, where median_s is the\nstate median across counties in year y, and k is a small positive constant\n(we propose k ≈ 3, a fixed \"outlier multiplier\"). Secondary thresholds are\nabsolute count levels drawn from the empirical distribution of E (e.g., the\n75th and 90th percentiles of county-year fentanyl counts), reported alongside\nthe relative one for the memo. This reads the threshold question as reading\n(b) relative + a population-normalized variant (reading c), and reports reading\n(a) absolute as a secondary.\n\nPlease accept or reject (a), (b), (c) as a coherent package. If you reject,\nname which of the three to revise and why.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2 was rejected. I revised the structure accordingly: instead of a\ntwo-layer Poisson observation model with a latent prevalence, I will treat the\nobserved drug-identification count E_{c,y} as the direct state variable of a\nspatial birth–death epidemic (SIR-like) on the county graph, with two spreading\nchannels — within-state adjacency (coefficient β_w) and a state-level regional\ninflow (coefficient β_b) — and the Part 1 threshold will be a *single,\npopulation-normalized* alert line: county c is at alert when its fentanyl\nidentification count per 100k residents in year y exceeds k times the state\nmedian in that year (k to be fixed from the empirical outlier distribution,\ntargeting roughly the top-decile counties per state per year). This removes the\nunidentifiable latent layer and keeps every quantity in the model directly\nobservable.\n\nGiven this revised structure, what is the specific case, boundary condition, or\nfailure mode that would break it — i.e., under what conditions on the data or\non the epidemic mechanism would the \"started-in-county\" inference, the β_w/β_b\nchannel attribution, or the population-normalized threshold stop giving the\nright answer? Name the case, not the fix."
+        ],
+        "expert_answers": [
+          "The text does not settle which reading is intended, and it supplies no basis for choosing among them: it never states whether counts are prevalence or enforcement artifacts, never defines the spatial channel, and never specifies absolute, relative, or population-normalized thresholds. What the work lacks is an explicit measurement model linking observed identifications to latent prevalence, a stated contact/network structure for inter-county spread, and a declared threshold definition with its units. Absent those, \"where it started,\" the threshold values, and the future crossing dates are not identifiable from the given data alone.",
+          "reject",
+          "The case that breaks it: a county whose 2010 count is zero or near-zero because its lab submissions were routed to a neighboring county's laboratory, or because the county had no reporting lab at all. Then the observed E_{c,y} is not the state variable — the \"started-in\" inference attributes ignition to the lab-hosting county, β_w/β_b attribution is contaminated by the reporting boundary rather than the epidemic, and the per-100k threshold is computed against a denominator (ACS population) that is a 5-year estimate centered on a different year than the identification count, so a county can cross the alert line purely from a population-estimate revision."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_311d5620561e",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.775,
+      "dimension_scores": {
+        "analysis_evaluation": 0.6499999999999999,
+        "modeling_rigorousness_evaluation": 0.8500000000000001,
+        "practicality_and_scientificity_evaluation": 0.7250000000000001,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for all three parts of the problem, accurately reflecting the requirements to model spread, identify origins, predict thresholds, analyze socio-economic factors, and propose strategies. However, there is a significant factual error in Task 1 where \"Pennsylvania (PA)\" is listed instead of \"Tennessee (TN)\" as specified in the background. This error compromises the accuracy of the problem definition regarding the specific geographic scope, preventing a perfect score despite the otherwise clear articulation of objectives.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks logically follow the problem requirements with clear dependencies: Task 1 builds the base model, Task 2 refines it with socio-economic data, and Task 3 applies the refined model to strategy. The coverage is comprehensive, addressing all key components including the memo requirement. However, the inclusion of the incorrect state (PA instead of TN) in Task 1 represents a deviation from the actual problem scope, which could lead to incorrect data usage or analysis if not corrected. This error slightly undermines the completeness and accuracy of the scope coverage.",
+            "score": 7
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, interpretable, and effectively distinguishes between different opioid trends while providing actionable insights and clear model limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key data and model biases (lab routing, non-linear spread) and appropriately qualifying results to mitigate their impact.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicitly justified, and rigorously aligned with the data limitations and problem context, showing high scientific integrity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate statistical and simulation methods that logically reflect the problem structure and data constraints, with clear metrics for evaluation.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model addresses the problem's core tasks with a workable framework for prediction and intervention testing, but its practicality is limited by oversimplified spatial dynamics and arbitrary parameter choices that may reduce real-world applicability.",
+            "score": 6
+          },
+          "analysis_2": {
+            "reason": "The model uses standard statistical techniques but lacks a strong theoretical basis for the spatial spread dynamics, relying on heuristics and simplified assumptions that do not fully adhere to scientific principles of diffusion or epidemiology.",
+            "score": 5
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 3,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nProblem MM-Bench 2019_C models the spread of synthetic-opioid (fentanyl-family) and\nheroin *drug-identification counts* at county level across five states, 2010–2017,\nand asks us to (i) identify where each substance likely *started* in each state,\n(ii) name drug-identification threshold levels that the U.S. government should\nworry about, and (iii) predict where/when those thresholds will be crossed.\nThree structural interpretations the text leaves open, all of which change the\nmechanism we are about to parameterize:\n\n1. **Interpretation of the observation.** Are drug-identification counts a\n   legitimate proxy for the prevalence/size of the local illicit-opioid market,\n   or are they counts of *lab-processed law-enforcement submissions* (i.e., a\n   measure of enforcement/lab activity filtered through an underlying prevalence\n   process)? In other words: do we model the counts directly as the state\n   variable (birth-death / SIR-style epidemic in counties), or as noisy\n   observations of a latent prevalence that we must separate from a\n   reporting/enforcement layer? The answer fixes whether the \"threshold levels\"\n   of Part 1 attach to the observed counts or to a latent prevalence index.\n\n2. **Definition of the spread mechanism between counties/states.** The problem\n   says \"spread ... in and between the five states and their counties.\" Do we\n   treat inter-county spread as a genuine spatial-diffusion (distance/contact)\n   process — meaning the between-state and within-state channels are different\n   operators with different kernels — or is the county a bookkeeping unit and\n   the real spreading entity moves along a shared network (highways, supply\n   routes), so that the \"location where use started\" is a source/seed node of\n   that network rather than a literal geographic ignition point? This decides\n   whether \"where it started\" is recoverable from the 2010 counts alone (seed\n   detection) or only from a fitted diffusion kernel.\n\n3. **Reading of the threshold question.** \"At what drug identification\n   threshold levels do these occur\" — is the threshold (a) an *absolute* count\n   level (e.g., N fentanyl identifications per county-year, a fixed line drawn\n   on the raw data), (b) a *relative* level (e.g., a county whose count exceeds\n   k times the state median or crosses a growth-rate regime change), or (c) a\n   *population-normalized* level (count per 100k residents, requiring the ACS\n   population column)? The three readings produce different threshold values,\n   different \"when will it occur\" predictions, and different policy targets.\n   Which reading does the problem intend, or if it allows all three, which one\n   should carry the primary answer in the memo?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nExchange 1 established that the text supplies no measurement model, no contact\nstructure, and no declared threshold units, so I must choose and commit. I\npropose the following three-part structure; please accept or reject the whole\nconfiguration:\n\n**(a) Two-layer model — observation layer over a latent prevalence.**\nLet E_{c,y} be the observed drug-identification count for county c, year y, and\nlet H_{c,y} be a latent county-level \"market size / addiction prevalence\" index.\nWe model E_{c,y} = λ_{c,y} · X_{c,y}, where X_{c,y} is a Poisson observation\nnoise term (log link) and λ_{c,y} is a deterministic reporting/enforcement\nintensity. The *spread mechanism* then operates on H, not on E: H evolves as a\nspatial epidemic (below). Observed-count thresholds from Part 1 are read\nthrough this layer; a county whose H crosses a latent threshold will appear in\nE when λ·H exceeds the absolute count line. This keeps the \"where/when it\nstarts\" question on the latent H (the true ignition) while the reported\nthresholds stay on E (the observable).\n\n**(b) Two-stage spread mechanism.** Within a state, H_{c,y+1} receives\ninfection from neighboring counties H_{n,y} with a kernel that is 1 (infection)\nif H_{n,y} > 0, 0 otherwise, weighted by a within-state adjacency coefficient\nβ_w. Between states, each county also receives a \"regional inflow\" term from a\nstate-level H_s,y aggregate, weighted by β_b < β_w (long-range, weaker). This\ngives a birth-death/SIR-like process on the county graph with two distinct\nspreading channels. The state-level aggregate H_s,y = sum_c H_{c,y}/pop_s\ncarries the between-state signal; β_w and β_b are the two structural\nparameters, and the ratio β_w/β_b determines whether spread is local (cluster\naround seeds) or network-driven (uniform infiltration).\n\n**(c) Relative, state-normalized threshold.** The primary threshold is a\n*relative* one: a county is \"alert\" when its population-normalized latent H\n(hat H_{c,y} = H_{c,y} / pop_c) exceeds k · median_s, where median_s is the\nstate median across counties in year y, and k is a small positive constant\n(we propose k ≈ 3, a fixed \"outlier multiplier\"). Secondary thresholds are\nabsolute count levels drawn from the empirical distribution of E (e.g., the\n75th and 90th percentiles of county-year fentanyl counts), reported alongside\nthe relative one for the memo. This reads the threshold question as reading\n(b) relative + a population-normalized variant (reading c), and reports reading\n(a) absolute as a secondary.\n\nPlease accept or reject (a), (b), (c) as a coherent package. If you reject,\nname which of the three to revise and why.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2 was rejected. I revised the structure accordingly: instead of a\ntwo-layer Poisson observation model with a latent prevalence, I will treat the\nobserved drug-identification count E_{c,y} as the direct state variable of a\nspatial birth–death epidemic (SIR-like) on the county graph, with two spreading\nchannels — within-state adjacency (coefficient β_w) and a state-level regional\ninflow (coefficient β_b) — and the Part 1 threshold will be a *single,\npopulation-normalized* alert line: county c is at alert when its fentanyl\nidentification count per 100k residents in year y exceeds k times the state\nmedian in that year (k to be fixed from the empirical outlier distribution,\ntargeting roughly the top-decile counties per state per year). This removes the\nunidentifiable latent layer and keeps every quantity in the model directly\nobservable.\n\nGiven this revised structure, what is the specific case, boundary condition, or\nfailure mode that would break it — i.e., under what conditions on the data or\non the epidemic mechanism would the \"started-in-county\" inference, the β_w/β_b\nchannel attribution, or the population-normalized threshold stop giving the\nright answer? Name the case, not the fix."
+            ],
+            "expert_answers": [
+              "The text does not settle which reading is intended, and it supplies no basis for choosing among them: it never states whether counts are prevalence or enforcement artifacts, never defines the spatial channel, and never specifies absolute, relative, or population-normalized thresholds. What the work lacks is an explicit measurement model linking observed identifications to latent prevalence, a stated contact/network structure for inter-county spread, and a declared threshold definition with its units. Absent those, \"where it started,\" the threshold values, and the future crossing dates are not identifiable from the given data alone.",
+              "reject",
+              "The case that breaks it: a county whose 2010 count is zero or near-zero because its lab submissions were routed to a neighboring county's laboratory, or because the county had no reporting lab at all. Then the observed E_{c,y} is not the state variable — the \"started-in\" inference attributes ignition to the lab-hosting county, β_w/β_b attribution is contaminated by the reporting boundary rather than the epidemic, and the per-100k threshold is computed against a denominator (ACS population) that is a 5-year estimate centered on a different year than the identification count, so a county can cross the alert line purely from a population-estimate revision."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_311d5620561e",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7416666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6999999999999998,
+            "modeling_rigorousness_evaluation": 0.8666666666666667,
+            "practicality_and_scientificity_evaluation": 0.55,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p1_20260930_053024/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for all three parts of the problem, accurately reflecting the requirements to model spread, identify origins, predict thresholds, analyze socio-economic factors, and propose strategies. However, there is a significant factual error in Task 1 where \"Pennsylvania (PA)\" is listed instead of \"Tennessee (TN)\" as specified in the background. This error compromises the accuracy of the problem definition regarding the specific geographic scope, preventing a perfect score despite the otherwise clear articulation of objectives.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks logically follow the problem requirements with clear dependencies: Task 1 builds the base model, Task 2 refines it with socio-economic data, and Task 3 applies the refined model to strategy. The coverage is comprehensive, addressing all key components including the memo requirement. However, the inclusion of the incorrect state (PA instead of TN) in Task 1 represents a deviation from the actual problem scope, which could lead to incorrect data usage or analysis if not corrected. This error slightly undermines the completeness and accuracy of the scope coverage.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and effectively distinguishes between different opioid trends while providing actionable insights and clear model limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases (lab routing, non-linear spread) and appropriately qualifying results to mitigate their impact.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified, and rigorously aligned with the data limitations and problem context, showing high scientific integrity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate statistical and simulation methods that logically reflect the problem structure and data constraints, with clear metrics for evaluation.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model addresses the problem's core tasks with a workable framework for prediction and intervention testing, but its practicality is limited by oversimplified spatial dynamics and arbitrary parameter choices that may reduce real-world applicability.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The model uses standard statistical techniques but lacks a strong theoretical basis for the spatial spread dynamics, relying on heuristics and simplified assumptions that do not fully adhere to scientific principles of diffusion or epidemiology.",
+                "score": 5
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        },
+        {
+          "problem_id": "2019_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p1_20260930_053024",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p1_20260930_053024/output/results/solution_report.md",
+          "interaction_receipt": {},
+          "average_score": 0.8083333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6,
+            "modeling_rigorousness_evaluation": 0.8333333333333334,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p1_20260930_053024/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for all three parts of the problem. However, there is a significant factual error in Task 1: the background specifies the five states as Ohio, Kentucky, West Virginia, Virginia, and Tennessee, but the modeler lists Pennsylvania instead of Tennessee. This misidentification of the study area undermines the accuracy of the problem definition, although the general objectives (modeling spread, identifying origins, predicting thresholds) are correctly stated.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks logically follow the problem requirements and cover the main aspects: modeling spread (Task 1), integrating socio-economic factors (Task 2), and strategy development (Task 3). The dependencies between tasks are correctly identified. However, the coverage is compromised by the incorrect state list in Task 1 (including Pennsylvania instead of Tennessee), which means the model would be built on the wrong geographic scope, leading to a deviation from the actual goal of analyzing the specified five states.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is very clear, providing specific metrics, distinguishing between drug types, and offering decisive, interpretable conclusions that directly address the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is comprehensive, identifying data and model biases, proposing specific mitigations, and transparently acknowledging limitations that cannot be fully corrected with the given data.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are largely clear and well-justified, especially regarding data normalization and missing data handling. However, the inference of latent prevalence from detection data lacks a fully specified observation model, and the use of external data slightly deviates from the strict data constraint.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (spatial diffusion, panel regression) that logically reflect the problem's complexities. The structure is scientifically valid, and the mapping of interventions to model parameters is rational and effective for testing strategy.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, tailored to the problem's specific data characteristics (NFLIS vs. true prevalence), and provides actionable insights for decision-making through clear thresholds and intervention simulations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, using a theoretically grounded mean-field diffusion model, appropriate statistical methods for high-dimensional data, and rigorous validation techniques, demonstrating a deep understanding of the problem's scientific underpinnings.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        }
+      ],
+      "refined_report_utility": 0.775,
+      "interaction_cost": 0.8598572354293436,
+      "interaction_penalty": 0.04299286177146718,
+      "net_utility": 0.7320071382285328,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2022,
+          "total_expert_latency_seconds": 3.13,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.893740218863187,
+          "latency_cost_component": 0.22535879847383963,
+          "interaction_cost": 0.8574960875452748,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2236,
+          "total_expert_latency_seconds": 4.85,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9055459582835305,
+          "latency_cost_component": 0.2806807528589666,
+          "interaction_cost": 0.8622183833134123,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2016_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a dynamic regional supply-vs-need model for clean water (Task 1) for a heavily water-stressed region, and the problem statement leaves three *structural/definitional* points unsettled that I cannot resolve from the text or the gathered data. I am not asking for magnitudes or empirical constants — only for the logical interpretation you would adopt, so the model's variables and objective have the right domain and meaning.\n\n1. **What does \"ability to provide clean water to meet the needs of its population\" refer to at its core — and what is its valid domain?**\n   I plan to define the regional ability as a single dimensionless index R(t) = usable clean-water supply (t) / clean-water demand (t), with R >= 1 meaning the region meets all need, 0 < R < 1 meaning a deficit, and R > 1 meaning surplus. Does that ratio-based definition — clean, usable supply over clean-water demand, as a fraction of need — capture the intended meaning of \"ability to provide clean water,\" or is the objective meant to be something structurally different (e.g., a per-capita volume against a fixed standard, or a multi-criterion score)? In particular: should \"needs\" include only direct human consumption plus minimum ecological/environmental flow, or also industrial and agricultural process water in full? What is the natural lower/upper bound of the index you would accept, and what value do you treat as the threshold of \"meets the needs\"?\n\n2. **Physical vs. economic scarcity — which one should the index's supply side actually represent, and how are the two combined?**\n   The problem distinguishes physical scarcity (inadequate water in the region) from economic scarcity (water exists but poor management/infrastructure limits clean availability). Structurally, does the \"clean-water supply\" entering R(t) mean *total renewable water physically present*, or *the fraction of that water that is actually capturable, deliverable and of acceptable quality* (i.e., after applying yield, treatment, sanitation, and desalination/reuse)? I.e., should economic scarcity lower the supply side of the same index, or should physical and economic scarcity be modeled as two separate indicators that the \"ability\" then combines in some way? Which reading of \"clean water availability\" is the one the model must deliver?\n\n3. **Demand growth — what is the logical relationship between population growth and water-use growth that the model should encode?**\n   The background says water use has grown at about twice the rate of population. Structurally, is the intended decomposition that per-capita water use itself grows over time (so total use = population x a rising per-capita use, i.e., the 2x comes from consumption intensity rising), or that total water use simply doubles its population base at a fixed per-capita level? In other words: should per-capita demand be held constant and only population drive growth, or should per-capita demand in each sector (agriculture, industry, domestic) be allowed to compound upward so that total demand out-runs population by roughly a factor of two? Which is the correct reading of \"water use growing at twice the rate of population\" for the demand side of the model?\n\nPlease answer each of the three as the interpretation I should adopt (not a number), so I can lock the definitions, the valid domain of the index, and the structure of the supply and demand sides before I parameterize them.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your structural guidance, I have proposed one specific configuration of the model's demand-side allocation and supply-side treatment, and I would like you to accept or reject it as the structure I should use. This is a judgment on a single coherent structural hypothesis, not a request for magnitudes.\n\n**The specific structural allocation I propose:**\n\n- **Two-tier demand, with the core tier non-negotiable and the secondary tier weighted.**\n  - *Core need* = direct human (domestic) consumption + a minimum ecological/environmental flow, treated as a hard requirement that must be met in full.\n  - *Secondary need* = agricultural + industrial process water, treated as a *weighted* share of the core need, with a weight w < 1 (I use w = 0.6). So the regional \"need\" entering the index is\n    `Need(t) = Core(t) + 0.6 x Secondary(t)`.\n  - The index remains a single ratio `R(t) = usable clean supply / Need(t)`, with threshold R = 1 meaning the region meets its (weighted) needs, R < 1 a deficit, R > 1 surplus.\n\n- **Supply side = capturable, deliverable, quality-acceptable water, a single indicator.**\n  - `Supply(t) = Pop(t) x [ RenewAvail(t) x Yield(t) x QualityFactor(t) + 0.5 x (Reuse(t) + Desal(t)) x RenewAvail(t) ]`,\n  - where `QualityFactor(t) = 1 - QualityLossRate x (1 - Sanitation(t))`.\n  - Economic scarcity (poor management/infrastructure) therefore *lowers the same supply side* via Yield, Sanitation/Quality, Reuse and Desal, rather than being a separate second index. Physical scarcity (RenewAvail, reduced by a climate trend) sets the ceiling of that same side.\n\n- **Demand per-capita compounds upward per sector** at a common growth rate, so total water use grows at roughly twice the rate of population (the only reading consistent with the background).\n\nPlease answer: **do you accept this specific two-tier, single-ratio, quality-discounted-supply structure as the model's configuration, or reject it?** If you reject it, name the specific term or weight that is mis-prioritized so I can revise it (I will then turn to a counterexample against the revised structure).",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my two-tier, single-ratio, quality-discounted-supply structure in Exchange 2. I will not default to a generic fix. Instead, I want to identify, in your terms, the specific case, boundary condition, or failure mode in which this current mechanism breaks — because that is the most current limitation of the model and it directly determines the bias-analysis and robustness discussion of the final report.\n\n**The current mechanism (the one you rejected), restated precisely:**\n\n`R(t) = Supply(t) / Need(t)`, where\n- `Need(t) = Core(t) + 0.6 x Secondary(t)`; `Core = domestic + minimum ecological flow` (hard), `Secondary = ag + industrial` (weighted at 0.6);\n- `Supply(t) = Pop x [ RenewAvail x Yield x (1 - QL x (1 - Sanitation)) + 0.5 (Reuse + Desal) x RenewAvail ]`;\n- per-capita sector use compounds upward at a common rate; RenewAvail declines on a climate trend.\n\n**Please identify the specific counterexample — a concrete case, region-type, or boundary condition — under which this mechanism gives the wrong answer or breaks down.** For instance (name the one that applies, or a different one of your own):\n\n1. **The ecological-flow floor.** If the minimum ecological flow in `Core` is set relative to population, does it break in a region where ecological flow must be set relative to *total streamflow / watershed*, not to the population served? I.e., a boundary where Core's ecological term is structurally mis-specified and should not scale with population?\n\n2. **The single-ratio collapse.** Does the weighted single ratio break when a region is simultaneously in *physical* scarcity (very low RenewAvail) and *economic* scarcity (low Yield/Sanitation) — i.e., a boundary where the one number R can no longer tell you which scarcity is binding, and the index should have exposed the two separately even though they feed one ratio?\n\n3. **The supplemental-supply cap.** Does the `0.5 x (Reuse + Desal) x RenewAvail` term break for a region where desalination and reuse are *not* bounded by a fraction of renewable supply (e.g., an arid region where desal is the *primary* source, independent of RenewAvail)? I.e., a boundary where tying supplemental supply to the renewable volume is the specific mis-specification?\n\n4. **The constant weight w = 0.6.** Does the fixed weight on Secondary break for a region whose agricultural share is dominant (e.g., ~91% ag, as in South Asia) — a boundary where weighting ag+ind at a flat 0.6 understates true need and makes the index falsely optimistic?\n\nName the specific case that breaks the mechanism (and, if relevant, which of the four above — or another — is the binding limitation). I will use it to revise the structure and to write the model's stated limitations."
+        ],
+        "expert_answers": [
+          "**1.** Adopt the ratio R = usable clean supply / demand, but define \"need\" as direct human consumption plus minimum ecological flow as the *core* requirement, with agricultural and industrial process water as a separate, weighted tier — not lumped in as non-negotiable need. Domain: R ≥ 0, unbounded above; threshold R = 1. A single ratio is the right structure; a multi-criterion score is not what \"ability to meet needs\" means.\n\n**2.** Supply entering R must be *capturable, deliverable, quality-acceptable* water — i.e., after yield, treatment, sanitation, reuse. Economic scarcity therefore lowers the supply side of the same index; physical scarcity sets its ceiling. Do not split into two indicators.\n\n**3.** Encode rising per-capita use: total demand = population × sector per-capita use, with per-capita use allowed to compound upward per sector. That is the only reading under which use outruns population by ~2×.",
+          "reject",
+          "Case 3 is the binding one: an arid, desalination-dependent region (Gulf-type, e.g. Kuwait, UAE, Qatar) where desalinated and reused water is the *primary* supply, not a supplement. There `0.5 × (Reuse + Desal) × RenewAvail` collapses toward zero as RenewAvail → 0, so R → 0 and the model reports catastrophic scarcity precisely where the region in fact meets demand — the mechanism fails at the boundary it most needs to handle. Tying supplemental supply to renewable volume is the mis-specification; desal/reuse must enter as an independent supply term with its own energy/cost ceiling, not as a fraction of RenewAvail."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_311d5620561e",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8604166666666666,
+      "dimension_scores": {
+        "analysis_evaluation": 0.7999999999999999,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8666666666666667,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately restates the core objectives of each task, clearly defining the scope from model development to intervention analysis. The goals are explicit, such as measuring regional water ability and projecting future scarcity. However, the analysis is largely a paraphrase of the prompt without adding significant depth to the \"definition\" aspect, such as specifying the exact mathematical nature of the \"measure\" or the specific criteria for \"clean water.\" It is clear but lacks the granular detail that would distinguish a high-level strategic definition from a simple task list.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically sequenced and cover all required components of the problem, including the dependency of Task 3 and 5 on Task 1's model. The coverage is comprehensive, addressing both physical/economic scarcity and social/environmental drivers. However, the modeler fails to explicitly decompose the complex interdisciplinary nature of the problem into distinct modeling sub-problems (e.g., separating supply dynamics from demand dynamics or defining specific variables for \"clean water\" quality). The analysis treats the tasks as sequential steps rather than a cohesive system of interrelated sub-problems, missing an opportunity to highlight the structural dependencies between supply, demand, and intervention variables.",
+            "score": 7
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing specific quantitative trends, clear societal implications, and a balanced discussion of model strengths and weaknesses.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying specific structural and data biases, and appropriately adjusts the final interpretation to account for the optimistic tilt of the model.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is practical, tailored to the specific region, and provides actionable insights through dynamic simulation and sensitivity analysis, effectively supporting decision-making for water resource management.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using established indices and logical distinctions between water use priorities, with assumptions that are reasonable and well-justified for the specific context.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, quantitatively specified, and logically consistent with the background context, effectively distinguishing between physical and economic scarcity drivers.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses an appropriate metric (ratio R) and a dynamic structure that accurately reflects the interplay of physical and economic scarcity, with a logical and region-specific intervention strategy.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2016_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a dynamic regional supply-vs-need model for clean water (Task 1) for a heavily water-stressed region, and the problem statement leaves three *structural/definitional* points unsettled that I cannot resolve from the text or the gathered data. I am not asking for magnitudes or empirical constants — only for the logical interpretation you would adopt, so the model's variables and objective have the right domain and meaning.\n\n1. **What does \"ability to provide clean water to meet the needs of its population\" refer to at its core — and what is its valid domain?**\n   I plan to define the regional ability as a single dimensionless index R(t) = usable clean-water supply (t) / clean-water demand (t), with R >= 1 meaning the region meets all need, 0 < R < 1 meaning a deficit, and R > 1 meaning surplus. Does that ratio-based definition — clean, usable supply over clean-water demand, as a fraction of need — capture the intended meaning of \"ability to provide clean water,\" or is the objective meant to be something structurally different (e.g., a per-capita volume against a fixed standard, or a multi-criterion score)? In particular: should \"needs\" include only direct human consumption plus minimum ecological/environmental flow, or also industrial and agricultural process water in full? What is the natural lower/upper bound of the index you would accept, and what value do you treat as the threshold of \"meets the needs\"?\n\n2. **Physical vs. economic scarcity — which one should the index's supply side actually represent, and how are the two combined?**\n   The problem distinguishes physical scarcity (inadequate water in the region) from economic scarcity (water exists but poor management/infrastructure limits clean availability). Structurally, does the \"clean-water supply\" entering R(t) mean *total renewable water physically present*, or *the fraction of that water that is actually capturable, deliverable and of acceptable quality* (i.e., after applying yield, treatment, sanitation, and desalination/reuse)? I.e., should economic scarcity lower the supply side of the same index, or should physical and economic scarcity be modeled as two separate indicators that the \"ability\" then combines in some way? Which reading of \"clean water availability\" is the one the model must deliver?\n\n3. **Demand growth — what is the logical relationship between population growth and water-use growth that the model should encode?**\n   The background says water use has grown at about twice the rate of population. Structurally, is the intended decomposition that per-capita water use itself grows over time (so total use = population x a rising per-capita use, i.e., the 2x comes from consumption intensity rising), or that total water use simply doubles its population base at a fixed per-capita level? In other words: should per-capita demand be held constant and only population drive growth, or should per-capita demand in each sector (agriculture, industry, domestic) be allowed to compound upward so that total demand out-runs population by roughly a factor of two? Which is the correct reading of \"water use growing at twice the rate of population\" for the demand side of the model?\n\nPlease answer each of the three as the interpretation I should adopt (not a number), so I can lock the definitions, the valid domain of the index, and the structure of the supply and demand sides before I parameterize them.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your structural guidance, I have proposed one specific configuration of the model's demand-side allocation and supply-side treatment, and I would like you to accept or reject it as the structure I should use. This is a judgment on a single coherent structural hypothesis, not a request for magnitudes.\n\n**The specific structural allocation I propose:**\n\n- **Two-tier demand, with the core tier non-negotiable and the secondary tier weighted.**\n  - *Core need* = direct human (domestic) consumption + a minimum ecological/environmental flow, treated as a hard requirement that must be met in full.\n  - *Secondary need* = agricultural + industrial process water, treated as a *weighted* share of the core need, with a weight w < 1 (I use w = 0.6). So the regional \"need\" entering the index is\n    `Need(t) = Core(t) + 0.6 x Secondary(t)`.\n  - The index remains a single ratio `R(t) = usable clean supply / Need(t)`, with threshold R = 1 meaning the region meets its (weighted) needs, R < 1 a deficit, R > 1 surplus.\n\n- **Supply side = capturable, deliverable, quality-acceptable water, a single indicator.**\n  - `Supply(t) = Pop(t) x [ RenewAvail(t) x Yield(t) x QualityFactor(t) + 0.5 x (Reuse(t) + Desal(t)) x RenewAvail(t) ]`,\n  - where `QualityFactor(t) = 1 - QualityLossRate x (1 - Sanitation(t))`.\n  - Economic scarcity (poor management/infrastructure) therefore *lowers the same supply side* via Yield, Sanitation/Quality, Reuse and Desal, rather than being a separate second index. Physical scarcity (RenewAvail, reduced by a climate trend) sets the ceiling of that same side.\n\n- **Demand per-capita compounds upward per sector** at a common growth rate, so total water use grows at roughly twice the rate of population (the only reading consistent with the background).\n\nPlease answer: **do you accept this specific two-tier, single-ratio, quality-discounted-supply structure as the model's configuration, or reject it?** If you reject it, name the specific term or weight that is mis-prioritized so I can revise it (I will then turn to a counterexample against the revised structure).",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my two-tier, single-ratio, quality-discounted-supply structure in Exchange 2. I will not default to a generic fix. Instead, I want to identify, in your terms, the specific case, boundary condition, or failure mode in which this current mechanism breaks — because that is the most current limitation of the model and it directly determines the bias-analysis and robustness discussion of the final report.\n\n**The current mechanism (the one you rejected), restated precisely:**\n\n`R(t) = Supply(t) / Need(t)`, where\n- `Need(t) = Core(t) + 0.6 x Secondary(t)`; `Core = domestic + minimum ecological flow` (hard), `Secondary = ag + industrial` (weighted at 0.6);\n- `Supply(t) = Pop x [ RenewAvail x Yield x (1 - QL x (1 - Sanitation)) + 0.5 (Reuse + Desal) x RenewAvail ]`;\n- per-capita sector use compounds upward at a common rate; RenewAvail declines on a climate trend.\n\n**Please identify the specific counterexample — a concrete case, region-type, or boundary condition — under which this mechanism gives the wrong answer or breaks down.** For instance (name the one that applies, or a different one of your own):\n\n1. **The ecological-flow floor.** If the minimum ecological flow in `Core` is set relative to population, does it break in a region where ecological flow must be set relative to *total streamflow / watershed*, not to the population served? I.e., a boundary where Core's ecological term is structurally mis-specified and should not scale with population?\n\n2. **The single-ratio collapse.** Does the weighted single ratio break when a region is simultaneously in *physical* scarcity (very low RenewAvail) and *economic* scarcity (low Yield/Sanitation) — i.e., a boundary where the one number R can no longer tell you which scarcity is binding, and the index should have exposed the two separately even though they feed one ratio?\n\n3. **The supplemental-supply cap.** Does the `0.5 x (Reuse + Desal) x RenewAvail` term break for a region where desalination and reuse are *not* bounded by a fraction of renewable supply (e.g., an arid region where desal is the *primary* source, independent of RenewAvail)? I.e., a boundary where tying supplemental supply to the renewable volume is the specific mis-specification?\n\n4. **The constant weight w = 0.6.** Does the fixed weight on Secondary break for a region whose agricultural share is dominant (e.g., ~91% ag, as in South Asia) — a boundary where weighting ag+ind at a flat 0.6 understates true need and makes the index falsely optimistic?\n\nName the specific case that breaks the mechanism (and, if relevant, which of the four above — or another — is the binding limitation). I will use it to revise the structure and to write the model's stated limitations."
+            ],
+            "expert_answers": [
+              "**1.** Adopt the ratio R = usable clean supply / demand, but define \"need\" as direct human consumption plus minimum ecological flow as the *core* requirement, with agricultural and industrial process water as a separate, weighted tier — not lumped in as non-negotiable need. Domain: R ≥ 0, unbounded above; threshold R = 1. A single ratio is the right structure; a multi-criterion score is not what \"ability to meet needs\" means.\n\n**2.** Supply entering R must be *capturable, deliverable, quality-acceptable* water — i.e., after yield, treatment, sanitation, reuse. Economic scarcity therefore lowers the supply side of the same index; physical scarcity sets its ceiling. Do not split into two indicators.\n\n**3.** Encode rising per-capita use: total demand = population × sector per-capita use, with per-capita use allowed to compound upward per sector. That is the only reading under which use outruns population by ~2×.",
+              "reject",
+              "Case 3 is the binding one: an arid, desalination-dependent region (Gulf-type, e.g. Kuwait, UAE, Qatar) where desalinated and reused water is the *primary* supply, not a supplement. There `0.5 × (Reuse + Desal) × RenewAvail` collapses toward zero as RenewAvail → 0, so R → 0 and the model reports catastrophic scarcity precisely where the region in fact meets demand — the mechanism fails at the boundary it most needs to handle. Tying supplemental supply to renewable volume is the mis-specification; desal/reuse must enter as an independent supply term with its own energy/cost ceiling, not as a fraction of RenewAvail."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_311d5620561e",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.825,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6999999999999998,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r1p2_20260930_053024/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately restates the core objectives of each task, clearly defining the scope from model development to intervention analysis. The goals are explicit, such as measuring regional water ability and projecting future scarcity. However, the analysis is largely a paraphrase of the prompt without adding significant depth to the \"definition\" aspect, such as specifying the exact mathematical nature of the \"measure\" or the specific criteria for \"clean water.\" It is clear but lacks the granular detail that would distinguish a high-level strategic definition from a simple task list.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced and cover all required components of the problem, including the dependency of Task 3 and 5 on Task 1's model. The coverage is comprehensive, addressing both physical/economic scarcity and social/environmental drivers. However, the modeler fails to explicitly decompose the complex interdisciplinary nature of the problem into distinct modeling sub-problems (e.g., separating supply dynamics from demand dynamics or defining specific variables for \"clean water\" quality). The analysis treats the tasks as sequential steps rather than a cohesive system of interrelated sub-problems, missing an opportunity to highlight the structural dependencies between supply, demand, and intervention variables.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative trends, clear societal implications, and a balanced discussion of model strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific structural and data biases, and appropriately adjusts the final interpretation to account for the optimistic tilt of the model.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, tailored to the specific region, and provides actionable insights through dynamic simulation and sensitivity analysis, effectively supporting decision-making for water resource management.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using established indices and logical distinctions between water use priorities, with assumptions that are reasonable and well-justified for the specific context.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, quantitatively specified, and logically consistent with the background context, effectively distinguishing between physical and economic scarcity drivers.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses an appropriate metric (ratio R) and a dynamic structure that accurately reflects the interplay of physical and economic scarcity, with a logical and region-specific intervention strategy.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        },
+        {
+          "problem_id": "2016_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p2_20260930_053024",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p2_20260930_053024/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Task 1 index: a dynamic measure of a region's ability to supply clean water to its population, defined as S(t)/D(t) where S is effective clean supply (renewable renewable supply × a clean-water access factor A) and D is sectoral demand (domestic, agriculture, industry) plus environmental flow requirements E. The problem and the Falkenmark thresholds (1700/1000/500 m³/capita/year) are settled, but three logical boundaries the text leaves open are required to parameterize the mechanism:\n\nG1 (status definition): The Falkenmark labels attach to per-capita renewable supply, while my index compares supply against total demand including E. Should the scarcity status be read from the supply-side per-capita indicator, from the S/D balance ratio, or from a combination — and if a combination, which quantity is authoritative when they disagree (e.g., ample supply per capita but S < D in a specific sector)?\n\nG2 (access factor A — economic scarcity): The problem separates physical from economic scarcity, but does not define where economic scarcity enters a supply-to-need measure. Should A enter the supply side (available clean water = raw supply × access), the demand side (unmet need), or both; and must the index equal 1 exactly when access is complete (A = 1), or is A allowed to exceed the physically available fraction (i.e., is S/D ≥ 1 attainable in principle)?\n\nG3 (environmental flows): Task 1 asks only about the population's needs, while Task 4 requires considering the water ecosystem. Are E part of the denominator (i.e., failing E also registers as scarcity in the Task 1 measure), or is E an exogenous constraint reported separately and left out of the index itself?\n\nPlease state, for each of G1–G3, the logical reading the problem text supports — the valid domain/interpretation, not a magnitude.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFrom Exchange 1 I have: (i) Falkenmark per-capita renewable supply is authoritative for the scarcity label, S/D is the complementary sector-diagnostic; (ii) the access factor A multiplies raw renewable supply to give effective clean supply, with A in [0,1]; (iii) environmental flows E sit in the demand denominator.\n\nBased on those boundaries I propose this one structure for the dynamic model and its phase organization, for your acceptance or rejection:\n\n- **State variables (dynamic):** renewable renewable supply R(t) (driven by precipitation/climate trend and aquifer depletion), access A(t) (driven by infrastructure and sanitation investment), population P(t), and sectoral per-capita demand rates (domestic, agricultural, industrial) that grow with income at a rate exceeding the population rate, consistent with \"water use grows twice as fast as population.\"\n- **Index structure:** I(t) = [R(t)·A(t)] / [D_dom(t) + D_agr(t) + D_ind(t) + E], computed annually; the Falkenmark label attaches to R(t)/P(t) separately, and a region is classified scarce if either the label says so or I(t) < 1.\n- **Phase-based organization:** demand-side interventions (irrigation efficiency, leakage reduction, water pricing) act on the D terms and are phased in over the first half of the 15-year horizon; supply-side interventions (desalination, harvesting, A-investments) act on R·A with a multi-year construction lag and are phased in over the second half, so the plan does not promise supply that cannot be built; E is held at the regional minimum environmental flow constant across both phases.\n\nOne coherent configuration only — please answer \"accept\" or \"reject.\"",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 structure. Integrating that rejection, the current structure is: a single coupled dynamic index I(t) = [R(t)·A(t)] / [D_dom(t) + D_agr(t) + D_ind(t) + E(t)] computed continuously year by year, where (a) supply-side measures (desalination, harvesting, A-investment) and demand-side measures (irrigation efficiency, pricing) may take effect in any combination in any year as their costs and lead times allow, rather than in fixed sequential phases; (b) E(t) is not a fixed constant but scales with renewable supply in drought years so the ecosystem share tracks the actual flow regime; (c) the Falkenmark label (R/P) and the balance index I(t) are reported together every year, the label carrying the classification, I(t) carrying the sector diagnosis.\n\nAgainst this revised structure, what is the specific case, boundary condition, or failure mode that would break the mechanism — i.e., where this coupled index gives a scarcity reading (or a projection for Task 5) that is wrong or misleading? Name the case and the condition that triggers it; no advice beyond that."
+            ],
+            "expert_answers": [
+              "**G1.** The problem text supports reading status from the supply-side per-capita indicator (Falkenmark), with S/D as a complementary balance diagnostic. Where they disagree, the per-capita indicator is authoritative for the scarcity *label*, since the thresholds are defined on it; S/D is authoritative for identifying *which sector* is short. Neither alone is the index.\n\n**G2.** A enters the supply side: effective clean supply = raw renewable supply × A. Economic scarcity is a supply-side limitation (water exists but is inaccessible), not a demand reduction. A is bounded in [0,1]; S/D ≥ 1 is attainable in principle when supply meets demand, but A cannot exceed the physically available fraction.\n\n**G3.** E belongs in the denominator. Task 1's \"needs of its population\" is not exclusive of ecosystem needs — the problem frames water as an ecosystem-embedded resource, and Task 4's ecosystem constraint is a continuation, not a new term. Excluding E would let the index report adequacy while the ecosystem is being depleted, which the problem's framing rejects.",
+              "reject",
+              "The case: a region with ample renewable supply per capita (R/P above 1700, so the Falkenmark label reads \"no scarcity\") but where A is near zero because infrastructure and sanitation are absent — economic scarcity. The coupled index I(t) = R·A/(D+E) then falls below 1, and the two reported indicators contradict each other: the label says adequate, the balance says scarce. The mechanism breaks because A multiplies supply while the authoritative label ignores A entirely, so the same region is simultaneously classified non-scarce and diagnosed scarce, and Task 5's projection inherits whichever indicator the reader privileges. Trigger condition: high R/P combined with low A — precisely the economic-scarcity case the problem separates from physical scarcity."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_311d5620561e",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8958333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_5/train_candidate/runs/round_5/r2p2_20260930_053024/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each of the six tasks, accurately reflecting the problem requirements. For Task 1, the goal of a dynamic, region-agnostic index distinguishing physical and economic scarcity is well-stated. Subsequent tasks (2-5) have specific, actionable goals (e.g., 15-year projection, intervention design) that align with the prompt. The decomposition into \"Goal\" and \"Scope\" for each task enhances clarity. The only minor weakness is the assumption in Task 6 that the report is delivered in a \"machine-readable container,\" which deviates slightly from the standard 20-page report requirement, though the content scope remains correct. Overall, the definitions are precise and the goals are explicit.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated and cover all aspects of the problem. Task 1 provides the tool, Task 2 applies it to a specific region (Jordan), Task 3 projects the baseline, Task 4 designs interventions, and Task 5 projects the post-intervention state. This dependency chain is coherent and directly supports the final goal of assessing water scarcity and mitigation. The coverage is complete, addressing both environmental and social drivers as required. There are no missing key parts; the modeler correctly identifies the need to consider dynamic factors and externalities. The scope for each task is appropriately bounded, ensuring that the decomposition is both comprehensive and manageable.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative insights, clear inference paths, and a balanced discussion of model strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is comprehensive, identifying key structural and data biases, and effectively mitigating their impact through sensitivity analysis and clear limitations.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and scientifically sound, correctly distinguishing physical and economic scarcity and including critical components like environmental flows. They are well-justified with data sources and sensitivity analyses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (coupled system, Monte Carlo) and metrics (dual indicators) that scientifically reflect the problem's complexity. The structure effectively captures the dynamic nature of water supply and demand, including stochastic elements.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, integrating physical, economic, and social factors into a dynamic simulation. It provides robust uncertainty quantification and clear decision-making insights for intervention planning, tailored specifically to the water scarcity problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, using established hydrological metrics and stochastic modeling. It incorporates domain-specific principles like environmental flows and infrastructure lags, demonstrating a deep understanding of the scientific factors driving water scarcity.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.8604166666666666,
+      "interaction_cost": 0.8578702528043363,
+      "interaction_penalty": 0.04289351264021682,
+      "net_utility": 0.8175231540264498,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2507,
+          "total_expert_latency_seconds": 3.57,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.91897142050669,
+          "latency_cost_component": 0.24144477549962703,
+          "interaction_cost": 0.867588568202676,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1657,
+          "total_expert_latency_seconds": 3.86,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8703798435149912,
+          "latency_cost_component": 0.25122089723572183,
+          "interaction_cost": 0.8481519374059965,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T06:14:53.107078",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_311d5620561e",
+  "workflow": {
+    "name": "Gap-Driven Operator Selection",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "This patch departs from Round 2 by introducing an explicit 'Operator Selection Rule' that decouples operator choice from exchange position. Round 2 strictly assigned operators to exchanges (1->1, 2->2, 3->3), which failed to account for cases where the gap type shifts (e.g., after a rejection in Exchange 2, the gap becomes a failure mode of the revised structure, requiring Operator 3, not Operator 2). Round 4 attempted to address this but was rejected for being too similar to Round 2. This patch explicitly names the failure mode (defaulting to generic revision) and prescribes a specific behavior (integrate flaw, then use Operator 3 on the revised structure), providing a clearer, more distinct behavioral change than previous rounds.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Operator Selection Rule:** The operator for each exchange is determined by the *type of gap* identified, not by the exchange number. \n- Use **Operator 1** when the gap is a missing definition, domain, or logical interpretation.\n- Use **Operator 2** when the gap is a choice between specific structural configurations or assumptions.\n- Use **Operator 3** when the gap is a potential failure mode or boundary condition of the current structure.\n\nIf Exchange 2 is rejected, the agent must NOT default to a generic revision. Instead, it must integrate the specific flaw identified by the expert into the structure and then use **Operator 3** to ask for a counterexample against this *revised* structure. If Exchange 2 is accepted, use **Operator 3** to ask for a counterexample against the accepted structure. In both cases, the counterexample query targets the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Operator Selection Rule:** The operator for each exchange is determined by the *type of gap* identified, not by the exchange number. \n- Use **Operator 1** when the gap is a missing definition, domain, or logical interpretation.\n- Use **Operator 2** when the gap is a choice between specific structural configurations or assumptions.\n- Use **Operator 3** when the gap is a potential failure mode or boundary condition of the current structure.\n\nIf Exchange 2 is rejected, the agent must NOT default to a generic revision. Instead, it must integrate the specific flaw identified by the expert into the structure and then use **Operator 3** to ask for a counterexample against this *revised* structure. If Exchange 2 is accepted, use **Operator 3** to ask for a counterexample against the accepted structure. In both cases, the counterexample query targets the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Operator Selection Rule:** The operator for each exchange is determined by the *type of gap* identified, not by the exchange number. \n- Use **Operator 1** when the gap is a missing definition, domain, or logical interpretation.\n- Use **Operator 2** when the gap is a choice between specific structural configurations or assumptions.\n- Use **Operator 3** when the gap is a potential failure mode or boundary condition of the current structure.\n\nIf Exchange 2 is rejected, the agent must NOT default to a generic revision. Instead, it must integrate the specific flaw identified by the expert into the structure and then use **Operator 3** to ask for a counterexample against this *revised* structure. If Exchange 2 is accepted, use **Operator 3** to ask for a counterexample against the accepted structure. In both cases, the counterexample query targets the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_311d5620561e",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 5,
+    "parent_workflow_ids": [
+      "interaction_workflow_e0f19556bdd2"
+    ],
+    "training_batch": [
+      "2019_C",
+      "2016_E"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2019_C",
+    "2016_E"
+  ],
+  "absolute_utility": 0.8177083333333333,
+  "interaction_cost": 0.8588637441168399,
+  "interaction_penalty": 0.042943187205842004,
+  "net_utility": 0.7747651461274914,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

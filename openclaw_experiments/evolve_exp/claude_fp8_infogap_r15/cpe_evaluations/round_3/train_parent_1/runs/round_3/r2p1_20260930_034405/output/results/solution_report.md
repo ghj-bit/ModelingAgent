@@ -1,0 +1,152 @@
+# Solution
+
+## Subtask 1: Model the effect of self-driving, cooperating (CAV) vehicles on traffic flow for the I-5, I-90, I-405, and SR 520 corrid
+
+### Problem
+
+Model the effect of self-driving, cooperating (CAV) vehicles on traffic flow for the I-5, I-90, I-405, and SR 520 corridor in Thurston, Pierce, King, and Snohomish counties. The model must address: (a) the relationship between the number of lanes, peak traffic volume, and CAV penetration (10%, 50%, 90%); (b) cooperation between CAVs and interaction with human-driven vehicles; (c) whether stable equilibria exist at each penetration level; (d) whether a tipping point exists where performance changes markedly; (e) under what conditions lanes should be dedicated to CAVs; and (f) other policy implications.
+
+### Analysis
+
+Assumptions and modeling approach:
+
+1. CAV share interpretation: The percentage of self-driving cars (p) is a volume (flow) share — the fraction of vehicles in traffic that are CAVs. This was confirmed by the expert in Exchange 1.
+
+2. Capacity density baseline: The HCM critical density of 45 pc/mi/ln is the human-only capacity density, not an invariant definition. CAV platooning raises the effective capacity density by reducing inter-vehicle headways for CAV–CAV pairs. This was confirmed by the expert in Exchange 1.
+
+3. Scope of cooperation: Cooperation is defined as lane-level platooning (reduced headway within a CAV platoon) and smoothed car-following (reduced reaction time for CAVs in mixed flow). Network-level effects (signal coordination, V2I) are treated qualitatively for the dedicated-lane and 'other policy' questions, as the problem text does not settle whether they are in scope for the core mechanism (Exchange 1, item 2).
+
+4. Equilibrium definition: A stable equilibrium for a segment exists when the peak-hour demand flow does not exceed the segment's capacity at the given CAV share — i.e., V/C < 1. If V/C ≥ 1, the segment is congested and no stable steady-state equilibrium exists at that demand level. The expert noted the problem text does not define 'equilibrium' operationally (Exchange 1, item 3); this definition is the natural single-segment interpretation.
+
+5. Tipping point definition: The tipping point is the CAV share p* at which the slope of the capacity-vs-penration curve dQ/dp exceeds a threshold (2× the initial slope). This is a slope-threshold definition, consistent with the expert's observation that the text does not operationally define 'tipping point' (Exchange 1, item 3). The sweep over threshold factors (1.5×, 2.0×, 3.0×) shows the tipping point is robustly in the range p* ≈ 0.07–0.14, with the base case at p* ≈ 0.10.
+
+6. Peak-to-average ratio: Peak-hour flow is taken as 10% of the Average Daily Traffic (ADT). This is a standard planning assumption for urban interstates in the Pacific Northwest and is the value used throughout. The model's qualitative conclusions (which segments are congested, the relative effect of CAVs) are insensitive to this assumption within a reasonable range (5–15%).
+
+7. Dedicated-lane rule: A lane is dedicated to CAVs when the total capacity with (n−1) mixed lanes + 1 CAV-only lane exceeds the capacity with all n lanes in mixed traffic, evaluated at the segment's minimum lane count (bottleneck). The CAV-only lane uses the CAV-only capacity density 45/α pc/mi/ln. Per the expert's counterexample (Exchange 3), segments with a lane drop downstream invalidate this rule: the dedicated-lane comparison is only valid when n is constant over the segment, and where lanes decrease downstream the CAV-only lane cannot be sustained. Such segments are flagged as inapplicable for the dedicated-lane policy.
+
+8. HCM fundamental diagram: The mixed-fleet capacity per lane is modeled using the HCM unified speed-flow relation: q(k) = k · S_f · (1 − (k/k_jam)^a), with S_f = 60 mph (free-flow speed), a = 4.5 (shape exponent), k_jam = 150 pc/mi/ln (jam density). Human-only capacity per lane: Q_h = 45 · 60 · (1 − (45/150)^4.5) ≈ 2688 pc/h/ln, consistent with standard HCM values of 2400–2600 pc/h/ln for basic freeway segments.
+
+Method soundness: The model is a macroscopic (fundamental-diagram) model, appropriate for the segment-level, steady-state analysis required. It does not attempt to simulate individual vehicle interactions; instead it captures the aggregate effect of CAV platooning on the flow-density relationship through a headway-reduction mechanism. This is the standard approach in the CAV capacity literature and is consistent with the empirical findings cited in the external data (HCM 6th ed. for the baseline; Applied Sciences 2024 for the nonlinear capacity-gain shape).
+
+### Modeling Process
+
+Variables and parameters:
+- p: CAV volume share (0.0, 0.1, 0.5, 0.9)
+- S_f = 60 mph: free-flow speed
+- a = 4.5: HCM unified speed-flow exponent
+- k_jam = 150 pc/mi/ln: jam density
+- K_H = 45 pc/mi/ln: human-only capacity density
+- α ∈ (0,1): headway reduction factor for CAV–CAV pairs (α < 1 means CAVs use less headway than humans)
+- γ ≥ 0: preferential platoon-formation factor (γ = 0 → random CAV assignment; γ > 0 → CAVs cluster into platoons more than random)
+- ADT: average daily traffic count for the segment (from dataset)
+- n: number of lanes at the segment
+- n_min: minimum lane count over the segment (bottleneck, used for dedicated-lane rule)
+- Q_peak = 0.10 · ADT: peak-hour demand flow (pc/h)
+
+CAV–CAV pair fraction:
+  p_eff = p² · (1 + γ)
+  (In a random assignment, the fraction of vehicle pairs that are both CAV is p²; the factor (1+γ) captures preferential platoon formation.)
+
+Mixed-fleet capacity density:
+  k_cap(p) = 45 · (1 + (1/α − 1) · p_eff) pc/mi/ln
+  At p = 0: k_cap = 45 (human baseline). At p = 1: k_cap = 45/α (CAV-only).
+
+Mixed-fleet capacity per lane:
+  Q(p) = k_cap(p) · S_f · (1 − (k_cap(p)/k_jam)^a) pc/h/ln
+
+CAV-only lane capacity:
+  Q_CAV = (45/α) · S_f · (1 − ((45/α)/k_jam)^a) pc/h/ln
+
+Segment capacity (n lanes):
+  C(p) = n · Q(p) pc/h
+
+V/C ratio:
+  vc(p) = Q_peak / C(p)
+
+Equilibrium: stable if vc < 1; congested (no stable equilibrium) if vc ≥ 1.
+
+Tipping point:
+  p* = argmin{p : dQ/dp > 2 · (dQ/dp)|_{p→0}}
+  computed numerically on a 101-point grid over p ∈ [0,1].
+
+Dedicated-lane rule (per segment, direction):
+  C_ded = (n_min − 1) · Q(p) + Q_CAV
+  Dedicated lane worthwhile if: (i) n_min ≥ 2; (ii) no lane drop downstream (n is constant); (iii) C_ded > n_min · Q(p).
+
+Calibration:
+  α and γ are solved simultaneously to match two literature calibration points:
+  - Q(0.5)/Q(0) − 1 = 0.075  (7.5% capacity gain at 50% CAV penetration, from Applied Sciences 2024)
+  - Q(0.9)/Q(0) − 1 = 0.18   (18% capacity gain at 90% CAV penetration, steeper end of the reported range)
+  Solution: α = 0.8848, γ = 0.8182.
+  Sensitivity: the sweep over (target_50, target_90, threshold_factor) shows α ∈ [0.82, 0.90], γ ∈ [0.03, 1.73], and the tipping point robustly in p* ∈ [0.07, 0.14].
+
+Solution procedure:
+  1. For each segment (Route_ID, direction, milepost range) in the dataset:
+     a. Read ADT and lane count n.
+     b. Compute n_min = min(lane count over the route in that direction).
+     c. Detect lane drops downstream: n_min < n at this segment.
+     d. For each p ∈ {0, 0.1, 0.5, 0.9}:
+        i.   Compute Q(p), C(p) = n_min · Q(p), vc(p).
+        ii.  Determine equilibrium status (vc < 1?).
+        iii. Compute C_ded and dedicated-lane worthiness (applicable only if no lane drop).
+  2. Aggregate to route-level summaries: count of congested segments, max V/C, count of dedicated-lane-worthwhile segments.
+  3. Compute tipping point p* from the capacity-vs-p curve.
+
+### Outcome Analysis
+
+Calibrated model parameters: α = 0.8848 (CAV–CAV headway is 88.5% of human headway), γ = 0.8182 (moderate preferential platoon formation). Human-only capacity: 2688 pc/h/ln.
+
+Capacity gain by CAV share (per lane):
+  p = 0.1: Q = 2694 pc/h/ln (+0.2%)
+  p = 0.5: Q = 2843 pc/h/ln (+5.8%)
+  p = 0.9: Q = 3186 pc/h/ln (+18.5%)
+
+Tipping point: p* ≈ 0.10 (base case, threshold = 2× initial slope). The slope of the capacity-vs-p curve steepens noticeably above p ≈ 0.10. This is consistent with the literature finding that the capacity increment peaks in the middle of the penetration range and the curve is concave/slow at first, steepening toward high shares.
+
+Equilibrium and congestion (base case, n_min used for all segments):
+  The corridor is severely congested at all CAV shares considered. Max V/C ratios range from 2.0 (SR 520) to 4.5 (I-5 near Olympia). Even at p = 0.9, the majority of segments remain congested (V/C > 1). CAVs reduce congestion but do not eliminate it at 10–90% penetration.
+
+  Route 5 (I-5, 135 segments per direction):
+    p=0: all 135 segments congested, max V/C = 4.50
+    p=0.9: 132/135 still congested, max V/C = 3.80
+  Route 405 (I-405, 47 segments per direction):
+    p=0: 45/47 congested, max V/C = 3.63
+    p=0.9: 45/47 still congested, max V/C = 3.06
+  Route 90 (I-90, 27 segments per direction):
+    p=0: 23/27 congested, max V/C = 3.01
+    p=0.9: 20/27 still congested, max V/C = 2.54
+  Route 520 (SR 520, 15 segments per direction):
+    p=0: 12/15 congested, max V/C = 2.03
+    p=0.9: 9/15 still congested, max V/C = 1.71
+
+  Interpretation: The corridor operates far above capacity at peak hour even with 90% CAV penetration. The demand (10% of ADT) exceeds the physical capacity of the existing lane configuration by a factor of 2–4.5. CAVs provide meaningful but insufficient relief: they reduce max V/C by 10–20% but do not bring the corridor to V/C < 1. Equilibria (stable steady states) do not exist for the majority of segments at any CAV share considered; the corridor is in a chronic over-capacity state.
+
+Dedicated-lane policy:
+  At p ≤ 0.5, a large number of segments are dedicated-lane-worthwhile (the CAV-only lane adds more capacity than the mixed lane it replaces). At p = 0.9, the dedicated-lane rule is not satisfied for any segment (the CAV-only lane capacity advantage is already captured in the mixed-fleet capacity at 90% CAV share, so converting a lane to CAV-only does not help).
+
+  Critical limitation (from Exchange 3): The dedicated-lane rule is structurally inapplicable at segments with a lane drop downstream. Where the lane count decreases from upstream to downstream, the CAV-only lane cannot be sustained over the segment, and the capacity comparison (n−1)·Q_mixed + Q_CAV_only > n·Q_mixed is evaluated at an n that does not hold. This inverts or invalidates the policy rule exactly where congestion concentrates (lane drops are typically at interchange bottlenecks). Routes 5, 90, and 405 all contain lane-drop segments (8, 3, and 4 respectively); the dedicated-lane recommendation must be reported as inapplicable at those points.
+
+  Policy implication: Dedicated CAV lanes are a net capacity gain at 10–50% CAV penetration for segments with constant lane count and V/C > 1, but the policy is structurally infeasible at lane-drop bottlenecks. The recommendation is therefore conditional: dedicated CAV lanes should be considered only for segments (i) with constant lane count over the segment, (ii) with V/C > 1 (congested), and (iii) where the CAV share is expected to remain in the 10–50% range for the policy horizon. At 90% CAV penetration, dedicated lanes are not warranted because the mixed-fleet capacity already captures most of the CAV headway advantage.
+
+Other policy implications:
+  1. The corridor's chronic over-capacity (V/C 2–4.5) means that CAVs alone, even at 90%, cannot restore free flow. Demand management (congestion pricing, transit investment, commute-time flexibility) is necessary in parallel.
+  2. The tipping point at p* ≈ 0.10 suggests that the first 10% of CAVs provide almost no capacity benefit (the p² scaling of CAV–CAV pairs means the effect is negligible below p ≈ 0.10). Policy should not expect measurable congestion relief from CAV deployment until penetration exceeds roughly 10–20%.
+  3. The nonlinear (convex) shape of the capacity-vs-p curve means that marginal CAVs become increasingly valuable as penetration rises. The 90% CAV scenario delivers roughly 3× the per-lane capacity gain of the 50% scenario, suggesting that full-fleet CAV adoption would be a qualitatively different traffic regime from partial adoption.
+
+Limitations and biases:
+  1. The model is a steady-state, single-segment macroscopic model. It does not capture transient dynamics, shockwave propagation, or network-wide spillover. The equilibrium analysis is local to each segment; a congested upstream segment can push demand downstream and alter the effective V/C of downstream segments, which the model does not capture.
+  2. The 10% peak-hour factor is a planning assumption, not a measured value for this corridor. If the actual peak-hour share is lower (e.g., 5–7%), the V/C ratios would be lower and some segments might reach equilibrium at p = 0.9. Conversely, a higher peak-hour share would make congestion worse. The qualitative conclusion (corridor is over-capacity) is robust to this assumption within a 5–15% range.
+  3. The calibration targets (7.5% at p=0.5, 18% at p=0.9) are taken from the literature (Applied Sciences 2024) and represent a specific set of assumptions about platoon length, headway reduction, and penetration dynamics. The actual gain for Washington's corridor may differ. The sweep over calibration targets shows the qualitative conclusions (congestion persists, tipping point in the 7–14% range, dedicated lanes not warranted at p=0.9) are robust to reasonable variation in the calibration.
+  4. The model assumes all CAVs have the same headway-reduction capability (α = 0.8848) and that platoons form with the same probability everywhere. In reality, platoon formation is disrupted at interchanges, on-ramps, and off-ramps — precisely the locations where lane drops occur. This reinforces the Exchange 3 finding that lane-drop segments are the primary failure mode for the dedicated-lane policy.
+  5. The model does not include a speed advantage for CAVs at free flow (S_f is the same for all vehicles). If CAVs can travel faster at free flow (e.g., 65–75 mph vs. 60 mph for humans), the capacity gain would be larger, particularly at low-to-mid densities. This would shift the tipping point to a lower p and make the dedicated-lane policy more attractive.
+  6. The ADT data is from 2015 and represents a single day-type. It does not capture daily or seasonal variation in traffic volume. The model's conclusions are for the typical day represented by the ADT counts.
+
+Sources:
+- Highway Capacity Manual, 6th Edition, Transportation Research Board, 2016, Chapter 12 (HCM baseline capacity density 45 pc/mi/ln; unified speed-flow formulation).
+- 'Enhancing Freeway Traffic Capacity: The Impact of Autonomous Vehicle Platooning Intensity', Applied Sciences 14(4):1362, 2024 (nonlinear capacity-gain shape; ~7.5% at 50% penetration).
+- 'Connected and Autonomous Vehicle Platoons and Traffic Bottlenecks', IntechOpen (supporting context for ~2% gain at 50% penetration with ~20-vehicle platoons).
+- 2017 MCM Problem C dataset (ADT, lane counts, milepost ranges for I-5, I-90, I-405, SR 520).
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

@@ -1,0 +1,655 @@
+{
+  "round": 7,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7882256004185255,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.9,
+    "modeling_rigorousness_evaluation": 0.85,
+    "practicality_and_scientificity_evaluation": 0.7,
+    "result_and_bias_analysis_evaluation": 0.875
+  },
+  "problem_results": [
+    {
+      "problem_id": "2018_A",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2018 MCM Problem A: multi-hop HF skywave propagation in which each ground-to-ground hop reflects once off the ionosphere and once off the ocean surface. The problem states that a turbulent ocean \"attenuates\" reflections more than a calm one, and attributes this to (a) turbulence altering the local permittivity/permeability (hence the Fresnel reflection coefficient) and (b) turbulence changing \"the height and angle of the reflection surface\" (hence scattering/spreading of the reflected energy).\n\nThe problem does not settle the logical structure of this mechanism. I need three structural clarifications before parameterizing the per-hop loss budget:\n\n1. **Decomposition of the turbulent-ocean excess loss.** When the problem says turbulence attenuates the first ocean reflection more, does it intend the effect to be treated as *two separable additive loss channels* — a Fresnel/refractive channel (change in the local complex dielectric constant of the surface layer) plus a geometric scattering/spreading channel (random tilt and displacement of the reflecting surface redistributing energy out of the specular direction) — or as a *single effective* additional attenuation applied to the reflection coefficient? In other words: is the physical reading \"turbulence changes the surface's electromagnetic response AND its geometry, and both must appear in the model\" or is \"effective extra reflection loss\" an acceptable lumped reading of the statement?\n\n2. **State of the ocean at the first reflection.** The problem fixes the first ocean reflection as turbulent and then says \"if additional reflections (2 through n) take place off calm oceans.\" Is the intended reading that the *first* hop's ocean leg is the only turbulent one, and every subsequent ocean reflection is off a calm sea (i.e., the storm cell is passed through in one hop)? Or is the reading that each hop could in principle be turbulent, and the problem simply asks for the specific case where hops 2..n are calm?\n\n3. **Domain of the SNR threshold.** \"Maximum number of hops before its strength falls below a usable SNR threshold of 10 dB\": is the 10 dB threshold to be applied to the *received signal power alone* (i.e., treat 10 dB as a floor on received level, implicitly referencing the receiver noise floor), or to *signal-to-noise ratio* in the strict sense (signal power divided by thermal-noise power in the receiver bandwidth)? This determines whether the hop count depends on an assumed receiver bandwidth/noise temperature, and hence whether those are legitimate model parameters or must be declared assumptions.\n\nThese are questions of interpretation of the problem's logical boundaries, not of magnitudes: I will not ask for empirical constants, only for the reading under which the following model (Fresnel reflection off seawater with a calm/turbulent surface treatment, geometric spreading over each hop, and a noise-floor-based usable-SNR stopping rule) is the correct formalization of the statement.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven your reply that all three gaps are open, I propose the following specific structural allocation for the per-hop loss mechanism, and I ask you to accept or reject it as a whole (not to pick among alternatives):\n\n**Proposed structure — a three-channel per-hop loss budget, with turbulence entering as a first-order effect in two of the three channels:**\n\nFor each hop h (one ionospheric reflection plus one ocean-surface reflection, carrying the signal across a ground range d_h under an ionospheric hop of effective height H), the received power after n hops is\n\nP_n = P_0 · Π_{h=1..n} [ G_ion(h) · G_geo(h) · R_ocean(h) · A_ion(h) ],\n\nwhere, per hop:\n\n- **G_geo(h)** = geometric spreading: the wave leaves the (previous) reflection point and spreads over the hemispherical/segmental area of the hop; modeled as the power per unit area at the far end of the hop times the effective capture area of the reflecting surface, i.e. an inverse-square (or spherical-segment) factor. This is the dominant distance-dependent term and must not be neglected.\n- **R_ocean(h)** = the ocean-surface reflection coefficient. For a *calm* ocean: the classical Fresnel reflection coefficient of a plane wave at a dielectric interface, evaluated at the grazing incidence of the HF skip, with seawater's large complex relative permittivity (|R_calm| ≈ 1 at grazing incidence, with a small loss component from the medium's conductivity). For the *first, turbulent* hop only: R_turb = R_calm · (1 − ρ) · e^{-jδ_θ}, where (i) a **refractive/dielectric channel** reduces |R| because turbulence modifies the local complex permittivity/conductivity of the surface layer (this is the problem's first attribution), and (ii) a **geometric scattering channel** redirects part of the energy out of the specular reflection direction through random surface tilt and wave-crest displacement (this is the problem's second attribution, \"height and angle of the reflection surface\"). I treat these two turbulent channels as *multiplicative on the reflection coefficient* and *separable in form* (one a magnitude factor, one an angular/spreading redistribution), but *both first-order* — i.e., the turbulent ocean is NOT modeled as a calm ocean with a single lumped extra dB, and neither channel is neglected.\n- **A_ion(h)** = ionospheric absorption per pass through the ionosphere (small for vertical-incidence at HF under normal conditions, order tenths of dB; included as a first-order term, not neglected, because it is the dominant per-hop *non-geometric* loss and accumulates linearly with hop count).\n- **G_ion(h)** = any additional ionospheric scattering/spreading beyond pure absorption (modeled as negligible unless your judgment says otherwise; I include it as a placeholder factor = 1 in the nominal case and flag it in the bias analysis).\n\n**Turbulence state assignment (per gap 2 of my first question):** I propose reading the problem as *the first ocean reflection is turbulent; ocean reflections 2 through n are calm.* The turbulent condition is a one-time event at the first hop, not a per-hop state.\n\n**SNR stopping rule (per gap 3 of my first question):** I propose reading the 10 dB threshold as a *true signal-to-noise ratio*: the signal stops being \"usable\" when the received signal power falls below 10 dB above the receiver's thermal noise power in the signal bandwidth. I take a nominal receiver noise figure and bandwidth as declared assumptions (stated in the model, not as data the problem provides), and I make the hop count a function of these so the sensitivity can be reported rather than hidden.\n\n**The single judgment I ask you to accept or reject:** Is this three-channel, turbulence-as-first-order-in-two-channels, first-hop-turbulent-then-calm, true-SNR stopping-rule the correct structural formalization of the problem statement — in particular, is it right to treat the two turbulent mechanisms as separable first-order factors on the reflection coefficient rather than a lumped extra attenuation, and to keep ionospheric absorption as a non-negligible per-hop term? If you reject it, tell me which of these structural choices is wrong and what the correct structural form is (a different allocation of the loss terms, a different turbulence-state reading, or a different SNR interpretation), so I can restructure before computing.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my three-channel structure (turbulence as two separable first-order factors on the reflection coefficient; first hop turbulent then calm; ionospheric absorption kept as a non-negligible per-hop term; true-SNR stopping rule). I do not yet know which of those four choices you rejected, so I assume the most plausible fallback before asking for the counterexample:\n\n**Fallback structure I will build on, if you do not redirect me:** a *lumped* per-hop loss budget in which (a) the turbulent ocean's excess attenuation over the calm ocean enters as a single effective additional loss applied at the first ocean reflection (the problem's two attributed mechanisms — dielectric change and surface height/angle — are not separated into distinct model factors but jointly represented by one extra reflection loss, whose *form* is still a factor on the reflection coefficient rather than an additive dB on total power), (b) every subsequent ocean reflection is calm, (c) per-hop loss = geometric spreading × calm-Fresnel ocean reflection × small ionospheric absorption, and (d) the 10 dB usable-SNR rule is a true signal-to-noise comparison against a stated receiver noise floor.\n\n**The counterexample question (Operator 3):** Within this fallback, which specific case, boundary condition, or failure mode would *break* the mechanism — i.e., make the lumped-first-hop-turbulent, calm-subsequent-hops, geometric-spreading-plus-small-ionospheric-absorption, true-SNR budget produce a wrong or infeasible hop count? For example: does the lumped treatment break down if the turbulent sea state is strong enough that the scattering channel dominates the dielectric channel (so the \"single extra reflection loss\" can no longer be represented as a constant factor on R, but must depend on the hop's grazing angle or range)? Does the \"first hop turbulent, rest calm\" reading break if the ship (Part III) keeps moving over turbulent water, so that *every* hop is effectively turbulent and the calm-subsequent-hops assumption fails? Does the true-SNR reading break if the receiver bandwidth is not fixed, so the noise floor is under-specified and the hop count is not well-defined? Or does the geometric-spreading term break at the shortest or longest hop lengths, where the spherical-segment approximation to the spreading area stops being valid (e.g., a hop so short that the wave has not yet reached the far field, or so long that the earth-curvature and earth-reflection interference change the effective spreading law)?\n\nName the one boundary case that is most consequential to the hop-count result and the Part III ship-communication duration, and state how the model must change at that boundary (a new term, a different spreading law, a per-hop turbulence state, or a bandwidth-dependent stopping rule), so I can build the robustness/bias analysis around it."
+        ],
+        "expert_answers": [
+          "The problem text does not settle any of the three. It gives a physical attribution (permittivity/permeability *and* height/angle) without stating whether these are separable channels or one lumped effect; it fixes only the first ocean reflection as turbulent without saying whether turbulence is a per-hop state or a one-time condition; and it names a \"usable SNR threshold of 10 dB\" without defining signal-only floor versus true signal-to-noise, so receiver bandwidth and noise temperature are neither mandated nor excluded. All three are genuine gaps the statement cannot resolve.",
+          "reject",
+          "The case that breaks it: Part III's moving ship on turbulent water. The \"first hop turbulent, rest calm\" reading collapses there — every ocean leg is turbulent, so the lumped single first-hop loss factor is applied to the wrong number of hops and the hop count is systematically overestimated. The model must change to a per-hop turbulence state (each hop's R_ocean carries its own turbulent factor, varying with local sea state and grazing angle), not a one-time first-hop condition."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_1da26e07898a",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.7979166666666666,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.7999999999999999,
+        "practicality_and_scientificity_evaluation": 0.625,
+        "result_and_bias_analysis_evaluation": 0.8666666666666667
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately identifies the four distinct parts of the problem as separate tasks. The goals for each task are explicitly stated and align perfectly with the problem requirements. For instance, Task 1 clearly defines the need to model reflection strength for turbulent vs. calm oceans and determine the maximum hop count based on SNR. The scope is well-defined, covering the specific signal parameters (100-watt, HF, below MUF) and the physical context (ionospheric and oceanic reflections). There is no ambiguity in what needs to be solved for each sub-problem.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all aspects of the original problem without deviation. The sub-tasks are logically ordered, with Task 1 providing the foundational model required for Task 2 (comparison) and Task 3 (dynamic application). Task 4 is correctly identified as a synthesis/reporting step. There are no missing key components; the modeler has not omitted any constraints or requirements from the background or problem statement. The interrelation between tasks is implicit but clear, as later tasks depend on the model developed in the first task.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed numerical evidence and logical explanations that effectively support the model's conclusions and decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, effectively identifying the dominant structural bias and correcting it through scenario comparison, while also addressing parameter sensitivities.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly stated, physically grounded, and pragmatically justified, with explicit acknowledgment of simplifications like lumping turbulence effects.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses standard and appropriate methods for HF propagation, correctly handling the dynamic nature of the ship scenario and providing a realistic structural representation of signal loss.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model provides a static power budget but fails to correctly model the dynamic movement of the ship in Part III, using an incorrect distance calculation for communication duration and ignoring geometric changes, limiting its practical utility for the specific scenario.",
+            "score": 5
+          },
+          "analysis_2": {
+            "reason": "The model uses valid EM principles for basic reflection but lacks scientific depth in handling ocean turbulence (using a constant factor) and incorrectly applies ocean-specific parameters to terrain reflection, showing a gap in domain-specific physical accuracy.",
+            "score": 6
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2018_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2018 MCM Problem A: multi-hop HF skywave propagation in which each ground-to-ground hop reflects once off the ionosphere and once off the ocean surface. The problem states that a turbulent ocean \"attenuates\" reflections more than a calm one, and attributes this to (a) turbulence altering the local permittivity/permeability (hence the Fresnel reflection coefficient) and (b) turbulence changing \"the height and angle of the reflection surface\" (hence scattering/spreading of the reflected energy).\n\nThe problem does not settle the logical structure of this mechanism. I need three structural clarifications before parameterizing the per-hop loss budget:\n\n1. **Decomposition of the turbulent-ocean excess loss.** When the problem says turbulence attenuates the first ocean reflection more, does it intend the effect to be treated as *two separable additive loss channels* — a Fresnel/refractive channel (change in the local complex dielectric constant of the surface layer) plus a geometric scattering/spreading channel (random tilt and displacement of the reflecting surface redistributing energy out of the specular direction) — or as a *single effective* additional attenuation applied to the reflection coefficient? In other words: is the physical reading \"turbulence changes the surface's electromagnetic response AND its geometry, and both must appear in the model\" or is \"effective extra reflection loss\" an acceptable lumped reading of the statement?\n\n2. **State of the ocean at the first reflection.** The problem fixes the first ocean reflection as turbulent and then says \"if additional reflections (2 through n) take place off calm oceans.\" Is the intended reading that the *first* hop's ocean leg is the only turbulent one, and every subsequent ocean reflection is off a calm sea (i.e., the storm cell is passed through in one hop)? Or is the reading that each hop could in principle be turbulent, and the problem simply asks for the specific case where hops 2..n are calm?\n\n3. **Domain of the SNR threshold.** \"Maximum number of hops before its strength falls below a usable SNR threshold of 10 dB\": is the 10 dB threshold to be applied to the *received signal power alone* (i.e., treat 10 dB as a floor on received level, implicitly referencing the receiver noise floor), or to *signal-to-noise ratio* in the strict sense (signal power divided by thermal-noise power in the receiver bandwidth)? This determines whether the hop count depends on an assumed receiver bandwidth/noise temperature, and hence whether those are legitimate model parameters or must be declared assumptions.\n\nThese are questions of interpretation of the problem's logical boundaries, not of magnitudes: I will not ask for empirical constants, only for the reading under which the following model (Fresnel reflection off seawater with a calm/turbulent surface treatment, geometric spreading over each hop, and a noise-floor-based usable-SNR stopping rule) is the correct formalization of the statement.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven your reply that all three gaps are open, I propose the following specific structural allocation for the per-hop loss mechanism, and I ask you to accept or reject it as a whole (not to pick among alternatives):\n\n**Proposed structure — a three-channel per-hop loss budget, with turbulence entering as a first-order effect in two of the three channels:**\n\nFor each hop h (one ionospheric reflection plus one ocean-surface reflection, carrying the signal across a ground range d_h under an ionospheric hop of effective height H), the received power after n hops is\n\nP_n = P_0 · Π_{h=1..n} [ G_ion(h) · G_geo(h) · R_ocean(h) · A_ion(h) ],\n\nwhere, per hop:\n\n- **G_geo(h)** = geometric spreading: the wave leaves the (previous) reflection point and spreads over the hemispherical/segmental area of the hop; modeled as the power per unit area at the far end of the hop times the effective capture area of the reflecting surface, i.e. an inverse-square (or spherical-segment) factor. This is the dominant distance-dependent term and must not be neglected.\n- **R_ocean(h)** = the ocean-surface reflection coefficient. For a *calm* ocean: the classical Fresnel reflection coefficient of a plane wave at a dielectric interface, evaluated at the grazing incidence of the HF skip, with seawater's large complex relative permittivity (|R_calm| ≈ 1 at grazing incidence, with a small loss component from the medium's conductivity). For the *first, turbulent* hop only: R_turb = R_calm · (1 − ρ) · e^{-jδ_θ}, where (i) a **refractive/dielectric channel** reduces |R| because turbulence modifies the local complex permittivity/conductivity of the surface layer (this is the problem's first attribution), and (ii) a **geometric scattering channel** redirects part of the energy out of the specular reflection direction through random surface tilt and wave-crest displacement (this is the problem's second attribution, \"height and angle of the reflection surface\"). I treat these two turbulent channels as *multiplicative on the reflection coefficient* and *separable in form* (one a magnitude factor, one an angular/spreading redistribution), but *both first-order* — i.e., the turbulent ocean is NOT modeled as a calm ocean with a single lumped extra dB, and neither channel is neglected.\n- **A_ion(h)** = ionospheric absorption per pass through the ionosphere (small for vertical-incidence at HF under normal conditions, order tenths of dB; included as a first-order term, not neglected, because it is the dominant per-hop *non-geometric* loss and accumulates linearly with hop count).\n- **G_ion(h)** = any additional ionospheric scattering/spreading beyond pure absorption (modeled as negligible unless your judgment says otherwise; I include it as a placeholder factor = 1 in the nominal case and flag it in the bias analysis).\n\n**Turbulence state assignment (per gap 2 of my first question):** I propose reading the problem as *the first ocean reflection is turbulent; ocean reflections 2 through n are calm.* The turbulent condition is a one-time event at the first hop, not a per-hop state.\n\n**SNR stopping rule (per gap 3 of my first question):** I propose reading the 10 dB threshold as a *true signal-to-noise ratio*: the signal stops being \"usable\" when the received signal power falls below 10 dB above the receiver's thermal noise power in the signal bandwidth. I take a nominal receiver noise figure and bandwidth as declared assumptions (stated in the model, not as data the problem provides), and I make the hop count a function of these so the sensitivity can be reported rather than hidden.\n\n**The single judgment I ask you to accept or reject:** Is this three-channel, turbulence-as-first-order-in-two-channels, first-hop-turbulent-then-calm, true-SNR stopping-rule the correct structural formalization of the problem statement — in particular, is it right to treat the two turbulent mechanisms as separable first-order factors on the reflection coefficient rather than a lumped extra attenuation, and to keep ionospheric absorption as a non-negligible per-hop term? If you reject it, tell me which of these structural choices is wrong and what the correct structural form is (a different allocation of the loss terms, a different turbulence-state reading, or a different SNR interpretation), so I can restructure before computing.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my three-channel structure (turbulence as two separable first-order factors on the reflection coefficient; first hop turbulent then calm; ionospheric absorption kept as a non-negligible per-hop term; true-SNR stopping rule). I do not yet know which of those four choices you rejected, so I assume the most plausible fallback before asking for the counterexample:\n\n**Fallback structure I will build on, if you do not redirect me:** a *lumped* per-hop loss budget in which (a) the turbulent ocean's excess attenuation over the calm ocean enters as a single effective additional loss applied at the first ocean reflection (the problem's two attributed mechanisms — dielectric change and surface height/angle — are not separated into distinct model factors but jointly represented by one extra reflection loss, whose *form* is still a factor on the reflection coefficient rather than an additive dB on total power), (b) every subsequent ocean reflection is calm, (c) per-hop loss = geometric spreading × calm-Fresnel ocean reflection × small ionospheric absorption, and (d) the 10 dB usable-SNR rule is a true signal-to-noise comparison against a stated receiver noise floor.\n\n**The counterexample question (Operator 3):** Within this fallback, which specific case, boundary condition, or failure mode would *break* the mechanism — i.e., make the lumped-first-hop-turbulent, calm-subsequent-hops, geometric-spreading-plus-small-ionospheric-absorption, true-SNR budget produce a wrong or infeasible hop count? For example: does the lumped treatment break down if the turbulent sea state is strong enough that the scattering channel dominates the dielectric channel (so the \"single extra reflection loss\" can no longer be represented as a constant factor on R, but must depend on the hop's grazing angle or range)? Does the \"first hop turbulent, rest calm\" reading break if the ship (Part III) keeps moving over turbulent water, so that *every* hop is effectively turbulent and the calm-subsequent-hops assumption fails? Does the true-SNR reading break if the receiver bandwidth is not fixed, so the noise floor is under-specified and the hop count is not well-defined? Or does the geometric-spreading term break at the shortest or longest hop lengths, where the spherical-segment approximation to the spreading area stops being valid (e.g., a hop so short that the wave has not yet reached the far field, or so long that the earth-curvature and earth-reflection interference change the effective spreading law)?\n\nName the one boundary case that is most consequential to the hop-count result and the Part III ship-communication duration, and state how the model must change at that boundary (a new term, a different spreading law, a per-hop turbulence state, or a bandwidth-dependent stopping rule), so I can build the robustness/bias analysis around it."
+            ],
+            "expert_answers": [
+              "The problem text does not settle any of the three. It gives a physical attribution (permittivity/permeability *and* height/angle) without stating whether these are separable channels or one lumped effect; it fixes only the first ocean reflection as turbulent without saying whether turbulence is a per-hop state or a one-time condition; and it names a \"usable SNR threshold of 10 dB\" without defining signal-only floor versus true signal-to-noise, so receiver bandwidth and noise temperature are neither mandated nor excluded. All three are genuine gaps the statement cannot resolve.",
+              "reject",
+              "The case that breaks it: Part III's moving ship on turbulent water. The \"first hop turbulent, rest calm\" reading collapses there — every ocean leg is turbulent, so the lumped single first-hop loss factor is applied to the wrong number of hops and the hop count is systematically overestimated. The model must change to a per-hop turbulence state (each hop's R_ocean carries its own turbulent factor, varying with local sea state and grazing angle), not a one-time first-hop condition."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_1da26e07898a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8083333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.55,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p1_20260930_070257/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the four distinct parts of the problem as separate tasks. The goals for each task are explicitly stated and align perfectly with the problem requirements. For instance, Task 1 clearly defines the need to model reflection strength for turbulent vs. calm oceans and determine the maximum hop count based on SNR. The scope is well-defined, covering the specific signal parameters (100-watt, HF, below MUF) and the physical context (ionospheric and oceanic reflections). There is no ambiguity in what needs to be solved for each sub-problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all aspects of the original problem without deviation. The sub-tasks are logically ordered, with Task 1 providing the foundational model required for Task 2 (comparison) and Task 3 (dynamic application). Task 4 is correctly identified as a synthesis/reporting step. There are no missing key components; the modeler has not omitted any constraints or requirements from the background or problem statement. The interrelation between tasks is implicit but clear, as later tasks depend on the model developed in the first task.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed numerical evidence and logical explanations that effectively support the model's conclusions and decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, effectively identifying the dominant structural bias and correcting it through scenario comparison, while also addressing parameter sensitivities.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, physically grounded, and pragmatically justified, with explicit acknowledgment of simplifications like lumping turbulence effects.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses standard and appropriate methods for HF propagation, correctly handling the dynamic nature of the ship scenario and providing a realistic structural representation of signal loss.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides a static power budget but fails to correctly model the dynamic movement of the ship in Part III, using an incorrect distance calculation for communication duration and ignoring geometric changes, limiting its practical utility for the specific scenario.",
+                "score": 5
+              },
+              "analysis_2": {
+                "reason": "The model uses valid EM principles for basic reflection but lacks scientific depth in handling ocean turbulence (using a constant factor) and incorrectly applies ocean-specific parameters to terrain reflection, showing a gap in domain-specific physical accuracy.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2018_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p1_20260930_070257",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p1_20260930_070257/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nProblem: 2018_A — HF (3–30 MHz) multi-hop propagation. A 100 W constant carrier, below the MUF, is transmitted from a point source on land; I model the strength of the first reflection off a turbulent ocean (one ionospheric hop already taken) versus a calm ocean, then count further calm-ocean hops until SNR drops below a 10 dB threshold.\n\nThe statement leaves three structural matters unsettled that I cannot derive from the text or the gathered data, and each one gates how the core reflection-and-budget mechanism can be parameterized:\n\n1. **Meaning of \"strength\" at the ocean reflection and at the final threshold.** Is the first-reflection strength to be evaluated (a) as the power actually received back at ground range by the single-ray reflected path, relative to the 100 W launch power (i.e., the full round-trip loss: source spreading, first ionospheric hop, sea-surface reflection, earth-curve path back to a receiver), or (b) as the power density (W/m^2) at the sea-surface reflection point itself, or (c) as some other normalized quantity (e.g., field strength in a specified band)? And is the 10 dB SNR threshold to be evaluated at the receiver antenna input, against what noise reference (thermal noise in the receiver bandwidth)?\n\n2. **Domain of the hop geometry.** In the n-hop counting (\"additional reflections 2 through n off calm oceans\"), are all hops taken over ocean except hop 1's landing region, and is the geometry to be a flat-earth per-hop distance with the ionosphere treated as a plane reflector at a fixed virtual height, or must the earth's curvature and a variable virtual height enter the valid domain of the hop count? What is the valid range of per-hop ground range for which the plane-wave Fresnel treatment at the sea surface is itself valid?\n\n3. **Reading of \"turbulent\" in the first reflection.** The statement says turbulence alters the local permittivity/permeability and the height and angle of the reflection surface. Which of these does the text require to be the *load-bearing* effect in the first-reflection strength comparison — (a) the change in effective dielectric properties of the near-surface seawater, (b) the change in the local reflection angle (tilt) distribution, (c) surface-roughness scattering out of the specular direction, or some combination — such that a model omitting the others would be structurally incomplete?\n\nThese three answers determine how the reflection coefficient, the per-hop loss budget, and the SNR comparison are defined; I ask only for the logical interpretation of the quantities and the valid domain, not for magnitudes or empirical constants.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven the Exchange 1 boundaries — strength = round-trip received power relative to the 100 W launch; SNR against thermal noise at the receiver input; earth curvature with variable ionospheric virtual height; first-hop landing over ocean; turbulence load-bearing via surface-roughness scattering out of the specular direction, tilt distribution second, permittivity change not load-bearing — I put the following single structural hypothesis to your acceptance or rejection:\n\n**The model is a per-hop link budget with three multiplicative loss families and one multiplicative gain, applied hop-by-hop until SNR falls below 10 dB:**\n\n1. **Free-space spherical spreading** of the source, L_spread = (λ/4πR₁)² from a point source at the first reflection point, where R₁ is the path length from the (effective radiating) source at the ionospheric landing point to the ocean reflection point.\n\n2. **Ionospheric hop loss** L_iono (constant per hop, combining absorption and diffraction), applied once per skywave hop; the first hop already taken is charged to the first-reflection figure, and hops 2..n each pay it once on the way up and once on the way down is *not* the scheme — rather each ground-to-ground hop (ocean reflection → ionosphere → next ocean reflection) pays one ionospheric transit, so hop k≥2 pays L_iono once, and the final leg to the receiver pays it once more.\n\n3. **Sea-surface reflection loss** L_sea(θ_local, σ_rms): for a calm ocean, L_sea = 1/|Γ_calm(θ)|² where |Γ|≈1 at grazing (from the high-permittivity seawater, ε_r ~ 10²–10³, so |Γ| = 0.99+). For a turbulent ocean, L_sea = L_spec(θ, σ_rms) = A(σ_rms)·exp(−4πσ_rms cosθ/λ)·(1 + B(σ_rms)·tan²θ)⁻¹·L_spec_calm(θ), i.e., a multiplicative specular-attenuation factor (Rayleigh-type exponential in rms roughness σ_rms, local incidence angle θ, and wavelength) times an angular-tilt spreading factor B(σ_rms)·tan²θ capturing scattering out of the specular direction, both dimensionless and applied to the calm-surface Fresnel baseline.\n\n4. **Multiplicative gain:** none in the chain; instead, a **receiver aperture gain** G_rx = (λ/4π)²·(4πA_eff/λ²) = A_eff/λ²·(λ/4π)⁻¹... — equivalently the standard received-power form P_rx = P_tx·G_tx·G_rx·(λ/4πR)²·L_chain, where G_tx is the transmitting antenna gain (omni, G_tx = 1) and G_rx = the effective aperture of a shipborne/ground HF antenna expressed as A_eff. The SNR is then SNR = P_rx/(kTB) with T = 290 K, B the receiver noise bandwidth.\n\n**The hop count n_max is the largest integer n such that SNR(n) ≥ 10 dB, where the n-th hop's receiver is at the n-th ocean reflection point's landing (or a fixed ground range), and every hop pays L_iono once, L_spread once, and L_sea once, with hop 1's L_sea being the turbulent value and hops 2..n paying the calm value.** The turbulent-vs-calm first-reflection comparison is the ratio P_rx,turb(1)/P_rx,calm(1) = [L_sea,turb(1)/L_sea,calm(1)]⁻¹·(other terms cancel).\n\nIs this per-hop budget structure — three multiplicative loss families (spreading, ionospheric, sea-surface) plus the standard received-power form with thermal-noise SNR, hop count defined by the SNR ≥ 10 dB threshold, turbulent L_sea as a multiplicative Rayleigh-type specular attenuation times a tilt-spreading factor on top of the calm Fresnel baseline — the correct and complete structural mechanism for Parts I–III, with no further loss families required (e.g., no separate ground-wave or antenna-pattern term beyond what is inside L_spread and G_rx)?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 per-hop budget. The most plausible fallback I will use if no further correction is given: a two-way skywave link budget in which the total path is the concatenation of hops, each ground-to-ground hop (ocean reflection k → ionosphere → ocean reflection k+1) pays the ionospheric transit loss L_iono twice (once up, once down), each ocean bounce pays its sea-surface reflection loss L_sea once (turbulent for bounce 1, calm for bounces 2..n), and free-space spherical spreading is applied once over the full end-to-end path length with the standard received-power form P_rx = P_tx·G_tx·G_rx·(λ/4πR_total)²·(product of all per-hop losses). The SNR is P_rx/(kTB) with T = 290 K. The first-reflection comparison is P_rx,turb(1)/P_rx,calm(1) = [L_sea,turb(1)/L_sea,calm(1)]⁻¹. The hop count n_max is the largest n with SNR(n) ≥ 10 dB.\n\nWhat specific case, boundary condition, or failure mode would break this mechanism — e.g., a particular range of per-hop ground range, a particular σ_rms / λ ratio, a particular incidence angle, a particular ionospheric virtual-height value, or a particular hop count — such that the resulting first-reflection strength or hop count is qualitatively wrong (off by more than a factor of 2 in power, or off by more than one hop in n_max), and the fix is structural (a missing or mis-placed loss family, a wrong counting rule, a wrong dependence on a parameter) rather than a tuning of a constant?"
+            ],
+            "expert_answers": [
+              "1. \"Strength\" is the power delivered to a receiver at ground range via the reflected path, expressed as a ratio to the 100 W launch (full round-trip loss). The 10 dB SNR is at the receiver input against thermal noise in the receiver bandwidth.\n\n2. All hops after the first are over ocean; the first hop's landing region is ocean. Geometry must include earth curvature and a variable virtual height; the plane-wave Fresnel treatment is valid only where the surface is locally flat over the first Fresnel zone.\n\n3. The load-bearing effect is surface-roughness scattering out of the specular direction, with tilt distribution second; the permittivity/permeability change is not load-bearing.",
+              "reject",
+              "The mechanism breaks at long per-hop ground range where the specular point leaves the ocean: with earth curvature and finite virtual height, the grazing angle at the sea surface falls below the critical angle, so the calm-ocean Fresnel coefficient is no longer ≈1 and the reflection becomes dominated by diffraction over the curved surface. Then L_sea,calm is not unity, the turbulent/calm ratio no longer reduces to the roughness factor alone, and n_max shifts by more than one hop. The fix is structural: a curvature/diffraction loss family and a range-dependent grazing angle, not a constant."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_1da26e07898a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7874999999999999,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.6999999999999998,
+            "practicality_and_scientificity_evaluation": 0.6999999999999998,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p1_20260930_070257/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the four distinct parts of the problem as separate tasks. The goals for each task are explicitly stated, mirroring the original requirements. Specifically, Task 1 clearly defines the objective to model signal reflection, compare turbulent vs. calm ocean conditions, and determine the maximum hop count based on the SNR threshold. The scope is well-defined, and the key components (signal strength, reflection types, SNR limit) are effectively identified without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all aspects of the problem requirements without deviation. The sub-tasks are logically ordered, with Task 1 providing the foundational model required for the comparisons in Task 2 and the dynamic adjustments in Task 3. Task 4 serves as the synthesis step. There are no missing key parts, and the dependencies between tasks (e.g., using Part I findings in Part II) are implicitly respected by the structure. The coverage is complete and directly supports the final goal of producing a publishable synopsis.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, using a standard link budget approach to provide clear, actionable results for signal strength and hop limits, supported by sensitivity analysis, though it simplifies the impact of ocean turbulence.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is based on sound electromagnetic principles but lacks scientific depth in modeling ocean turbulence, using an oversimplified correction that underestimates real-world physical effects, and relies on heuristic parameters for terrain.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative breakdowns, sensitivity analyses, and physically grounded explanations that effectively support the model's conclusions and decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific model and parameter biases, explaining their impact, and acknowledging limitations with suggestions for more detailed corrections, though full correction is not implemented.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are physically grounded but lack rigorous justification for the specific statistical models of turbulence and do not fully address the variability of ionospheric conditions mentioned in the background.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model structure is sound and decomposes losses logically, but the assumption of a fixed path for the moving ship in Part III is physically questionable, and the turbulence attenuation estimate may be underestimated.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.7979166666666666,
+      "interaction_cost": 0.8690162695315593,
+      "interaction_penalty": 0.04345081347657797,
+      "net_utility": 0.7544658531900886,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2874,
+          "total_expert_latency_seconds": 3.06,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9350053229848456,
+          "latency_cost_component": 0.22264255908124775,
+          "interaction_cost": 0.8740021291939383,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2324,
+          "total_expert_latency_seconds": 3.15,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9100760246729511,
+          "latency_cost_component": 0.2261264141459598,
+          "interaction_cost": 0.8640304098691804,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2020_A",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a 50-year migration model for Scottish herring and mackerel under\nwarming North Atlantic surface temperatures. The species' temperature bands are\nalready pinned down (herring optimum ~5-7 C, tolerance ~3-15 C; mackerel optimum\n~13-14 C, acceptable ~7-16 C). The text leaves three structural boundaries\nunsettled that I cannot resolve from the problem statement or the data:\n\n1. **Definition of \"too far away.\"** The problem asks when the populations\n   become unreachable for small Scottish vessels, but does not define the\n   boundary of the feasible fishing area. How should the deliverable define it:\n   a day-trip distance limit measured from current Scottish home ports, a\n   named fishing-ground box, or some other logical boundary? And should the\n   test be \"preferred (optimal) temperature band no longer reachable\" versus\n   \"any acceptable-temperature water no longer reachable\"?\n\n2. **Interpretation of the migration mechanism.** Should the model treat each\n   species as tracking a single temperature isotherm that drifts poleward (the\n   population centroid pinned to the optimal isotherm's position), or as\n   maintaining a two-edge tolerance band (preferred band riding inside the\n   acceptable band, both edges moving at different speeds)? The two readings\n   change what \"the population has moved\" means mathematically.\n\n3. **Domain of the temperature scenario.** Requirement 2 asks for best/worst/\n   most-likely elapsed times \"based on how rapidly the temperature change\n   occurs.\" Should the scenario axis be an annual warming rate (a set of\n   rates, e.g. slow/moderate/fast), or an endpoint temperature by 2075\n   (a set of target deltas)? Which quantity is the problem's independent\n   variable in your reading?\n\nThese three answers determine the state space of the model, so I am asking for\nthe logical/definitional boundaries only, not magnitudes.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your Exchange 1 boundaries — reachability = acceptable band's\npoleward edge within day-trip range of the Scottish home port; migration =\ntwo-edge tolerance band; scenario axis = annual warming rate — I propose one\nspecific structure. Please accept, reject, or correct it as a whole:\n\n**Proposed structure (one coherent mechanism):**\n\n1. **State variables.** For each species s ∈ {herring, mackerel}:\n   - acceptable band T_acc,s(T0) = [T_lo,s(T0), T_hi,s(T0)], a band of fixed\n     width that translates rigidly with temperature: the band's position at\n     time t is [T0 + w(t) + c_lo,s, T0 + w(t) + c_hi,s], where w(t) = r·t is\n     the cumulative warming under annual rate r;\n   - the preferred band [T0 + w(t) + p_lo,s, T0 + w(t) + p_hi,s] nested\n     inside it (herring p: 5–7 C inside 3–15 C; mackerel p: 13–14 C inside\n     7–16 C);\n   - latitudes L_lo,s(t), L_hi_s(t) where the acceptable band's edges sit,\n     L_opt,s(t) where the preferred band sits, computed from a fixed\n     latitude–temperature profile L(T) of the North Atlantic (monotone\n     decreasing in latitude, i.e. temperature falls with latitude).\n\n2. **Dominant loss mechanism, not idealized.** The two edges do not move at\n   the same speed: the poleward (cold) edge of the acceptable band is the\n   reachability boundary R_s(t) = L_hi,s(t) (temperature falling with\n   latitude, so the cold edge is poleward). The population's centroid\n   C_s(t) = L_opt,s(t) follows the preferred band. \"Too far away\" is the\n   first t at which R_s(t) exceeds the day-trip range D_max from the home\n   port's latitude L_port, in BOTH species (consensus: the fishery needs both\n   species reachable for its business case; I will also report the first\n   failure of each species separately).\n\n3. **Scenario allocation.** Three warming rates r ∈ {r_slow, r_mid, r_fast}\n   (the magnitudes themselves I take from the plausible 50-year range and\n   state as an assumption — you do not need to supply numbers); the structure\n   I ask you to judge is the allocation above: rigid band translation,\n   poleward-edge reachability, dual-species consensus for \"too far away,\"\n   and elapsed time T(r) = min{t : R_s(t) > D_max for some s} reported per\n   rate.\n\nIs this the structure you would accept for the core mechanism, and if not,\nwhich component do you reject (edge choice, consensus rule, rigid-band\ntranslation, or the rate-based scenario axis)?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nMy Exchange 2 structure was rejected without specifics, so for this exchange\nI fall back to the most plausible revision: keep your two-edge tolerance band\nand poleward-edge reachability from Exchange 1, but replace the rigid-band\ntranslation with a temperature-dependence in the band widths — i.e. the\nacceptable band [T_lo(T), T_hi(T)] and preferred band [P_lo(T), P_hi(T)] are\nfunctions of the ambient temperature T(t) = T0 + r·t (wider or narrower as\nthe ocean warms), with reachability still \"the poleward edge of the\nacceptable band stays within day-trip range D_max of the home port,\"\nreported per warming rate r, and \"too far away\" = the first rate-r year at\nwhich this fails for either species.\n\nQuestion: which specific case, boundary condition, or failure mode breaks\nthis mechanism — for example, a warming rate, a band-width dependence, a\nport-location choice, or a dual-species interaction — such that the\npredicted \"too far away\" time becomes qualitatively wrong (off by a decade\nor more, or reversed in ordering between best/worst/most-likely)? Naming the\nbreaking case is what I need to bound the model's validity in the final\nbias/robustness analysis; I do not need the fix."
+        ],
+        "expert_answers": [
+          "Define \"too far away\" by the operating constraint the problem itself names: a day-trip range from current Scottish home ports for vessels without on-board refrigeration, tested against the acceptable-temperature band, not the optimum — the optimum defines habitat quality, the tolerance edge defines reachability.\n\nTreat migration as a two-edge tolerance band: the acceptable band's poleward edge is the reachability boundary, the preferred band's position is the habitat centroid. A single isotherm conflates the two and cannot express \"still reachable but no longer thriving.\"\n\nThe independent variable is the annual warming rate, not an endpoint delta. Requirement 2 asks for elapsed time as a function of how rapidly change occurs; rate is the driver, endpoint is a derived outcome.",
+          "reject",
+          "The breaking case is a non-monotone latitude–temperature profile: where the poleward edge of the acceptable band crosses a warm-current boundary (e.g. the Gulf Stream/North Atlantic Drift), the isotherm's latitude can jump or even retreat locally as warming proceeds. Reachability then fails, recovers, and fails again, so \"first year the poleward edge exceeds D_max\" is not the true \"too far away\" time and can be off by a decade or reversed in ordering between rates."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_1da26e07898a",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8645833333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.7749999999999999,
+        "result_and_bias_analysis_evaluation": 0.8833333333333333
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-problem, accurately reflecting the original requirements. Subproblem 1 explicitly sets a 50-year horizon and warming scenarios, while Subproblem 2 correctly links temperature change rates to economic viability for unrefrigerated boats. The goals are explicit, such as identifying \"productive core\" locations and assessing \"economically attractive strategies.\" The analysis is accurate and directly addresses the core mathematical and economic questions without ambiguity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all five required tasks with logical dependencies. Subproblem 1 provides the spatial data needed for Subproblem 2's time predictions, which in turn inform the strategic decisions in Subproblem 3. Subproblem 4 correctly identifies the need to adjust strategies based on jurisdictional changes, and Subproblem 5 is appropriately separated as a communication deliverable. There are no missing key parts or deviations; the sub-tasks are interrelated and fully support the final goal of advising the consortium.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, interpretable, and provides strong, actionable insights into the economic and biological implications of the model.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying critical structural risks and providing logical corrections or robustness checks to ensure the validity of the conclusions.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, biologically grounded, and explicitly justified. The distinction between reachability and habitat quality is a strong rational choice, and economic parameters are honestly labeled as planning assumptions with sensitivity analysis provided.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate deterministic methods for long-term climate projection, logically linking physical, biological, and economic factors. The structure is scientifically sound and effectively translates climate data into actionable business strategies.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively links biological migration to economic outcomes, providing actionable strategies for relocation and equipment investment. It is feasible, parameterized for scenario analysis, and directly addresses the client's need for operational planning, though some economic parameters lack explicit data sourcing.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses a scientifically reasonable logistic approximation for temperature-latitude relationships and correctly models species migration based on thermal preferences. However, it oversimplifies ocean dynamics by ignoring currents and seasonality, and the economic components are basic linear approximations rather than rigorous dynamic models.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a 50-year migration model for Scottish herring and mackerel under\nwarming North Atlantic surface temperatures. The species' temperature bands are\nalready pinned down (herring optimum ~5-7 C, tolerance ~3-15 C; mackerel optimum\n~13-14 C, acceptable ~7-16 C). The text leaves three structural boundaries\nunsettled that I cannot resolve from the problem statement or the data:\n\n1. **Definition of \"too far away.\"** The problem asks when the populations\n   become unreachable for small Scottish vessels, but does not define the\n   boundary of the feasible fishing area. How should the deliverable define it:\n   a day-trip distance limit measured from current Scottish home ports, a\n   named fishing-ground box, or some other logical boundary? And should the\n   test be \"preferred (optimal) temperature band no longer reachable\" versus\n   \"any acceptable-temperature water no longer reachable\"?\n\n2. **Interpretation of the migration mechanism.** Should the model treat each\n   species as tracking a single temperature isotherm that drifts poleward (the\n   population centroid pinned to the optimal isotherm's position), or as\n   maintaining a two-edge tolerance band (preferred band riding inside the\n   acceptable band, both edges moving at different speeds)? The two readings\n   change what \"the population has moved\" means mathematically.\n\n3. **Domain of the temperature scenario.** Requirement 2 asks for best/worst/\n   most-likely elapsed times \"based on how rapidly the temperature change\n   occurs.\" Should the scenario axis be an annual warming rate (a set of\n   rates, e.g. slow/moderate/fast), or an endpoint temperature by 2075\n   (a set of target deltas)? Which quantity is the problem's independent\n   variable in your reading?\n\nThese three answers determine the state space of the model, so I am asking for\nthe logical/definitional boundaries only, not magnitudes.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your Exchange 1 boundaries — reachability = acceptable band's\npoleward edge within day-trip range of the Scottish home port; migration =\ntwo-edge tolerance band; scenario axis = annual warming rate — I propose one\nspecific structure. Please accept, reject, or correct it as a whole:\n\n**Proposed structure (one coherent mechanism):**\n\n1. **State variables.** For each species s ∈ {herring, mackerel}:\n   - acceptable band T_acc,s(T0) = [T_lo,s(T0), T_hi,s(T0)], a band of fixed\n     width that translates rigidly with temperature: the band's position at\n     time t is [T0 + w(t) + c_lo,s, T0 + w(t) + c_hi,s], where w(t) = r·t is\n     the cumulative warming under annual rate r;\n   - the preferred band [T0 + w(t) + p_lo,s, T0 + w(t) + p_hi,s] nested\n     inside it (herring p: 5–7 C inside 3–15 C; mackerel p: 13–14 C inside\n     7–16 C);\n   - latitudes L_lo,s(t), L_hi_s(t) where the acceptable band's edges sit,\n     L_opt,s(t) where the preferred band sits, computed from a fixed\n     latitude–temperature profile L(T) of the North Atlantic (monotone\n     decreasing in latitude, i.e. temperature falls with latitude).\n\n2. **Dominant loss mechanism, not idealized.** The two edges do not move at\n   the same speed: the poleward (cold) edge of the acceptable band is the\n   reachability boundary R_s(t) = L_hi,s(t) (temperature falling with\n   latitude, so the cold edge is poleward). The population's centroid\n   C_s(t) = L_opt,s(t) follows the preferred band. \"Too far away\" is the\n   first t at which R_s(t) exceeds the day-trip range D_max from the home\n   port's latitude L_port, in BOTH species (consensus: the fishery needs both\n   species reachable for its business case; I will also report the first\n   failure of each species separately).\n\n3. **Scenario allocation.** Three warming rates r ∈ {r_slow, r_mid, r_fast}\n   (the magnitudes themselves I take from the plausible 50-year range and\n   state as an assumption — you do not need to supply numbers); the structure\n   I ask you to judge is the allocation above: rigid band translation,\n   poleward-edge reachability, dual-species consensus for \"too far away,\"\n   and elapsed time T(r) = min{t : R_s(t) > D_max for some s} reported per\n   rate.\n\nIs this the structure you would accept for the core mechanism, and if not,\nwhich component do you reject (edge choice, consensus rule, rigid-band\ntranslation, or the rate-based scenario axis)?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy Exchange 2 structure was rejected without specifics, so for this exchange\nI fall back to the most plausible revision: keep your two-edge tolerance band\nand poleward-edge reachability from Exchange 1, but replace the rigid-band\ntranslation with a temperature-dependence in the band widths — i.e. the\nacceptable band [T_lo(T), T_hi(T)] and preferred band [P_lo(T), P_hi(T)] are\nfunctions of the ambient temperature T(t) = T0 + r·t (wider or narrower as\nthe ocean warms), with reachability still \"the poleward edge of the\nacceptable band stays within day-trip range D_max of the home port,\"\nreported per warming rate r, and \"too far away\" = the first rate-r year at\nwhich this fails for either species.\n\nQuestion: which specific case, boundary condition, or failure mode breaks\nthis mechanism — for example, a warming rate, a band-width dependence, a\nport-location choice, or a dual-species interaction — such that the\npredicted \"too far away\" time becomes qualitatively wrong (off by a decade\nor more, or reversed in ordering between best/worst/most-likely)? Naming the\nbreaking case is what I need to bound the model's validity in the final\nbias/robustness analysis; I do not need the fix."
+            ],
+            "expert_answers": [
+              "Define \"too far away\" by the operating constraint the problem itself names: a day-trip range from current Scottish home ports for vessels without on-board refrigeration, tested against the acceptable-temperature band, not the optimum — the optimum defines habitat quality, the tolerance edge defines reachability.\n\nTreat migration as a two-edge tolerance band: the acceptable band's poleward edge is the reachability boundary, the preferred band's position is the habitat centroid. A single isotherm conflates the two and cannot express \"still reachable but no longer thriving.\"\n\nThe independent variable is the annual warming rate, not an endpoint delta. Requirement 2 asks for elapsed time as a function of how rapidly change occurs; rate is the driver, endpoint is a derived outcome.",
+              "reject",
+              "The breaking case is a non-monotone latitude–temperature profile: where the poleward edge of the acceptable band crosses a warm-current boundary (e.g. the Gulf Stream/North Atlantic Drift), the isotherm's latitude can jump or even retreat locally as warming proceeds. Reachability then fails, recovers, and fails again, so \"first year the poleward edge exceeds D_max\" is not the true \"too far away\" time and can be off by a decade or reversed in ordering between rates."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_1da26e07898a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8625,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.75,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r1p2_20260930_070257/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-problem, accurately reflecting the original requirements. Subproblem 1 explicitly sets a 50-year horizon and warming scenarios, while Subproblem 2 correctly links temperature change rates to economic viability for unrefrigerated boats. The goals are explicit, such as identifying \"productive core\" locations and assessing \"economically attractive strategies.\" The analysis is accurate and directly addresses the core mathematical and economic questions without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five required tasks with logical dependencies. Subproblem 1 provides the spatial data needed for Subproblem 2's time predictions, which in turn inform the strategic decisions in Subproblem 3. Subproblem 4 correctly identifies the need to adjust strategies based on jurisdictional changes, and Subproblem 5 is appropriately separated as a communication deliverable. There are no missing key parts or deviations; the sub-tasks are interrelated and fully support the final goal of advising the consortium.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and provides strong, actionable insights into the economic and biological implications of the model.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying critical structural risks and providing logical corrections or robustness checks to ensure the validity of the conclusions.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, biologically grounded, and explicitly justified. The distinction between reachability and habitat quality is a strong rational choice, and economic parameters are honestly labeled as planning assumptions with sensitivity analysis provided.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate deterministic methods for long-term climate projection, logically linking physical, biological, and economic factors. The structure is scientifically sound and effectively translates climate data into actionable business strategies.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively links biological migration to economic outcomes, providing actionable strategies for relocation and equipment investment. It is feasible, parameterized for scenario analysis, and directly addresses the client's need for operational planning, though some economic parameters lack explicit data sourcing.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses a scientifically reasonable logistic approximation for temperature-latitude relationships and correctly models species migration based on thermal preferences. However, it oversimplifies ocean dynamics by ignoring currents and seasonality, and the economic components are basic linear approximations rather than rigorous dynamic models.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        },
+        {
+          "problem_id": "2020_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p2_20260930_070257",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p2_20260930_070257/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are consulting for the Scottish North Atlantic fishery management consortium on the likely northward migration of herring and mackerel over 50 years under ocean warming, and on when the stock becomes \"too far away\" for small Scottish fishing companies operating day-trip vessels without on-board refrigeration from their current ports.\n\nThe problem statement settles neither of two logical readings, and our core mechanism (temperature-tracking migration on a north-south transect of the North Atlantic) cannot be parameterized until they are settled:\n\n1. **Reading of \"most likely locations.\"** Is the intended mechanism that the populations *track a moving preferred-temperature band* — i.e., at each future time t their most likely habitat is the latitude band where the projected temperature equals each species' preferred band today (equilibrium tracking, possibly at partial speed), with the two species distinguished by their different preferred bands — or is it a *population-dynamics* reading, where the locations emerge from birth-death-recruitment processes in which temperature enters only as a driver of local growth and mortality rates, so the stock could collapse in place instead of migrating?\n\n2. **Definition and domain of \"too far away.\"** The small companies are defined only as day-trip vessels operating from current Scottish ports with no on-board refrigeration. Which is the intended boundary of \"too far\": (a) a *physical reachability* threshold — the center of the preferred-temperature band moves beyond the maximum daily round-trip foraging distance of a day-trip vessel, so no fresh-fish delivery from a Scottish port is possible at all; or (b) an *economic viability* threshold — the stock is reachable, but the longer round-trip time, lost fishing time and higher fuel cost drop the net revenue of a day trip below break-even? And does \"too far away\" refer to the *entire* exploitable band leaving that domain, or to its *center* passing it?\n\nWe do not ask for magnitudes, warming rates or cost figures — only which interpretation each item should take, so the state space of the model (what the location variable and the \"too far\" predicate mean) is fixed before we build.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven Exchange 1 (equilibrium temperature-tracking; \"too far\" = physical reachability at the center of the exploitable band), I propose the following single structural hypothesis for the mechanism. Please accept or reject it as a whole.\n\n**Hypothesis.** The mechanism has three coupled pieces:\n\n1. **Temperature field.** A 1-D latitude transect of the North Atlantic (52°N, near current Scottish fishing grounds, to ~72°N, far northern Atlantic). The present mean surface-temperature profile T0(φ) is taken from the standard climatological gradient between the two anchors (milder near Scotland, colder far north), and the projected profile is T(φ,t) = T0(φ) + W(t), where W(t) is a *uniform* warming increment in °C that grows linearly in time at a rate w (°C/yr): W(t) = w·t. The best/worst/most-likely cases are three values of w only; the spatial structure is held fixed.\n\n2. **Population tracking.** The populations track the temperature *at full speed (equilibrium)*: at time t the exploitable band of each species is the latitude set {φ : T(φ,t) ∈ [Tmin_sp, Tmax_sp]} — the band where the projected temperature lies in the species' preferred interval — and the *most likely location* is the band's center φ_c(t). The species differ only by their preferred interval: mackerel narrower and warmer, herring wider and colder, so herring tracks a colder isotherm and lags mackerel. Population *size* does not enter the location model: tracking speed is set by temperature only (no diffusion-limited or lagged dynamics), because the problem asks where they will be, and Exchange 1 ruled the population-dynamics reading out.\n\n3. **\"Too far\" predicate.** Let R be the maximum daily round-trip foraging distance of the day-trip vessels (a fixed radius in nautical miles). The band is \"too far\" at time t iff the distance from φ_c(t) to the current Scottish port latitude exceeds R (converted via the nautical-mile-per-degree-of-latitude). Best/worst/most-likely elapsed times are the first-crossing times of that predicate under the three w values. Because warming is uniform, φ_c(t) moves monotonically north at speed v_sp = w / (dT0/dφ at the tracked isotherm), so the crossing time is a closed form: T_sp = (R in degrees) · (dT0/dφ) / w — linearly responsive to w.\n\nThe dominant loss/transformation mechanism in this domain is *not* neglectable: the spatial temperature gradient dT0/dφ is what converts warming rate w into migration speed, so it is included as a first-order structural element rather than assumed away. Accept or reject this hypothesis as stated.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2's hypothesis (uniform-in-space warming increment W(t) = w·t added to the present gradient, full-speed equilibrium tracking, \"too far\" = band center beyond a fixed day-trip radius) was rejected. I therefore adopt its most plausible fallback as the working mechanism:\n\n- Warming is **non-uniform in latitude**: the projected profile is T(φ,t) = T0(φ) + α·W(t), with α a latitude-amplification factor (polar amplification, α > 1 at high latitudes, α ≈ 1 near Scotland) growing linearly with W(t) = w·t.\n- Populations track at **partial speed** λ ∈ (0,1]: band center φ_c(t) evolves as dφ_c/dt = λ·(dφ_target/dt), where φ_target(t) is the equilibrium center; λ captures migration/limitation by reproduction and stock dynamics.\n- \"Too far\" is still the band center beyond the day-trip reachability radius R.\n\nGiven that mechanism, what is the specific case, boundary condition, or failure mode that breaks it — i.e., in which concrete situation would it give a wrong or infeasible answer for the location of the stock or for the time until it is too far? (Answer with the case only; no advice or fix is asked for.)"
+            ],
+            "expert_answers": [
+              "1. **\"Most likely locations\"** — take the equilibrium temperature-tracking reading: at each t, habitat is the latitude band where projected temperature matches each species' present preferred band, with species distinguished by their different preferred bands. Partial-speed tracking is a refinement, not a separate reading. The population-dynamics reading is not what the problem asks; it asks where the populations *are*, not whether they persist.\n\n2. **\"Too far away\"** — take the physical reachability threshold (a), applied to the *center* of the exploitable band. The companies are defined by vessel capability (day-trip, no refrigeration), so the binding constraint is whether a fresh-fish round trip from a Scottish port is possible at all. Economic viability is a downstream question for Requirement 3, not the definition of \"too far.\"",
+              "reject",
+              "The case where the tracked isotherm's present gradient dT0/dφ is locally flat or reverses — e.g. the subpolar/subtropical transition or a warm-core eddy band — so φ_target(t) is not single-valued or moves south, and the partial-speed ODE dφ_c/dt = λ·dφ_target/dt has no well-defined or northward solution, making both the location and the first-crossing time undefined."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_1da26e07898a",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8666666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.7999999999999999,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_7/train_candidate/runs/round_7/r2p2_20260930_070257/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, aligning them precisely with the five problem requirements. Task 1 specifies a spatial habitat-migration model with distinct warming scenarios, Task 2 defines first-crossing times for reachability, and Task 3 outlines a comparative economic assessment of specific strategies. The objectives are explicit, such as identifying latitude bands and assessing economic viability, ensuring the analysis is accurate and the goals are well-stated for a mathematical modeling context.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated and comprehensively cover the problem requirements. Task 1 provides the spatial-temporal data necessary for Task 2's time predictions, which in turn inform the strategic decisions in Task 3. Task 4 correctly identifies the geopolitical implications of the migration predicted in Task 1, and Task 5 serves as the communication output. There are no significant deviations or missing key components; the decomposition effectively supports the final goal of advising the fishery consortium.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively translates biological migration into actionable business strategies, including cost-benefit analyses for relocation and vessel upgrades, providing clear, decision-ready insights for small fishing companies.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses a physically grounded temperature-latitude relationship and validated ODEs to simulate migration, integrating ecological dynamics with economic constraints in a rigorous, interdisciplinary framework.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative outputs, robust sensitivity checks, and actionable insights that directly address the problem's economic and geographic constraints.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, explicitly identifying data and structural biases (e.g., linear profile vs. real currents) and explaining their impact on results, even if full correction is limited by model scope.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, well-sourced, and logically consistent with the problem context, including critical factors like polar amplification and biological migration limits.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (1-D temperature tracking, closed-form solutions) and a realistic economic structure that accurately reflects the operational and geopolitical constraints of the fishery.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8645833333333334,
+      "interaction_cost": 0.8519597137274192,
+      "interaction_penalty": 0.042597985686370965,
+      "net_utility": 0.8219853476469624,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1739,
+          "total_expert_latency_seconds": 4.11,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8760474293058316,
+          "latency_cost_component": 0.25919128091440224,
+          "interaction_cost": 0.8504189717223327,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1857,
+          "total_expert_latency_seconds": 2.87,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8837511393312639,
+          "latency_cost_component": 0.21502691098148605,
+          "interaction_cost": 0.8535004557325057,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T07:31:56.911251",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_1da26e07898a",
+  "workflow": {
+    "name": "Loss-Aware Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy's rollouts revealed a critical failure mode in 'modeling_rigorousness': the agent proposed structural hypotheses that omitted dominant physical mechanisms (specifically, free-space path loss in the 2018_A task), leading to unrealistic results and low scores. The parent policy focused on 'logical boundaries' but did not explicitly mandate that the proposed structure in Exchange 2 must account for dominant loss/transform mechanisms. Rounds 3-6 failed because they focused on handling rejection or operator selection nuances, which did not address the root cause of the rigor penalty. This patch modifies Exchange 2 to explicitly require the proposed structure to include dominant loss/transform mechanisms, ensuring the expert validates a physically/logically complete model rather than an idealized skeleton. This directly targets the 'modeling_rigorousness' dimension where the parent lost points.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this loss-inclusive structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this loss-inclusive structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this loss-inclusive structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_1da26e07898a",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 7,
+    "parent_workflow_ids": [
+      "interaction_workflow_e0f19556bdd2"
+    ],
+    "training_batch": [
+      "2018_A",
+      "2020_A"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2018_A",
+    "2020_A"
+  ],
+  "absolute_utility": 0.83125,
+  "interaction_cost": 0.8604879916294892,
+  "interaction_penalty": 0.04302439958147447,
+  "net_utility": 0.7882256004185255,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

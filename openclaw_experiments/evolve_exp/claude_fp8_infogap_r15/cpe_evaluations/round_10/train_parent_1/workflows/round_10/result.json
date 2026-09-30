@@ -1,0 +1,655 @@
+{
+  "round": 10,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7787730032665807,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8166666666666667,
+    "modeling_rigorousness_evaluation": 0.8833333333333333,
+    "practicality_and_scientificity_evaluation": 0.7666666666666667,
+    "result_and_bias_analysis_evaluation": 0.8208333333333333
+  },
+  "problem_results": [
+    {
+      "problem_id": "2019_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Part 1 spread model for the 2019_MCM problem C (NFLIS drug-\nidentification counts for narcotic analgesics and heroin, 2010–2017, counties of\nOH, KY, WV, VA, TN). Three structural/definitional ambiguities in the problem\nstatement need to be settled before the core mechanism can be parameterized.\nI am asking for the logical reading, not for empirical magnitudes.\n\n1. **Origin identification (Part 1, \"identify possible locations where specific\n   opioid use might have started in each of the five states\").** The data are\n   identification counts, i.e. detection reports from forensic labs, not\n   incidence of use. How should \"started\" be interpreted for a detection\n   process so that an origin can be attributed to a county without inventing\n   data? Specifically: is it (a) the first year a county records a nonzero\n   count of the substance (a pure appearance event, which is trivially\n   data-driven but confounded with reporting coverage), (b) the county whose\n   early growth best explains later county-level growth through a diffusion\n   channel (an inference that attributes explanatory precedence, not literal\n   first appearance), or (c) some other logically valid reading? And must this\n   be done per substance class, or per state only?\n\n2. **Interpretation of the drug-identification threshold (Part 1, \"At what drug\n   identification threshold levels do these occur? Where and when does your\n   model predict they will occur in the future?\").** The text never defines\n   what quantity the threshold applies to. Logically it must be a level of the\n   same detection variable the model tracks (a county's annual identification\n   count for a substance class, or a county's share of its state's\n   identifications). Which quantity is the intended referent, and should the\n   threshold be defined relative (e.g. a county exceeding its own historical\n   level or the state mean) rather than as an absolute count, given that\n   reporting coverage and lab capacity differ across states and grew over the\n   window?\n\n3. **Deliverable extension (Deliverable Alignment).** The problem lists three\n   distinct deliverables: (Part 1) the temporal/spatial spread model with\n   origins, thresholds, and forward prediction; (Part 2) incorporation of ACS\n   socio-economic drivers (2010–2016, 5-year ACS, no 2017); (Part 3) a counter\n   strategy with model-tested effectiveness and parameter bounds, plus a memo\n   to the DEA. Which structural elements of the Part 1 core mechanism must be\n   designed so they extend directly to Part 2 (covariate-conditioned growth or\n   arrival rates) and Part 3 (an intervention acts as a multiplier on which\n   mechanism term — e.g. a suppression factor on the diffusion channel, or on\n   the intrinsic growth rate), and which require separate treatment? In\n   particular, does the Part 3 strategy test require the Part 1 model to\n   expose an explicit intervention parameter at a named mechanism term, or is\n   it sufficient for the Part 1 model to be re-run with a perturbed data\n   scenario?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on the Exchange 1 answers (explanatory-precedence origin per substance\nclass; relative threshold on the model's own detection variable;\ncovariate-conditioned growth built into Part 1; explicit intervention parameter\non a named mechanism term), please judge whether you accept or reject the\nfollowing single structural hypothesis for the core model.\n\n**Model: two-layer detection process per substance class (analgesics A, heroin\nH) and county i, year t.**\n\n- **Latent (true) layer.** U_it follows a multiplicative growth-diffusion\n  process:\n  U_it = (1 + g_it) * U_i,t-1 + sum_j in N(i) beta_ij * U_j,t-1,\n  where g_it = alpha_0 + alpha_1 * z_it (intrinsic growth, covariate-\n  conditioned; z_it are standardized ACS socio-economic factors from the\n  nearest ACS 5-year release), and beta_ij >= 0 is a county-pair diffusion\n  coefficient with support on shared-border pairs only (plus a weak within-\n  state complete-graph term for transport corridors). N(i) is the set of\n  counties sharing a border with county i. **Cross-state diffusion is\n  restricted to counties that share a physical border** (e.g. Kentucky-OHIO,\n  KY-TN); states that do not physically border (e.g. VA-OH, KY-VA) exchange\n  no direct diffusion. This encodes the domain's dominant transformation\n  mechanism — physical proximity as the propagation channel — rather than\n  assuming a complete graph across all 500+ counties.\n\n- **Observation layer.** X_it (NFLIS drug identifications) is a noisy\n  observation of U_it: X_it ~ Poisson(mu_it), mu_it = p_it * U_it, where\n  p_it is a latent detection/probability of reporting that is modeled as\n  p_it = c_state,i * t_growth, with c_state,i a county-level capture\n  constant (absorbing coverage differences across states and labs) and\n  t_growth a common national growth trend in lab reporting. The\n  observation layer is the \"dominant loss mechanism\" — identifications are\n  detections, not true use, so the model separates the underlying\n  spread from the measurement process.\n\n- **Parameter estimation.** EM-style: E-step estimates U_it given current\n  p and beta (by inverting the observation model and the growth equation),\n  M-step updates alpha, beta, p, and c by maximum likelihood / method of\n  moments. Beta is sparsified to the border graph to keep the parameter\n  count tractable (500+ counties -> a few thousand border pairs per\n  substance class).\n\n- **Origin (per Exchange 1).** For each substance class and state, the\n  origin county is the one whose early U_it (2010-2012) has the largest\n  Granger-causal / explanatory contribution to the state's aggregate U_s,t\n  for 2013-2017, computed on the estimated U, not on raw X.\n\n- **Threshold (per Exchange 1).** A \"concern threshold\" for county i and\n  substance class is defined as the value of X_it that exceeds the county's\n  own 2010-2013 mean by a fixed relative margin (e.g. +50%), or exceeds the\n  state mean for that year by a fixed factor. The model predicts where and\n  when these relative-threshold crossings occur in 2018-2020.\n\n- **Part 3 interface (per Exchange 1).** A named intervention parameter\n  lambda is applied as a multiplicative suppression on the diffusion term:\n  beta_ij -> lambda * beta_ij (lambda in [0,1]), representing interdiction /\n  supply disruption. A second scenario applies lambda as a suppression on\n  the intrinsic growth rate g. The model is re-run for a sweep of lambda to\n  identify the parameter bounds on which the strategy succeeds (e.g. reduces\n  predicted 2020 state totals by more than 30% without triggering a\n  compensating surge in the other substance class).\n\n**Please state: accept, or reject with the specific structural flaw you see.**",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe accepted structure from Exchange 2 is: a two-layer per-substance-class,\nper-county model — latent true spread U_it following multiplicative growth\nplus diffusion over a shared-border county graph with within-state corridor\nterms, observed through a Poisson detection layer X_it ~ Poisson(p_it * U_it)\nwith county capture constants and a common reporting trend, EM-style\nestimation, explanatory-precedence origin attribution, relative\nthreshold-crossing predictions for 2018–2020, and a Part 3 intervention\nparameter lambda suppressing either the diffusion term or the intrinsic\ngrowth term.\n\nAssuming this structure, what is the specific boundary condition, case, or\nfailure mode that would break it — the strongest counterexample you can\nidentify? In particular, consider: (a) counties with zero or near-zero\nidentifications for years (observation layer degenerate, p_it or U_it\nnear zero); (b) the 2017 heroin decline occurring while non-heroin\n(non-fentanyl) counts fall — could the detection layer be misattributing a\ntrue-use change to a reporting-coverage change, or vice versa; (c) the\nphysical-border-only diffusion restriction when the dominant real\ntransport channel (e.g. the I-75 / I-70 interstate corridors, or interstate\nmail/parcels) does not follow county borders; (d) the relative threshold\nwhen a county's own 2010-2013 baseline is near zero (division by a\ndegenerate baseline). Which of these — or another case — is the one that\nmost threatens the validity of the mechanism, and what is the specific\nform of the failure?"
+        ],
+        "expert_answers": [
+          "1. \"Started\" cannot be literal first use; the data only license detection. Reading (b) is the logically defensible one: attribute origin to the county whose early detection growth has explanatory precedence for later county growth via a diffusion channel, while treating (a) as a reporting-coverage artifact to be screened, not an origin. Do it per substance class (analgesics and heroin have distinct diffusion histories), then aggregate to state.\n\n2. The threshold must refer to the model's own detection variable — county annual identification count for a substance class, or county share of state identifications. Because coverage and lab capacity differ and grew, define it relative (county exceeding its own historical baseline or the state mean), not as an absolute count.\n\n3. Covariate-conditioned arrival/growth rates must be built into Part 1 so Part 2 enters as parameters, not a bolt-on. Part 3 requires an explicit intervention parameter on a named mechanism term (diffusion suppression or intrinsic growth multiplier); re-running perturbed data does not expose effectiveness or parameter bounds.",
+          "accept",
+          "(c) is the one that breaks it. The border-only graph encodes a mechanism the data cannot confirm: the dominant real channel is corridor and parcel flow (I-75/I-70, mail), which jumps non-adjacent counties and crosses non-bordering states (VA–OH, KY–VA). The failure is structural, not numerical: beta is constrained to zero on exactly the pairs carrying the signal, so the diffusion term is misspecified, EM will push that unexplained growth into g_it and p_it, and origin attribution via explanatory precedence will then credit a border neighbor rather than the true corridor hub. The model still fits, which is what makes it dangerous — the counterexample is a county whose rise is explained only by a distant corridor-linked county, which the accepted graph forbids."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.76875,
+      "dimension_scores": {
+        "analysis_evaluation": 0.7333333333333334,
+        "modeling_rigorousness_evaluation": 0.8666666666666667,
+        "practicality_and_scientificity_evaluation": 0.7250000000000001,
+        "result_and_bias_analysis_evaluation": 0.75
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope (five states, 2010-2017 data) and specific goals for each part: modeling spread, identifying origins, setting thresholds, linking socio-economic factors, and proposing strategies. However, there is a significant factual error in Task 1 where the modeler incorrectly identifies the fifth state as Pennsylvania (FIPS 42) instead of Tennessee, which is explicitly stated in the problem background. This misidentification undermines the accuracy of the problem definition despite the clear structure of the objectives.",
+            "score": 6
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks logically follow the problem requirements, covering the spread model, socio-economic analysis, and strategy formulation. The dependencies are correctly identified (Part 2 modifies Part 1, Part 3 uses both). However, the coverage is compromised by the incorrect state identification in Task 1. If the modeler proceeds with Pennsylvania data instead of Tennessee, the entire analysis for that state will be invalid, leading to a deviation from the actual goal of analyzing the specified five states. The rest of the scope is well-covered.",
+            "score": 6
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are clear, specific, and well-interpreted with actionable insights, though explicit discussion of model weaknesses is limited.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model identifies key data limitations and uses regularization to correct for overfitting, but does not thoroughly analyze other potential biases like reporting or spatial biases.",
+            "score": 7
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly explained, rigorously justified, and consistent with the problem background, particularly regarding the distinction between detection and incidence and the handling of data discrepancies.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model structure is scientifically sound, using appropriate diffusion and growth mechanisms, and the intervention strategies are logically defined and testable within the model framework.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, effectively handling data noise via a latent-observation split, incorporating domain-specific logistics (corridors), and providing interpretable, decision-supporting outputs for policy intervention.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, utilizing appropriate statistical frameworks (Poisson, EM, fixed effects) and a mechanistic latent-variable approach that correctly accounts for detection bias and spatial dynamics.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 3,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Part 1 spread model for the 2019_MCM problem C (NFLIS drug-\nidentification counts for narcotic analgesics and heroin, 2010–2017, counties of\nOH, KY, WV, VA, TN). Three structural/definitional ambiguities in the problem\nstatement need to be settled before the core mechanism can be parameterized.\nI am asking for the logical reading, not for empirical magnitudes.\n\n1. **Origin identification (Part 1, \"identify possible locations where specific\n   opioid use might have started in each of the five states\").** The data are\n   identification counts, i.e. detection reports from forensic labs, not\n   incidence of use. How should \"started\" be interpreted for a detection\n   process so that an origin can be attributed to a county without inventing\n   data? Specifically: is it (a) the first year a county records a nonzero\n   count of the substance (a pure appearance event, which is trivially\n   data-driven but confounded with reporting coverage), (b) the county whose\n   early growth best explains later county-level growth through a diffusion\n   channel (an inference that attributes explanatory precedence, not literal\n   first appearance), or (c) some other logically valid reading? And must this\n   be done per substance class, or per state only?\n\n2. **Interpretation of the drug-identification threshold (Part 1, \"At what drug\n   identification threshold levels do these occur? Where and when does your\n   model predict they will occur in the future?\").** The text never defines\n   what quantity the threshold applies to. Logically it must be a level of the\n   same detection variable the model tracks (a county's annual identification\n   count for a substance class, or a county's share of its state's\n   identifications). Which quantity is the intended referent, and should the\n   threshold be defined relative (e.g. a county exceeding its own historical\n   level or the state mean) rather than as an absolute count, given that\n   reporting coverage and lab capacity differ across states and grew over the\n   window?\n\n3. **Deliverable extension (Deliverable Alignment).** The problem lists three\n   distinct deliverables: (Part 1) the temporal/spatial spread model with\n   origins, thresholds, and forward prediction; (Part 2) incorporation of ACS\n   socio-economic drivers (2010–2016, 5-year ACS, no 2017); (Part 3) a counter\n   strategy with model-tested effectiveness and parameter bounds, plus a memo\n   to the DEA. Which structural elements of the Part 1 core mechanism must be\n   designed so they extend directly to Part 2 (covariate-conditioned growth or\n   arrival rates) and Part 3 (an intervention acts as a multiplier on which\n   mechanism term — e.g. a suppression factor on the diffusion channel, or on\n   the intrinsic growth rate), and which require separate treatment? In\n   particular, does the Part 3 strategy test require the Part 1 model to\n   expose an explicit intervention parameter at a named mechanism term, or is\n   it sufficient for the Part 1 model to be re-run with a perturbed data\n   scenario?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on the Exchange 1 answers (explanatory-precedence origin per substance\nclass; relative threshold on the model's own detection variable;\ncovariate-conditioned growth built into Part 1; explicit intervention parameter\non a named mechanism term), please judge whether you accept or reject the\nfollowing single structural hypothesis for the core model.\n\n**Model: two-layer detection process per substance class (analgesics A, heroin\nH) and county i, year t.**\n\n- **Latent (true) layer.** U_it follows a multiplicative growth-diffusion\n  process:\n  U_it = (1 + g_it) * U_i,t-1 + sum_j in N(i) beta_ij * U_j,t-1,\n  where g_it = alpha_0 + alpha_1 * z_it (intrinsic growth, covariate-\n  conditioned; z_it are standardized ACS socio-economic factors from the\n  nearest ACS 5-year release), and beta_ij >= 0 is a county-pair diffusion\n  coefficient with support on shared-border pairs only (plus a weak within-\n  state complete-graph term for transport corridors). N(i) is the set of\n  counties sharing a border with county i. **Cross-state diffusion is\n  restricted to counties that share a physical border** (e.g. Kentucky-OHIO,\n  KY-TN); states that do not physically border (e.g. VA-OH, KY-VA) exchange\n  no direct diffusion. This encodes the domain's dominant transformation\n  mechanism — physical proximity as the propagation channel — rather than\n  assuming a complete graph across all 500+ counties.\n\n- **Observation layer.** X_it (NFLIS drug identifications) is a noisy\n  observation of U_it: X_it ~ Poisson(mu_it), mu_it = p_it * U_it, where\n  p_it is a latent detection/probability of reporting that is modeled as\n  p_it = c_state,i * t_growth, with c_state,i a county-level capture\n  constant (absorbing coverage differences across states and labs) and\n  t_growth a common national growth trend in lab reporting. The\n  observation layer is the \"dominant loss mechanism\" — identifications are\n  detections, not true use, so the model separates the underlying\n  spread from the measurement process.\n\n- **Parameter estimation.** EM-style: E-step estimates U_it given current\n  p and beta (by inverting the observation model and the growth equation),\n  M-step updates alpha, beta, p, and c by maximum likelihood / method of\n  moments. Beta is sparsified to the border graph to keep the parameter\n  count tractable (500+ counties -> a few thousand border pairs per\n  substance class).\n\n- **Origin (per Exchange 1).** For each substance class and state, the\n  origin county is the one whose early U_it (2010-2012) has the largest\n  Granger-causal / explanatory contribution to the state's aggregate U_s,t\n  for 2013-2017, computed on the estimated U, not on raw X.\n\n- **Threshold (per Exchange 1).** A \"concern threshold\" for county i and\n  substance class is defined as the value of X_it that exceeds the county's\n  own 2010-2013 mean by a fixed relative margin (e.g. +50%), or exceeds the\n  state mean for that year by a fixed factor. The model predicts where and\n  when these relative-threshold crossings occur in 2018-2020.\n\n- **Part 3 interface (per Exchange 1).** A named intervention parameter\n  lambda is applied as a multiplicative suppression on the diffusion term:\n  beta_ij -> lambda * beta_ij (lambda in [0,1]), representing interdiction /\n  supply disruption. A second scenario applies lambda as a suppression on\n  the intrinsic growth rate g. The model is re-run for a sweep of lambda to\n  identify the parameter bounds on which the strategy succeeds (e.g. reduces\n  predicted 2020 state totals by more than 30% without triggering a\n  compensating surge in the other substance class).\n\n**Please state: accept, or reject with the specific structural flaw you see.**",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe accepted structure from Exchange 2 is: a two-layer per-substance-class,\nper-county model — latent true spread U_it following multiplicative growth\nplus diffusion over a shared-border county graph with within-state corridor\nterms, observed through a Poisson detection layer X_it ~ Poisson(p_it * U_it)\nwith county capture constants and a common reporting trend, EM-style\nestimation, explanatory-precedence origin attribution, relative\nthreshold-crossing predictions for 2018–2020, and a Part 3 intervention\nparameter lambda suppressing either the diffusion term or the intrinsic\ngrowth term.\n\nAssuming this structure, what is the specific boundary condition, case, or\nfailure mode that would break it — the strongest counterexample you can\nidentify? In particular, consider: (a) counties with zero or near-zero\nidentifications for years (observation layer degenerate, p_it or U_it\nnear zero); (b) the 2017 heroin decline occurring while non-heroin\n(non-fentanyl) counts fall — could the detection layer be misattributing a\ntrue-use change to a reporting-coverage change, or vice versa; (c) the\nphysical-border-only diffusion restriction when the dominant real\ntransport channel (e.g. the I-75 / I-70 interstate corridors, or interstate\nmail/parcels) does not follow county borders; (d) the relative threshold\nwhen a county's own 2010-2013 baseline is near zero (division by a\ndegenerate baseline). Which of these — or another case — is the one that\nmost threatens the validity of the mechanism, and what is the specific\nform of the failure?"
+            ],
+            "expert_answers": [
+              "1. \"Started\" cannot be literal first use; the data only license detection. Reading (b) is the logically defensible one: attribute origin to the county whose early detection growth has explanatory precedence for later county growth via a diffusion channel, while treating (a) as a reporting-coverage artifact to be screened, not an origin. Do it per substance class (analgesics and heroin have distinct diffusion histories), then aggregate to state.\n\n2. The threshold must refer to the model's own detection variable — county annual identification count for a substance class, or county share of state identifications. Because coverage and lab capacity differ and grew, define it relative (county exceeding its own historical baseline or the state mean), not as an absolute count.\n\n3. Covariate-conditioned arrival/growth rates must be built into Part 1 so Part 2 enters as parameters, not a bolt-on. Part 3 requires an explicit intervention parameter on a named mechanism term (diffusion suppression or intrinsic growth multiplier); re-running perturbed data does not expose effectiveness or parameter bounds.",
+              "accept",
+              "(c) is the one that breaks it. The border-only graph encodes a mechanism the data cannot confirm: the dominant real channel is corridor and parcel flow (I-75/I-70, mail), which jumps non-adjacent counties and crosses non-bordering states (VA–OH, KY–VA). The failure is structural, not numerical: beta is constrained to zero on exactly the pairs carrying the signal, so the diffusion term is misspecified, EM will push that unexplained growth into g_it and p_it, and origin attribution via explanatory precedence will then credit a border neighbor rather than the true corridor hub. The model still fits, which is what makes it dangerous — the counterexample is a county whose rise is explained only by a distant corridor-linked county, which the accepted graph forbids."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.65,
+            "modeling_rigorousness_evaluation": 0.8833333333333333,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.6833333333333332
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p1_20260930_094328/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope (five states, 2010-2017 data) and specific goals for each part: modeling spread, identifying origins, setting thresholds, linking socio-economic factors, and proposing strategies. However, there is a significant factual error in Task 1 where the modeler incorrectly identifies the fifth state as Pennsylvania (FIPS 42) instead of Tennessee, which is explicitly stated in the problem background. This misidentification undermines the accuracy of the problem definition despite the clear structure of the objectives.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks logically follow the problem requirements, covering the spread model, socio-economic analysis, and strategy formulation. The dependencies are correctly identified (Part 2 modifies Part 1, Part 3 uses both). However, the coverage is compromised by the incorrect state identification in Task 1. If the modeler proceeds with Pennsylvania data instead of Tennessee, the entire analysis for that state will be invalid, leading to a deviation from the actual goal of analyzing the specified five states. The rest of the scope is well-covered.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are clear, specific, and well-interpreted with actionable insights, though explicit discussion of model weaknesses is limited.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model identifies key data limitations and uses regularization to correct for overfitting, but does not thoroughly analyze other potential biases like reporting or spatial biases.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly explained, rigorously justified, and consistent with the problem background, particularly regarding the distinction between detection and incidence and the handling of data discrepancies.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model structure is scientifically sound, using appropriate diffusion and growth mechanisms, and the intervention strategies are logically defined and testable within the model framework.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, effectively handling data noise via a latent-observation split, incorporating domain-specific logistics (corridors), and providing interpretable, decision-supporting outputs for policy intervention.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, utilizing appropriate statistical frameworks (Poisson, EM, fixed effects) and a mechanistic latent-variable approach that correctly accounts for detection bias and spatial dynamics.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        },
+        {
+          "problem_id": "2019_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p1_20260930_094328",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p1_20260930_094328/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM Problem C (MM-Bench 2019_C) with NFLIS drug\nidentification counts (2010-2017, five states: OH, KY, WV, VA, TN) for Part 1\n(spatial-temporal spread of synthetic opioids and heroin, possible origin\nlocations, threshold levels and future warning), Part 2 (association with ACS\nsocio-economic data, 2010-2016), and Part 3 (a counter-strategy tested in the\nmodel with success-dependent parameter bounds). The provided datasets are the\nonly data I may use for modeling.\n\nThe problem statement leaves several structural/definitional points unsettled,\nand each one maps to a specific deliverable. Which logical reading of each is\ncorrect?\n\n(a) Substrate definition (governs the Part 1 core model). \"Synthetic opioids\n(synthetic and non-synthetic opioids)\" vs \"heroin\": which substances in the\nNFLIS list count as the synthetic-opioid substrate, and is methadone (a\nprescription/medication-assisted-treatment drug) included in \"synthetic opioid\nuse\" or excluded as iatrogenic? I will not invent an arbitrary list; I need\nthe intended reading.\n\n(b) Spread mechanism (governs Part 1's \"spread between counties\"). Drug\nidentification counts are laboratory submissions from crime cases, not\nprevalence. Is the spatial process to be modeled as diffusion of usage\nacross county borders (geographic spread of the epidemic), or as diffusion\nof the *reporting/enforcement* signal, with usage-level inferences\nconstrained to within-county intensity only? In other words, what is the\nvalid domain for a between-county coupling term?\n\n(c) Origin identification (governs the Part 1 deliverable \"identify possible\nlocations where specific opioid use might have started\"). What is the\nstructural criterion for calling a county a \"possible origin\" — the\nearliest non-zero detection, the earliest exceedance of a baseline threshold,\nor the inferred seed of a spreading wave — and at what level (county,\nsubstance, or substance-class) should the answer be stated?\n\n(d) Threshold deliverable (governs Part 1's \"at what drug identification\nthreshold levels do these concerns occur? Where and when in the future?\"). The\ntext never defines a unit or basis for \"drug identification threshold.\" Is the\nthreshold meant per county-year (raw count), per county per 100k population,\nor as a fraction of the county's all-substance total — i.e., which observable\nquantity do \"threshold levels\" attach to?\n\n(e) Deliverable interface (Deliverable Alignment Rule; governs how Parts 2\nand 3 extend Part 1). Part 2 says \"modify your model from Part 1\" using the\nACS data. Structurally, is the intended extension (i) to re-estimate the Part 1\nmechanism with ACS covariates as forcing/drift terms in the same\ncounty-level dynamics, or (ii) to keep Part 1's dynamics fixed and add a\nstatic explanatory layer (county fixed effects / covariate regression) around\nit? And for Part 3, is the counter-strategy required to act *within the same\nmodel* (e.g., a term that suppresses growth or transmission, parameterized and\nswept for its effectiveness bounds), or is a separate planning/evaluation\nmodel acceptable?\n\nI am not asking for magnitudes, rates, or empirical constants; I am asking for\nthe logical boundaries and the intended reading of each object above.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nPer your Exchange 1 answers I propose the following single, complete\nstructural configuration. Accept or reject it as a whole.\n\nPart 1 — two-layer county-level model, one state at a time:\n- State layer (between-county coupling): for each state s and each substance\n  class c in {synthetic opioids = the NFLIS narcotic-analgesic list, heroin},\n  the county intensity I_i(t) (per-capita, population-normalized NFLIS\n  county-year count) follows\n  dI_i/dt = r_c,s * I_i * (1 - I_i/K_c,s) + kappa_c,s * sum_j W_ij * I_j(t),\n  where W_ij is a county-adjacency matrix (topological spread channel of the\n  reporting/enforcement signal, exactly as you scoped in (b)), r_c,s is the\n  intrinsic county-level growth rate, and K_c,s is the carrying capacity\n  (saturation of the observable county-year signal).\n- All r, K, kappa are estimated per substance class and state from the 2010-2017\n  panel via least squares on the annual increments (a finite-difference form of\n  the PDE). No county-level usage is inferred beyond I_i(t).\n- \"Concerns\" and thresholds: define the threshold T_c,s on the per-capita\n  county-year observable (basis: I_i(t) per 100,000 population, justified in\n  the report; I also report the raw-count and share-of-county-total versions\n  as sensitivity views). A \"specific concern\" = the predicted first county-year\n  in which I_i(t) crosses T_c,s, where T_c,s is the 75th percentile of that\n  state's observed county-year distribution (a defined, justified choice).\n- Origin: for each (state, substance class), the inferred seed = the county\n  that maximizes (i) early high intensity and (ii) subsequent rise of the\n  adjacent counties weighted by W_ij — a \"spreading wave\" seed, stated at\n  county-substance level.\n\nPart 2 — same dynamics, modified: add ACS covariates as drift/forcing terms\nin the county increment equation,\n  dI_i/dt = ... + beta1 * X_poverty_i(t) + beta2 * X_unemp_i(t) + beta3 * X_other_i(t),\nwhere X_* are standardized ACS DP02 variables (poverty rate, unemployment\nrate, and at most two further variables selected from the DP02 list), and\nbeta_* are estimated jointly with r, K, kappa per (state, substance class).\n\nPart 3 — counter-strategy inside the same model: add a policy term\n  -gamma * I_i(t) * u_i(t),\nwhere u_i(t) is a binary/graded intervention indicator (e.g., a county is\n\"covered\" by the strategy when its I_i(t) crosses the 75th-percentile\nthreshold), and gamma is the suppression strength. Sweep gamma over a\nrange; success = the predicted trajectory crosses a lower target threshold\nor flattens; failure = it does not. Report the gamma bounds separating\nsuccess from failure.\n\nPlease accept or reject this structure. If rejected, name the specific\nstructural flaw.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy revised structure, after the Exchange 2 rejection (the flaws I identified in\nmy own proposal: single logistic carrying capacity that cannot represent the\ndata's two distinct epidemic waves — the prescriber-driven rise and the\nfentanyl-wave transition; a static adjacency matrix that cannot represent the\nlate-emerging fentanyl channel; and the Part 3 intervention acting only on\ncurrent intensity while the epidemic's persistence is driven by the\nself-reinforcing growth term). Revisions:\n\n1. Piecewise-phase logistic: split the observation window into two phases at\n   the year in which the synthetic-opioid class's state-level trajectory\n   changes its growth sign (detected from the data, e.g., 2014). Each phase\n   has its own (r, K, kappa); within a phase the county dynamics are\n   dI_i/dt = r_phase * I_i * (1 - I_i/K_phase) + kappa_phase * sum_j W_ij I_j.\n   This lets the model represent both waves without a single K forcing a\n   spurious saturation.\n\n2. Time-varying coupling weight: W_ij(t) = base adjacency * (1 + lambda *\n   f_t), where f_t is a per-substance activity index (e.g., fentanyl's share\n   of the synthetic-opioid class total in state s at time t), so the coupling\n   can strengthen or weaken as the dominant substance shifts.\n\n3. Part 3 intervention now acts on the growth term, not just the intensity:\n   -gamma * u_i(t) * r * I_i * (1 - I_i/K), i.e., the policy suppresses the\n   self-reinforcing growth rate of covered counties, with success/failure\n   defined against the phase-2 predicted trajectory as before.\n\nAssuming this revised structure stands, which specific boundary condition,\ncase, or failure mode would break it — e.g., a county with zero detections in\nan early phase, a state whose phase split is degenerate, the fentanyl-activity\nindex being dominated by a single county, the intervention threshold being\ncrossed in every county simultaneously, or a different case you can name?"
+            ],
+            "expert_answers": [
+              "(a) The intended substrate is the NFLIS substance list itself: all narcotic-analgesic (synthetic opioid) substances as named in the data, with heroin treated as the separate non-synthetic comparator. Methadone is a synthetic opioid by chemistry and appears in the list; the problem does not authorize excluding it as iatrogenic, so it stays in unless the data's own naming separates it.\n\n(b) The valid domain is within-county intensity; between-county coupling can only represent diffusion of the reporting/enforcement signal, since counts are case submissions, not prevalence. Usage-level spread across borders is not identifiable from these data.\n\n(c) Origin = inferred seed of a spreading wave, stated at county-substance level, not merely earliest non-zero.\n\n(d) Threshold attaches to the county-year observable quantity; the text leaves the basis open, so it must be defined and justified, not assumed.\n\n(e) Part 2: (i), covariates as forcing/drift in the same dynamics. Part 3: within the same model, parameterized and swept.",
+              "reject",
+              "The case that breaks it: a county whose phase-1 detections are zero but which becomes a phase-2 seed. With I_i(0)=0 the logistic growth term is identically zero, so the county can only be ignited by the coupling term — and if its adjacency neighbors are also zero in phase 1, the model can never generate the phase-2 emergence, no matter how the phase split or lambda is set. The fentanyl wave's actual entry points are exactly such counties, so the mechanism fails on the case it was revised to capture."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7583333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8166666666666668,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.55,
+            "result_and_bias_analysis_evaluation": 0.8166666666666668
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p1_20260930_094328/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope, time frame (2010-2017), and geographic focus (five states). It explicitly lists the key objectives: modeling spread, identifying origins, determining thresholds, and making predictions. The goals are well-aligned with the problem requirements, though it could be more specific about the mathematical nature of the \"spread\" model (e.g., spatial-temporal) to fully clarify the analytical approach.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The decomposition into three tasks directly mirrors the three parts of the problem statement, ensuring complete coverage. The logical dependencies are correctly identified, with Task 2 modifying Task 1 and Task 3 synthesizing both. However, the analysis is somewhat superficial, merely restating the requirements without breaking them down into specific modeling steps (e.g., data preprocessing, feature selection, or specific statistical methods), which limits the depth of the problem understanding.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed metrics, clear conclusions on state-specific trends, and a transparent explanation of the model's inference process and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying critical data and model biases like collinearity and proxy adjacency, though it relies more on acknowledgment than explicit mathematical correction.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified. They correctly address data limitations (TN absence, DP02 constraints) and model the complex, multi-phase nature of the opioid crisis, demonstrating high rationality and attention to detail.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (logistic growth, coupling, regression) that realistically reflect the problem's dynamics. The structure is scientifically sound, and the parameter estimation and policy testing methods are rational and well-integrated.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model addresses key problem aspects like spread and policy testing but is limited by using raw counts without normalization, arbitrary adjacency definitions, and lack of robustness checks, reducing its practical reliability for decision-making.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The model uses a theoretical framework but suffers from ad-hoc phase splitting, inconsistent parameter estimation methods, and weak explanatory power for socio-economic factors, indicating limited scientific rigor and justification.",
+                "score": 5
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        }
+      ],
+      "refined_report_utility": 0.76875,
+      "interaction_cost": 0.8673209318288522,
+      "interaction_penalty": 0.04336604659144261,
+      "net_utility": 0.7253839534085574,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2588,
+          "total_expert_latency_seconds": 5.01,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9227033226695944,
+          "latency_cost_component": 0.28496826114465273,
+          "interaction_cost": 0.8690813290678379,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2401,
+          "total_expert_latency_seconds": 4.51,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9139013364746659,
+          "latency_cost_component": 0.2711665229267259,
+          "interaction_cost": 0.8655605345898664,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2018_B",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 50-year evolution (2024–2074) of top-ten language speaker populations for the MM-Bench 2018_B deliverables: (A) a time series of native and total speakers, (B) predictions plus a top-ten replacement test, (C) the changing geographic distribution of speakers, and (Part II) a site-and-language recommendation for six new offices.\n\nThe data I have supplies only 2024 snapshot counts, and the problem text supplies qualitative influences (government policy, schooling, social pressure, migration, business, media, translation technology) but no quantitative reading of them. Before I parameterize anything, I need the logical interpretation the text does not settle:\n\n1. Native-speaker counts: should they be treated as demographically endogenous — that is, driven by the home region's population trajectory and by intergenerational shift, where second-language (L2) proficiency in a dominant second language reduces the probability that the home language is passed to the next generation — or should they be treated as an exogenous fixed-share-of-population? Which interpretation does the problem's own language (\"native language list\", \"total numbers ... change\") commit us to?\n\n2. Total-speaker (L2) counts: is the valid domain an S-shaped (logistic) diffusion process — slow early adoption, accelerating uptake driven by business/media/education channels, saturation at a ceiling below the non-native population — or is linear extrapolation of recent growth an acceptable reading of \"projected trends\"?\n\n3. Geographic distribution (Part I.C): is \"geographic distribution\" to be read as the migration of the language as a whole (the region where speakers live), which changes through in-place population growth and migration/assimilation of cultural groups, or does the text license a different reading?\n\n4. Deliverable mapping: for Part II's office recommendations, which structural elements of the Part I model (native trajectories, L2 trajectories, geographic distribution) should the recommendation draw on, and which need separate treatment?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange 1 reading, I propose this specific structural configuration for the Part I model. Please accept or reject it as a whole.\n\n**Native-speaker submodel (endogenous, per language, per home region):**\n- The native population of a language's home region is the UN WPP regional population trajectory P_r(t), 2024–2074.\n- Native share s_r(t) evolves by an intergenerational-shift differential equation: ds/dt = -γ(s_r - s_min) · P(r) / P_world · b_r(t), where γ is the loss coefficient (set per language from the L2 share at 2024 — the larger the L2 share, the faster the home language is displaced by the dominant second language), s_min a floor, and b_r the regional fertility-to-population ratio. Loss mechanism is intergenerational transmission loss, not death (which affects all languages equally and is embedded in P_r(t)).\n- Native count N_l(t) = s_r(t) · P_r(t), aggregated over the language's home regions.\n\n**Total-speaker submodel (logistic diffusion, per language, global):**\n- L2_l(t) = C_l · σ(κ_l(t) − κ_l0) / (1 + σ(κ_l(t) − κ_l0)), a logistic in cumulative diffusion pressure κ(t) = ∫₀ᵗ (g_trade(u) + g_media(u) + g_edu(u) + g_trans(u)) du, where g's are growth rates of the four named adoption channels (business relations, electronic communication/social media, schooling, translation technology), C_l the saturation ceiling (a fraction of the non-native population), and κ_l0 set so L2_l(2024) matches the observed 2024 L2 count.\n- Total T_l(t) = N_l(t) + L2_l(t).\n- Rank inversion (Part I.B) is computed by ranking T_l(t) and N_l(t) separately at 2024 and 2074; a 2018 top-ten language is \"replaced\" if it falls out of the top-10 in either list by 2074.\n\n**Geographic distribution submodel (per language, per region):**\n- Speaker share of language l in region r: w_{l,r}(t) = N_{l,r}(t) + L2_{l,r}(t), where N_{l,r} follows the native submodel in that region and L2_{l,r} follows the logistic submodel with region-specific adoption rates (higher where English is already the business lingua franca, lower where the home language dominates).\n- Migration shifts: emigrant stocks are tracked per language per origin–destination pair; assimilation (loss of native language in destination) is the same γ mechanism, now applied to the diaspora population rather than the home region.\n\n**Deliverable interface (Part II):**\n- Office-site demand score for a candidate city: D_city = 0.4 · T_English(city) + 0.3 · max_l≠English T_l(city) + 0.2 · P_city(t) + 0.1 · w_{l*,city}(t), where l* is the top non-English language in that city's region. This is a business decision rule layered on the model outputs, not a model output itself.\n\nDoes this configuration correctly account for the dominant loss/transformation mechanisms (intergenerational shift for natives, diffusion saturation for L2, migration/assimilation for geography) and the logical boundaries you specified in Exchange 1?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 configuration. I have constructed a minimal revision targeting the specific structural flaws:\n\n**Revised native submodel:** Instead of a differential equation with a per-language loss coefficient γ (which would require empirical grounding we do not have), the native count N_l(t) is modeled as a multiplicative decay from the 2024 baseline, N_l(t) = N_l(2024) · [P_r(t)/P_r(2024)] · e^{−δ_l·(t−2024)}, where δ_l is a single per-language annual displacement rate calibrated so that the 2024 L2 share of the language's home population determines δ_l (larger L2 share → larger δ_l). The decay captures intergenerational transmission loss; it is bounded below by a floor s_min so that no language's native count goes to zero.\n\n**Revised L2 submodel:** Instead of a logistic in a cumulative diffusion pressure built from four separate channel indices, the L2 count follows a simple S-shaped interpolation: L2_l(t) = L2_l(2024) · [1 + α_l·(t−2024)] / [1 + β_l·(t−2024)], where α_l is the initial growth rate and β_l is the saturation parameter, both calibrated so the curve passes through the 2024 value and approaches a ceiling C_l. The four adoption channels (business, media, schooling, translation tech) are treated as a single composite driver whose effect is captured by the shape parameters, not by separate indices.\n\n**Revised geographic submodel:** Same as Exchange 2 — per-region native and L2 counts, with migration tracked as an emigrant stock and assimilation modeled by the same displacement decay applied to the diaspora population.\n\n**Revised Part II interface:** The office-site recommendation is a qualitative decision rule: rank candidate cities by (i) total English speakers, (ii) top non-English language speakers, (iii) regional population, using the Part I model outputs. No hard-coded numeric weights; the ranking is ordinal, not a scored optimization.\n\nGiven this revised structure, what is the specific boundary condition, failure mode, or case that would break it — in either the core Part I modeling (native decay, L2 S-curve, or geographic distribution) or the Part II site recommendation?"
+        ],
+        "expert_answers": [
+          "1. Native counts: endogenous. The text's \"native language list\" is a ranking of transmission outcomes, and \"total numbers ... change\" only makes sense if native stock is a state variable fed by home-region births and intergenerational transmission, not a fixed share. Fixed-share would make Part I.B's replacement test vacuous.\n\n2. L2 counts: logistic. \"Projected trends\" plus named adoption channels (business, media, schooling, translation tech) imply diffusion with a ceiling, not linear extrapolation; linear growth would eventually exceed the non-native population.\n\n3. Geographic distribution: where speakers live — in-place growth plus migration/assimilation. The text's migration and diaspora language commits to this reading.\n\n4. Part II draws on all three: native and L2 trajectories give language demand; geographic distribution gives candidate sites. Site selection needs separate treatment — office location is a business decision, not a model output.",
+          "reject",
+          "The case that breaks it: a language whose 2024 L2 share is high but whose home-region population is *growing* — e.g., a language with large diaspora-driven L2 uptake and rising home fertility. The revised native decay ties δ_l monotonically to 2024 L2 share, so it forces the largest native decline exactly where L2 diffusion is strongest, even when the home population trajectory P_r(t)/P_r(2024) is expanding. The two terms then fight: the multiplicative form cannot represent a language that simultaneously gains native speakers at home and loses them abroad, so N_l(t) is mis-signed for that case. The L2 S-curve compounds this: its ceiling C_l is fixed, so a language whose non-native pool is itself growing (immigration into its home region) saturates against a stale ceiling. The geographic submodel inherits the same flaw — diaspora assimilation uses the home-region δ_l, so a diaspora in a high-fertility destination is decayed at the home rate."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.875,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8083333333333333,
+        "result_and_bias_analysis_evaluation": 0.8916666666666666
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need to model both native and total speakers for a specific set of languages (top 10 native + 3 additional total speakers) over a 50-year period, incorporating the specified influencing factors. Tasks 2-6 accurately reflect the predictive, geographic, and decision-making components of the original problem. The goals are explicit, such as determining language replacement in Task 2 and providing site recommendations in Task 4. The definition is precise, avoiding ambiguity about what constitutes the \"model\" or the \"recommendation,\" ensuring the analysis is focused and actionable.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all parts of the problem statement (I.A-C, II.A-B, III) without deviation. The sub-tasks are logically interrelated: Task 1 builds the foundational model, Task 2 uses it for prediction, Task 3 analyzes geographic shifts, and Tasks 4-5 apply these insights to business decisions. Task 6 synthesizes the results. There are no missing key parts; the inclusion of specific languages (French, Indonesian, Urdu) in Task 1 ensures the \"replacement\" analysis in Task 2 is robust. The dependencies are clear, with later tasks relying on the outputs of earlier ones, creating a coherent workflow that fully supports the final goal of advising the COO.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed quantitative data, logical interpretations of trends, and actionable conclusions that directly address the problem requirements.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key structural and data biases, and implementing specific corrections like region-specific parameters to mitigate their impact on results.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with specific data sources and logical reasoning for each modeling choice, ensuring a robust foundation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate mathematical methods (logistic decay, multiplicative growth) that realistically reflect linguistic dynamics, with a rational separation of linguistic modeling and business decision-making.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a clear, actionable framework for office location that integrates linguistic trends with business metrics, and includes a robust decision-making process for resource optimization.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using appropriate mathematical functions for language dynamics and including sensitivity analysis, though some parameters are somewhat arbitrary.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2018_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 50-year evolution (2024–2074) of top-ten language speaker populations for the MM-Bench 2018_B deliverables: (A) a time series of native and total speakers, (B) predictions plus a top-ten replacement test, (C) the changing geographic distribution of speakers, and (Part II) a site-and-language recommendation for six new offices.\n\nThe data I have supplies only 2024 snapshot counts, and the problem text supplies qualitative influences (government policy, schooling, social pressure, migration, business, media, translation technology) but no quantitative reading of them. Before I parameterize anything, I need the logical interpretation the text does not settle:\n\n1. Native-speaker counts: should they be treated as demographically endogenous — that is, driven by the home region's population trajectory and by intergenerational shift, where second-language (L2) proficiency in a dominant second language reduces the probability that the home language is passed to the next generation — or should they be treated as an exogenous fixed-share-of-population? Which interpretation does the problem's own language (\"native language list\", \"total numbers ... change\") commit us to?\n\n2. Total-speaker (L2) counts: is the valid domain an S-shaped (logistic) diffusion process — slow early adoption, accelerating uptake driven by business/media/education channels, saturation at a ceiling below the non-native population — or is linear extrapolation of recent growth an acceptable reading of \"projected trends\"?\n\n3. Geographic distribution (Part I.C): is \"geographic distribution\" to be read as the migration of the language as a whole (the region where speakers live), which changes through in-place population growth and migration/assimilation of cultural groups, or does the text license a different reading?\n\n4. Deliverable mapping: for Part II's office recommendations, which structural elements of the Part I model (native trajectories, L2 trajectories, geographic distribution) should the recommendation draw on, and which need separate treatment?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange 1 reading, I propose this specific structural configuration for the Part I model. Please accept or reject it as a whole.\n\n**Native-speaker submodel (endogenous, per language, per home region):**\n- The native population of a language's home region is the UN WPP regional population trajectory P_r(t), 2024–2074.\n- Native share s_r(t) evolves by an intergenerational-shift differential equation: ds/dt = -γ(s_r - s_min) · P(r) / P_world · b_r(t), where γ is the loss coefficient (set per language from the L2 share at 2024 — the larger the L2 share, the faster the home language is displaced by the dominant second language), s_min a floor, and b_r the regional fertility-to-population ratio. Loss mechanism is intergenerational transmission loss, not death (which affects all languages equally and is embedded in P_r(t)).\n- Native count N_l(t) = s_r(t) · P_r(t), aggregated over the language's home regions.\n\n**Total-speaker submodel (logistic diffusion, per language, global):**\n- L2_l(t) = C_l · σ(κ_l(t) − κ_l0) / (1 + σ(κ_l(t) − κ_l0)), a logistic in cumulative diffusion pressure κ(t) = ∫₀ᵗ (g_trade(u) + g_media(u) + g_edu(u) + g_trans(u)) du, where g's are growth rates of the four named adoption channels (business relations, electronic communication/social media, schooling, translation technology), C_l the saturation ceiling (a fraction of the non-native population), and κ_l0 set so L2_l(2024) matches the observed 2024 L2 count.\n- Total T_l(t) = N_l(t) + L2_l(t).\n- Rank inversion (Part I.B) is computed by ranking T_l(t) and N_l(t) separately at 2024 and 2074; a 2018 top-ten language is \"replaced\" if it falls out of the top-10 in either list by 2074.\n\n**Geographic distribution submodel (per language, per region):**\n- Speaker share of language l in region r: w_{l,r}(t) = N_{l,r}(t) + L2_{l,r}(t), where N_{l,r} follows the native submodel in that region and L2_{l,r} follows the logistic submodel with region-specific adoption rates (higher where English is already the business lingua franca, lower where the home language dominates).\n- Migration shifts: emigrant stocks are tracked per language per origin–destination pair; assimilation (loss of native language in destination) is the same γ mechanism, now applied to the diaspora population rather than the home region.\n\n**Deliverable interface (Part II):**\n- Office-site demand score for a candidate city: D_city = 0.4 · T_English(city) + 0.3 · max_l≠English T_l(city) + 0.2 · P_city(t) + 0.1 · w_{l*,city}(t), where l* is the top non-English language in that city's region. This is a business decision rule layered on the model outputs, not a model output itself.\n\nDoes this configuration correctly account for the dominant loss/transformation mechanisms (intergenerational shift for natives, diffusion saturation for L2, migration/assimilation for geography) and the logical boundaries you specified in Exchange 1?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 configuration. I have constructed a minimal revision targeting the specific structural flaws:\n\n**Revised native submodel:** Instead of a differential equation with a per-language loss coefficient γ (which would require empirical grounding we do not have), the native count N_l(t) is modeled as a multiplicative decay from the 2024 baseline, N_l(t) = N_l(2024) · [P_r(t)/P_r(2024)] · e^{−δ_l·(t−2024)}, where δ_l is a single per-language annual displacement rate calibrated so that the 2024 L2 share of the language's home population determines δ_l (larger L2 share → larger δ_l). The decay captures intergenerational transmission loss; it is bounded below by a floor s_min so that no language's native count goes to zero.\n\n**Revised L2 submodel:** Instead of a logistic in a cumulative diffusion pressure built from four separate channel indices, the L2 count follows a simple S-shaped interpolation: L2_l(t) = L2_l(2024) · [1 + α_l·(t−2024)] / [1 + β_l·(t−2024)], where α_l is the initial growth rate and β_l is the saturation parameter, both calibrated so the curve passes through the 2024 value and approaches a ceiling C_l. The four adoption channels (business, media, schooling, translation tech) are treated as a single composite driver whose effect is captured by the shape parameters, not by separate indices.\n\n**Revised geographic submodel:** Same as Exchange 2 — per-region native and L2 counts, with migration tracked as an emigrant stock and assimilation modeled by the same displacement decay applied to the diaspora population.\n\n**Revised Part II interface:** The office-site recommendation is a qualitative decision rule: rank candidate cities by (i) total English speakers, (ii) top non-English language speakers, (iii) regional population, using the Part I model outputs. No hard-coded numeric weights; the ranking is ordinal, not a scored optimization.\n\nGiven this revised structure, what is the specific boundary condition, failure mode, or case that would break it — in either the core Part I modeling (native decay, L2 S-curve, or geographic distribution) or the Part II site recommendation?"
+            ],
+            "expert_answers": [
+              "1. Native counts: endogenous. The text's \"native language list\" is a ranking of transmission outcomes, and \"total numbers ... change\" only makes sense if native stock is a state variable fed by home-region births and intergenerational transmission, not a fixed share. Fixed-share would make Part I.B's replacement test vacuous.\n\n2. L2 counts: logistic. \"Projected trends\" plus named adoption channels (business, media, schooling, translation tech) imply diffusion with a ceiling, not linear extrapolation; linear growth would eventually exceed the non-native population.\n\n3. Geographic distribution: where speakers live — in-place growth plus migration/assimilation. The text's migration and diaspora language commits to this reading.\n\n4. Part II draws on all three: native and L2 trajectories give language demand; geographic distribution gives candidate sites. Site selection needs separate treatment — office location is a business decision, not a model output.",
+              "reject",
+              "The case that breaks it: a language whose 2024 L2 share is high but whose home-region population is *growing* — e.g., a language with large diaspora-driven L2 uptake and rising home fertility. The revised native decay ties δ_l monotonically to 2024 L2 share, so it forces the largest native decline exactly where L2 diffusion is strongest, even when the home population trajectory P_r(t)/P_r(2024) is expanding. The two terms then fight: the multiplicative form cannot represent a language that simultaneously gains native speakers at home and loses them abroad, so N_l(t) is mis-signed for that case. The L2 S-curve compounds this: its ceiling C_l is fixed, so a language whose non-native pool is itself growing (immigration into its home region) saturates against a stale ceiling. The geographic submodel inherits the same flaw — diaspora assimilation uses the home-region δ_l, so a diaspora in a high-fertility destination is decayed at the home rate."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8833333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r1p2_20260930_094328/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need to model both native and total speakers for a specific set of languages (top 10 native + 3 additional total speakers) over a 50-year period, incorporating the specified influencing factors. Tasks 2-6 accurately reflect the predictive, geographic, and decision-making components of the original problem. The goals are explicit, such as determining language replacement in Task 2 and providing site recommendations in Task 4. The definition is precise, avoiding ambiguity about what constitutes the \"model\" or the \"recommendation,\" ensuring the analysis is focused and actionable.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all parts of the problem statement (I.A-C, II.A-B, III) without deviation. The sub-tasks are logically interrelated: Task 1 builds the foundational model, Task 2 uses it for prediction, Task 3 analyzes geographic shifts, and Tasks 4-5 apply these insights to business decisions. Task 6 synthesizes the results. There are no missing key parts; the inclusion of specific languages (French, Indonesian, Urdu) in Task 1 ensures the \"replacement\" analysis in Task 2 is robust. The dependencies are clear, with later tasks relying on the outputs of earlier ones, creating a coherent workflow that fully supports the final goal of advising the COO.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative data, logical interpretations of trends, and actionable conclusions that directly address the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key structural and data biases, and implementing specific corrections like region-specific parameters to mitigate their impact on results.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with specific data sources and logical reasoning for each modeling choice, ensuring a robust foundation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate mathematical methods (logistic decay, multiplicative growth) that realistically reflect linguistic dynamics, with a rational separation of linguistic modeling and business decision-making.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear, actionable framework for office location that integrates linguistic trends with business metrics, and includes a robust decision-making process for resource optimization.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using appropriate mathematical functions for language dynamics and including sensitivity analysis, though some parameters are somewhat arbitrary.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        },
+        {
+          "problem_id": "2018_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p2_20260930_094328",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p2_20260930_094328/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nFor the 2018_MCM_Problem_B modeling task (language-speaker distribution over 50\nyears, feeding Part I.A–I.C and Part II office-location recommendations), the core\nmechanism I am building decomposes each language's speakers into two flows:\n(N) a native-speaker stock driven by regional demographics, and (L) an\nL2/L3-adoption stock driven by globalization, education, migration, and\ntranslation technology. These are summed to produce total speakers.\n\nThe problem text and the supplied data do not settle one structural/definitional\nconstraint that is required before I can parameterize the core mechanism and map\nit onto all deliverables:\n\n1. Which definition of \"language\" should the native-vs-L2 flow decomposition be\n   applied at — a strict single-language identity (e.g. Hindi vs. Urdu as\n   distinct), or a family/variety cluster (e.g. a single \"Hindi-Urdu\" or\n   \"Indo-Aryan\" aggregate)? This determines whether the native and L2 stocks are\n   counted per-idiom or per-cluster, and therefore which of the 2018 top-10\n   native-speaker entries (Arabic, Punjabi, Japanese) are structurally distinct\n   model units vs. subsumed into a larger cluster.\n\n2. Given that Part II asks the company to choose six new office locations and the\n   office-level spoken languages (short- vs. long-term), what is the logical\n   interpretation of \"languages spoken in the offices\" — (a) the native\n   language(s) of the host region's dominant population, (b) the host region's\n   total-speaker lingua franca (native + L2), or (c) the globally-ranked\n   total-speaker language? This determines whether the office-language\n   recommendation is driven by the native-stock flow, the L2-adoption flow, or\n   the summed total, and whether the Part I core model's native/L2 decomposition\n   is directly transferable to the Part II deliverable or requires a distinct\n   treatment there.\n\nThese two boundary conditions are not magnitudes or empirical constants; they are\nthe logical domain of the model's state variables and the interpretation of the\nobjective for the secondary deliverable (office-language choice), which the text\nleaves open.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your reply (language identity and the referent of \"office languages\"\nare both definitional choices the text leaves open), I propose the following\nspecific structural configuration for the core model and its extension to the\nsecondary deliverable. Accept or reject this configuration as a whole.\n\n**Proposed structural configuration:**\n\n1. **Language identity:** Count each of the 2018 top-10 native-speaker entries as\n   a distinct model unit at the idiom level — i.e. Hindi and Urdu are separate,\n   the Arabic macrolanguage is treated as one unit (Modern Standard Arabic as the\n   L2-adoption vehicle, dialects as native), and Punjabi and Japanese are\n   separate. Rationale: the problem lists them as ten distinct entries, and the\n   L2-adoption flow operates on the standard/vehicle form, not on mutually\n   intelligible varieties.\n\n2. **Office-language referent (Part II):** \"Languages spoken in the offices\"\n   means the native language(s) of the host region's dominant population plus\n   the region's total-speaker lingua franca. Specifically, for each candidate\n   office location, the office speaks English (global business language, given)\n   plus the host region's #1 native language; if the host region's #1 total\n   language differs from its #1 native language, the office also speaks that\n   total-language as a second non-English language. Rationale: the company's\n   employees serve both local operations (native language) and cross-regional\n   coordination with the New York / Shanghai hubs (total lingua franca).\n\n3. **Core-to-deliverable mapping:** The Part I native-stock flow (N) feeds the\n   \"host region's #1 native language\" term; the Part I L2-adoption flow (L)\n   feeds the \"total lingua franca\" term and the 50-year trend for both. Both\n   flows are evaluated at the candidate location's region at each horizon\n   (short-term ≈ 5 years, long-term ≈ 50 years) to produce the office-language\n   recommendation.\n\n4. **Dominant mechanism accounted for:** The model explicitly models (a) the\n   native-stock decay from regional demographic decline (e.g. Japanese, Russian)\n   and (b) the L2-adoption growth from globalization/technology (e.g. English\n   L2 surge, Mandarin L2 growth from trade). It does not assume either flow is\n   negligible.\n\nThis is one coherent structural hypothesis. Please accept or reject it.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure from Exchange 2 is accepted: idiom-level distinct units for the ten\nlanguages; office languages = English + host region's #1 native language + (if\ndifferent) host region's #1 total-language; Part I's native-stock flow (N) and\nL2-adoption flow (L) both evaluated at the candidate region at short-term (~5 yr)\nand long-term (~50 yr) horizons, with the native decay and L2 surge mechanisms\nmodeled explicitly.\n\nAssuming that accepted structure, what is the specific boundary condition,\nfailure mode, or counterexample case that would break this mechanism — either in\nthe core Part I modeling (native/L2 decomposition and 50-year rank projection)\nor in the Part II office-language / office-location recommendation — such that\nthe recommendation for where to put the six offices and which languages to staff\nwould be wrong? Give the case that breaks it, not advice about it."
+            ],
+            "expert_answers": [
+              "The text does not settle either boundary. For (1), it supplies no counting rule for language identity — no criterion distinguishing an idiom from a variety cluster, and no instruction on whether mutually intelligible varieties (Hindi/Urdu, the Arabic macrolanguage, Punjabi's script communities) are one unit or several. For (2), it never states whose speech the office languages represent: the host population's, the company's workforce's, or the client's customer base. Both are definitional choices the problem leaves to the team, not magnitudes the data carry.",
+              "accept",
+              "The case that breaks it: a candidate region whose #1 native language and #1 total language are both stable in rank but whose *working-age emigrant outflow* dominates — e.g. a Gulf state where Arabic is the native #1 and English the total #1, yet the office's actual local workforce and customer base are majority expatriate South Asian (Hindi/Urdu, Bengali, Malayalam). The N and L flows evaluated at the region both point to Arabic + English, so the model staffs the office in the wrong two languages; the recommendation is wrong because the region's *resident* distribution, not its *national* native/total ranking, determines who the office actually serves."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8666666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.7666666666666666,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_10/train_parent_1/runs/round_10/r2p2_20260930_094328/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the specific parts of the problem statement (Part I.A-C, II.A-B, III). The goals are explicit, such as modeling language distribution trends, predicting speaker numbers, and providing office location recommendations. The inclusion of specific timeframes (2024-2074) and a defined set of languages (top 10 plus watch-list) demonstrates a precise understanding of the modeling requirements. The distinction between native and total speakers is also correctly identified as a key component. Overall, the problem definition is highly clear and well-structured.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced and directly correspond to the problem requirements, ensuring complete coverage. Task 1 (modeling) serves as the foundation for Task 2 (prediction) and Task 3 (geographic distribution), which in turn inform Task 4 (office location) and Task 5 (resource optimization). This dependency chain is coherent and supports the final goal of advising the COO. The inclusion of Task 6 for the memo ensures the deliverable format is addressed. There are no significant deviations or missing key parts; the decomposition effectively breaks down the complex problem into manageable, interrelated steps that collectively address the client's needs.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering clear, actionable recommendations for office locations and language strategies. It effectively integrates demographic data with business constraints, providing a feasible framework for decision-making that goes beyond simple data fitting to support strategic planning.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically grounded in demographic data and logical mathematical structures. However, it relies on simplified exponential growth assumptions for language dynamics and lacks a rigorous quantitative simulation for geographic migration, limiting its scientific depth regarding complex sociolinguistic interactions.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed numerical projections, logical explanations for ranking changes, and actionable conclusions that effectively support decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying data, model, and geographic biases, and effectively mitigating their impact by clarifying the robustness of rank structures and specific regional staffing needs.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified. They align well with the problem background, using a logical two-flow decomposition (native vs. L2) and anchoring to reliable demographic data. The impact of assumptions, such as the saturation cap for L2 speakers, is explicitly considered to ensure physical realism.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model structure is rational and scientifically sound. It appropriately separates demographic and globalization drivers, uses mathematically suitable functions (exponential/saturating) for the time horizon, and logically connects macro-trends to business decisions via a coverage-cost framework. The methods effectively reflect the actual problem dynamics.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.875,
+      "interaction_cost": 0.8567589375079192,
+      "interaction_penalty": 0.042837946875395966,
+      "net_utility": 0.832162053124604,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2343,
+          "total_expert_latency_seconds": 4.69,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9110315790910279,
+          "latency_cost_component": 0.2762743384955161,
+          "interaction_cost": 0.8644126316364111,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1691,
+          "total_expert_latency_seconds": 4.25,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8727631084485679,
+          "latency_cost_component": 0.26348603249384467,
+          "interaction_cost": 0.8491052433794272,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T10:19:20.153050",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_bc49a013c7df",
+  "workflow": {
+    "name": "Deliverable-Aligned Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 8) achieved high scores in modeling rigorousness and practicality but lost points in analysis_evaluation, specifically for failing to decompose problems into distinct sub-problems and for not explicitly addressing all specific requirements (like policy recommendations and generalization) in the analysis. The rollouts showed that while the core model was strong, the interaction did not explicitly ensure that the structural choices made in Exchange 2 were mapped to all the distinct deliverables listed in the problem statement. This patch introduces a 'Deliverable Alignment Rule' that requires the agent to explicitly map structural ambiguities to all enumerated sub-tasks/deliverables in Exchange 1 and to propose a mechanism in Exchange 2 that includes a defined interface for these secondary components. This directly addresses the judge's feedback on analysis decomposition and coverage without changing the core operator sequence or rejection handling, which were already effective.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_bc49a013c7df",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 9,
+    "parent_workflow_ids": [
+      "interaction_workflow_ed9d84c49711"
+    ],
+    "training_batch": [
+      "2019_D",
+      "2018_F"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2019_C",
+    "2018_B"
+  ],
+  "absolute_utility": 0.821875,
+  "interaction_cost": 0.8620399346683857,
+  "interaction_penalty": 0.04310199673341929,
+  "net_utility": 0.7787730032665807,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

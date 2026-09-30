@@ -1,0 +1,655 @@
+{
+  "round": 13,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8314732784214196,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8791666666666667,
+    "modeling_rigorousness_evaluation": 0.875,
+    "practicality_and_scientificity_evaluation": 0.8583333333333334,
+    "result_and_bias_analysis_evaluation": 0.8875
+  },
+  "problem_results": [
+    {
+      "problem_id": "2019_A",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the MCM 2019_A dragon problem. The text fixes only two growth facts (≈10 kg at hatching, ≈30–40 kg at one year) and leaves several structural questions unsettled that I cannot resolve from the text or the supplied data. I ask for the logical interpretation, not magnitudes or constants, on three points that jointly fix the structure of my analysis:\n\n1. **Deliverable scope of the energy model.** The problem requires (a) ecological impact and requirements, (b) energy expenditure and caloric intake, (c) area to support three dragons, (d) the size of the supporting human community at varying assistance levels, (e) climate sensitivity across arid/temperate/arctic regions, and (f) a real-world analogue plus a two-page letter to the author. Which of these are logically *derived outputs* of a single core energy-and-growth model — i.e., the same mechanism re-parameterized by region and assistance level — and which require structurally separate models? Specifically: should the community-size requirement (d) be computed as the inverse of the same prey-carrying-capacity model used for area (c), or is a distinct socioeconomic balance required? And should the \"varying levels of assistance\" be treated as a parameter on the community (how much the community directly supplies) with the dragon's total intake held fixed, or as changing the dragon's own foraging fraction?\n\n2. **Interpretation of the growth mechanism.** The growth facts (10 kg hatch, 30–40 kg at 1 year) span roughly a 3–4× mass change. Is the intended reading that growth follows the same allometric (power-law) logic as metabolism — i.e., a single size-scaling family governs both maintenance demand and growth capacity, with adult mass emerging as the steady state of an energy-budget growth equation — or should growth be treated as an independent schedule, with metabolism and growth only coupled through the current mass? This determines whether my core mechanism is one energy-balance model (self-consistent) or two models joined by mass.\n\n3. **Domain of the climate parameter.** The letter must cover movement arid → temperate → arctic. Structurally, which of the climate's effects are *boundary conditions on the same energy model* (e.g., seasonal availability of prey, which scales what food exists) and which are a *separate thermal maintenance channel* (heat loss to ambient temperature, i.e., the dragon's maintenance demand itself changing with climate)? In other words: does climate act on the supply side only, on both supply and demand, or primarily on thermal physiology — and does the model need an explicit temperature term at all, or is regional prey availability enough?\n\nMy plan for how the core mechanism will extend to all deliverables: one mass–energy budget at the center, with (1) region as a parameter on prey availability and, if you confirm it, on maintenance; (2) assistance level as a parameter on the split between community supply and wild prey; (3) area and community size as the same carrying-capacity relation solved for two different unknowns; (4) the real-world analogue and the letter as the same model re-run over a parameter grid. Please settle the three readings above so the structure is fixed before I parameterize.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on your readings, I propose this specific, self-consistent structure. Please accept or reject it as a whole (if you reject, name the specific structural flaw).\n\n**Core: one mass–energy budget with a shared size-scaling family.**\n\n- Maintenance (demand): `BMR(M) = 70·M^b` kcal/day (Kleiber baseline, M in kg), with an explicit thermal multiplier for a warm-blooded endotherm: `Demand = BMR(M) · F(T_a)`, where `F(T_a) = 1 + c·(T_neutral − T_a)` below a neutral temperature `T_neutral ≈ 37 °C` and `F = 1` above it (endotherms spend extra to hold body temperature in cold; arid heat adds at most a modest load, so `F ≈ 1` in warm climates). This gives the arctic contrast you asked for on the demand side.\n- Growth: follows the same family, `dM/dt = (Assimilated − Demand)/e_g` where `e_g` is the energy cost per kg of mass gained; `M_adult` is the steady state where net energy vanishes. One power family, not an independent schedule.\n- Supply: prey biomass needed per day = `Demand / η`, with `η` the assimilation efficiency (fraction of consumed prey mass converted to metabolizable energy).\n- Carrying capacity: the area `A` supporting prey that regenerate at rate `r` (biomass per km²·year) must satisfy `A·r ≥ total prey demand`; area to support three dragons = 3× single-dragon area.\n\n**Extensions, mapped to deliverables:**\n\n- (d) Community size: a *distinct* socioeconomic balance, not the inverse of (c). The community must produce the prey (or equivalent feed) its residents forgo plus a human dietary/trophic overhead; assistance level `α ∈ [0,1]` is the fraction of the dragon's total prey need the community supplies directly, and the dragon's own foraging fraction is the residual `1−α`. Total dragon intake is fixed by its budget; `α` is the free parameter, the foraging fraction is not.\n- (e) Climate: regional parameters — prey availability `r_region` and ambient `T_a_region` — re-run the same core over {arid, warm-temperate, arctic} × season.\n- (f) Real-world analogue + letter: the same model re-run over a parameter grid (a managed endotherm on a fixed habitat, e.g., livestock or a reintroduced large predator).\n\n**Uncertainty intervals for parameters with no standard value (sensitivity will test the boundaries):**\n- metabolic exponent `b ∈ [0.67, 0.85]` (surface-area to hyperbolic; data note flags 0.75 ± 0.052)\n- assimilation efficiency `η ∈ [0.15, 0.30]`\n- growth cost `e_g ∈ [4, 10]` MJ/kg\n- thermal coefficient `c ∈ [0.02, 0.05]` per °C, neutral temp 37 °C\n- prey regeneration `r_region` within the region's realistic primary/secondary productivity range\n\nDo you accept this structure — one endotherm energy-growth budget, thermal demand term, separate socioeconomic balance for community size with `α` as the assistance parameter, and climate as (region prey rate, ambient temperature)?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the structure in Exchange 2 without naming the flaw, so I have not assumed a rejection cause. I make a *minimal* revision, keeping everything you accepted in Exchange 1 (one self-consistent energy-growth budget, growth and maintenance in one size-scaling family with adult mass as the zero-net-energy steady state, climate acting on both supply and demand, community size as a distinct socioeconomic balance with assistance level α as the fraction of the dragon's fixed total intake supplied by the community).\n\nThe minimal revision targets the most load-bearing single link I had left rigid: the linear cold-term `F(T_a) = 1 + c·(37 − T_a)` had no lower bound and no heat side. I revise it to a **two-sided, bounded thermal load**:\n\n`F(T_a) = max(1, 1 + c_cold·(37 − T_a) for T_a < 37)`, with an upper cap `F ≤ F_max` (I take `F_max = 2` as a sanity ceiling), and a modest heat-side load for sustained arid heat above a comfort ceiling `T_hot ≈ 40 °C`: `F = 1 + c_heat·(T_a − 40)` capped at `F_max`. This keeps the arctic contrast you required (demand rises below neutral), but the temperature dependence is now explicitly bounded and has a heat branch, so an extreme climate cannot drive `F` unbounded.\n\nAssuming this revised structure (your Exchange-1 readings plus the bounded two-sided thermal term), please give me the **specific case, boundary condition, or failure mode that breaks it** — for example: a boundary of my stated sensitivity ranges (b = 0.67 or 0.85, η = 0.15 or 0.30, e_g = 4 or 10, the F_max cap, or the assistance level α at an extreme such as α → 0 or α → 1), or a region/season where the revised mechanism fails in either the core modeling or a secondary deliverable (area, community size, climate, or the letter), and where the conclusion would flip rather than merely shift. This goes directly into the bias/robustness analysis and the letter's guidance to the author."
+        ],
+        "expert_answers": [
+          "1. **Derived vs. separate.** (a), (b), (c), (e) are derived outputs of one energy-and-growth core re-parameterized by region. (d) is not the inverse of the prey-carrying-capacity model: community size requires a distinct socioeconomic balance (human diet, trophic transfer, competing land use), coupled to the core only through the prey-supply term. Assistance level is best read as a parameter on the community's direct supply, with total intake fixed by the dragon's budget — the foraging fraction is then the residual, not the free parameter.\n\n2. **Growth.** One self-consistent energy-balance model: growth and maintenance share a single size-scaling family, adult mass is the steady state where net energy vanishes. Not an independent schedule.\n\n3. **Climate.** Climate acts on both sides: supply (regional/seasonal prey availability) and demand (explicit thermal maintenance term). An explicit temperature term is needed; prey availability alone cannot produce the arid/arctic contrast the letter requires.",
+          "reject",
+          "The case that breaks it: **α → 1 with the community supplying the dragon's entire fixed intake.** Your socioeconomic balance then has no prey-production term left to solve for — the community's own food base and the dragon's demand decouple, so community size collapses toward the human-only requirement and the \"assistance\" axis stops moving the answer. The conclusion flips (community size becomes independent of dragon size), not merely shifts."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_6ea5a8e8f516",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.9020833333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9083333333333332,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.9,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the core energy budget mechanism. The objectives are specific, such as calculating caloric intake as a function of mass and temperature, and determining adult mass via steady-state analysis. The goals directly address the problem requirements, including ecological impact, community support, and climate sensitivity. The clarity is high, with each task having a distinct purpose and measurable output, ensuring the analysis is accurate and focused.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically interrelated, with Task 1 serving as the foundational engine for subsequent tasks. The decomposition covers all key aspects of the problem, including energy, growth, ecological footprint, community support, and climate impact. Dependencies are well-managed, ensuring that each sub-task builds upon the previous ones. The coverage is comprehensive, addressing all required elements without significant deviation or omission, thus fully supporting the final goal of providing ecological insights and guidance for the story.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively solves the problem by providing clear, actionable metrics for energy, area, and community support, with robust sensitivity analysis that aids decision-making and narrative guidance.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is grounded in established biological and physical laws, with well-justified assumptions and rigorous sensitivity analysis, demonstrating a sophisticated and scientifically valid approach to the fictional problem.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, interpretable, and effectively explains the model's inference process with strong sensitivity analysis.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is very thorough, identifying key structural and data biases and effectively contextualizing their impact on the results.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified, with strong links to biological and physical constraints, ensuring a consistent and robust model foundation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate and scientifically sound methods, such as allometric scaling and ODEs, to realistically reflect the biological and ecological constraints of the problem.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the MCM 2019_A dragon problem. The text fixes only two growth facts (≈10 kg at hatching, ≈30–40 kg at one year) and leaves several structural questions unsettled that I cannot resolve from the text or the supplied data. I ask for the logical interpretation, not magnitudes or constants, on three points that jointly fix the structure of my analysis:\n\n1. **Deliverable scope of the energy model.** The problem requires (a) ecological impact and requirements, (b) energy expenditure and caloric intake, (c) area to support three dragons, (d) the size of the supporting human community at varying assistance levels, (e) climate sensitivity across arid/temperate/arctic regions, and (f) a real-world analogue plus a two-page letter to the author. Which of these are logically *derived outputs* of a single core energy-and-growth model — i.e., the same mechanism re-parameterized by region and assistance level — and which require structurally separate models? Specifically: should the community-size requirement (d) be computed as the inverse of the same prey-carrying-capacity model used for area (c), or is a distinct socioeconomic balance required? And should the \"varying levels of assistance\" be treated as a parameter on the community (how much the community directly supplies) with the dragon's total intake held fixed, or as changing the dragon's own foraging fraction?\n\n2. **Interpretation of the growth mechanism.** The growth facts (10 kg hatch, 30–40 kg at 1 year) span roughly a 3–4× mass change. Is the intended reading that growth follows the same allometric (power-law) logic as metabolism — i.e., a single size-scaling family governs both maintenance demand and growth capacity, with adult mass emerging as the steady state of an energy-budget growth equation — or should growth be treated as an independent schedule, with metabolism and growth only coupled through the current mass? This determines whether my core mechanism is one energy-balance model (self-consistent) or two models joined by mass.\n\n3. **Domain of the climate parameter.** The letter must cover movement arid → temperate → arctic. Structurally, which of the climate's effects are *boundary conditions on the same energy model* (e.g., seasonal availability of prey, which scales what food exists) and which are a *separate thermal maintenance channel* (heat loss to ambient temperature, i.e., the dragon's maintenance demand itself changing with climate)? In other words: does climate act on the supply side only, on both supply and demand, or primarily on thermal physiology — and does the model need an explicit temperature term at all, or is regional prey availability enough?\n\nMy plan for how the core mechanism will extend to all deliverables: one mass–energy budget at the center, with (1) region as a parameter on prey availability and, if you confirm it, on maintenance; (2) assistance level as a parameter on the split between community supply and wild prey; (3) area and community size as the same carrying-capacity relation solved for two different unknowns; (4) the real-world analogue and the letter as the same model re-run over a parameter grid. Please settle the three readings above so the structure is fixed before I parameterize.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your readings, I propose this specific, self-consistent structure. Please accept or reject it as a whole (if you reject, name the specific structural flaw).\n\n**Core: one mass–energy budget with a shared size-scaling family.**\n\n- Maintenance (demand): `BMR(M) = 70·M^b` kcal/day (Kleiber baseline, M in kg), with an explicit thermal multiplier for a warm-blooded endotherm: `Demand = BMR(M) · F(T_a)`, where `F(T_a) = 1 + c·(T_neutral − T_a)` below a neutral temperature `T_neutral ≈ 37 °C` and `F = 1` above it (endotherms spend extra to hold body temperature in cold; arid heat adds at most a modest load, so `F ≈ 1` in warm climates). This gives the arctic contrast you asked for on the demand side.\n- Growth: follows the same family, `dM/dt = (Assimilated − Demand)/e_g` where `e_g` is the energy cost per kg of mass gained; `M_adult` is the steady state where net energy vanishes. One power family, not an independent schedule.\n- Supply: prey biomass needed per day = `Demand / η`, with `η` the assimilation efficiency (fraction of consumed prey mass converted to metabolizable energy).\n- Carrying capacity: the area `A` supporting prey that regenerate at rate `r` (biomass per km²·year) must satisfy `A·r ≥ total prey demand`; area to support three dragons = 3× single-dragon area.\n\n**Extensions, mapped to deliverables:**\n\n- (d) Community size: a *distinct* socioeconomic balance, not the inverse of (c). The community must produce the prey (or equivalent feed) its residents forgo plus a human dietary/trophic overhead; assistance level `α ∈ [0,1]` is the fraction of the dragon's total prey need the community supplies directly, and the dragon's own foraging fraction is the residual `1−α`. Total dragon intake is fixed by its budget; `α` is the free parameter, the foraging fraction is not.\n- (e) Climate: regional parameters — prey availability `r_region` and ambient `T_a_region` — re-run the same core over {arid, warm-temperate, arctic} × season.\n- (f) Real-world analogue + letter: the same model re-run over a parameter grid (a managed endotherm on a fixed habitat, e.g., livestock or a reintroduced large predator).\n\n**Uncertainty intervals for parameters with no standard value (sensitivity will test the boundaries):**\n- metabolic exponent `b ∈ [0.67, 0.85]` (surface-area to hyperbolic; data note flags 0.75 ± 0.052)\n- assimilation efficiency `η ∈ [0.15, 0.30]`\n- growth cost `e_g ∈ [4, 10]` MJ/kg\n- thermal coefficient `c ∈ [0.02, 0.05]` per °C, neutral temp 37 °C\n- prey regeneration `r_region` within the region's realistic primary/secondary productivity range\n\nDo you accept this structure — one endotherm energy-growth budget, thermal demand term, separate socioeconomic balance for community size with `α` as the assistance parameter, and climate as (region prey rate, ambient temperature)?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the structure in Exchange 2 without naming the flaw, so I have not assumed a rejection cause. I make a *minimal* revision, keeping everything you accepted in Exchange 1 (one self-consistent energy-growth budget, growth and maintenance in one size-scaling family with adult mass as the zero-net-energy steady state, climate acting on both supply and demand, community size as a distinct socioeconomic balance with assistance level α as the fraction of the dragon's fixed total intake supplied by the community).\n\nThe minimal revision targets the most load-bearing single link I had left rigid: the linear cold-term `F(T_a) = 1 + c·(37 − T_a)` had no lower bound and no heat side. I revise it to a **two-sided, bounded thermal load**:\n\n`F(T_a) = max(1, 1 + c_cold·(37 − T_a) for T_a < 37)`, with an upper cap `F ≤ F_max` (I take `F_max = 2` as a sanity ceiling), and a modest heat-side load for sustained arid heat above a comfort ceiling `T_hot ≈ 40 °C`: `F = 1 + c_heat·(T_a − 40)` capped at `F_max`. This keeps the arctic contrast you required (demand rises below neutral), but the temperature dependence is now explicitly bounded and has a heat branch, so an extreme climate cannot drive `F` unbounded.\n\nAssuming this revised structure (your Exchange-1 readings plus the bounded two-sided thermal term), please give me the **specific case, boundary condition, or failure mode that breaks it** — for example: a boundary of my stated sensitivity ranges (b = 0.67 or 0.85, η = 0.15 or 0.30, e_g = 4 or 10, the F_max cap, or the assistance level α at an extreme such as α → 0 or α → 1), or a region/season where the revised mechanism fails in either the core modeling or a secondary deliverable (area, community size, climate, or the letter), and where the conclusion would flip rather than merely shift. This goes directly into the bias/robustness analysis and the letter's guidance to the author."
+            ],
+            "expert_answers": [
+              "1. **Derived vs. separate.** (a), (b), (c), (e) are derived outputs of one energy-and-growth core re-parameterized by region. (d) is not the inverse of the prey-carrying-capacity model: community size requires a distinct socioeconomic balance (human diet, trophic transfer, competing land use), coupled to the core only through the prey-supply term. Assistance level is best read as a parameter on the community's direct supply, with total intake fixed by the dragon's budget — the foraging fraction is then the residual, not the free parameter.\n\n2. **Growth.** One self-consistent energy-balance model: growth and maintenance share a single size-scaling family, adult mass is the steady state where net energy vanishes. Not an independent schedule.\n\n3. **Climate.** Climate acts on both sides: supply (regional/seasonal prey availability) and demand (explicit thermal maintenance term). An explicit temperature term is needed; prey availability alone cannot produce the arid/arctic contrast the letter requires.",
+              "reject",
+              "The case that breaks it: **α → 1 with the community supplying the dragon's entire fixed intake.** Your socioeconomic balance then has no prey-production term left to solve for — the community's own food base and the dragon's demand decouple, so community size collapses toward the human-only requirement and the \"assistance\" axis stops moving the answer. The conclusion flips (community size becomes independent of dragon size), not merely shifts."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_6ea5a8e8f516",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8958333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8833333333333333,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p1_20260930_123018/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the core energy budget mechanism. The objectives are specific, such as calculating caloric intake as a function of mass and temperature, and determining adult mass via steady-state analysis. The goals directly address the problem requirements, including ecological impact, community support, and climate sensitivity. The clarity is high, with each task having a distinct purpose and measurable output, ensuring the analysis is accurate and focused.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated, with Task 1 serving as the foundational engine for subsequent tasks. The decomposition covers all key aspects of the problem, including energy, growth, ecological footprint, community support, and climate impact. Dependencies are well-managed, ensuring that each sub-task builds upon the previous ones. The coverage is comprehensive, addressing all required elements without significant deviation or omission, thus fully supporting the final goal of providing ecological insights and guidance for the story.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the problem by providing clear, actionable metrics for energy, area, and community support, with robust sensitivity analysis that aids decision-making and narrative guidance.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is grounded in established biological and physical laws, with well-justified assumptions and rigorous sensitivity analysis, demonstrating a sophisticated and scientifically valid approach to the fictional problem.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, interpretable, and effectively explains the model's inference process with strong sensitivity analysis.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying key structural and data biases and effectively contextualizing their impact on the results.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified, with strong links to biological and physical constraints, ensuring a consistent and robust model foundation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate and scientifically sound methods, such as allometric scaling and ODEs, to realistically reflect the biological and ecological constraints of the problem.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        },
+        {
+          "problem_id": "2019_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p1_20260930_123018",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p1_20260930_123018/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the three dragons of 2019_A: mass growth from ~10 kg at hatching\nto ~30-40 kg at one year, energy balance via Kleiber's law, caloric intake,\nhabitat area, supporting community size at varying assistance levels, and the\nclimate-migration analysis (arid / warm-temperate / arctic) that feeds the\nletter to G.R.R. Martin.\n\nThe problem statement leaves three structural/definitional choices unsettled, and\neach would branch the work that follows:\n\n1. **Age and mass domain.** The statement fixes mass only at hatching and at\n   one year; the analysis (adult energy demand, area, community size) requires\n   an age range. What reading does the problem statement itself support: should\n   the model's reference age (the \"living today\" dragons in the books are\n   centuries old, yet the problem's numbers describe the first year) be\n   parameterized as a variable with an explicit reference value, or should the\n   deliverables be anchored to a single canonical age that I must then defend?\n\n2. **Community/assistance mapping.** The requirement \"how large a community is\n   necessary to support a dragon for varying levels of assistance\" names no\n   structure. Which structural interpretation of \"levels of assistance\" does\n   the problem statement's wording point toward — a direct provisioning\n   fraction of the dragon's caloric intake (0% to 100%), a spatial/land-use\n   tier, or a mixed provisioning-plus-protection scheme — and which of the\n   deliverables (caloric intake, area, letter guidance) each of these must be\n   consistent with?\n\n3. **Climate mechanism boundary.** For the migration analysis, which\n   logical boundary does the text settle for what climate can change: only\n   prey biomass productivity and hence required foraging area, or also the\n   dragon's own maintenance metabolism (e.g., thermoregulation cost) and its\n   activity pattern? I need the interpretation the problem statement\n   supports, not a magnitude.\n\nPlease answer the three readings only — no magnitudes, no constants.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 answer (age is a free variable with an explicit\nreference value; assistance is a direct provisioning fraction 0-100% of\ncaloric intake, consistent with caloric intake and community size, with area\nfollowing from foraging; climate acts only through prey biomass productivity\nand hence foraging area), I propose the following single structural\nconfiguration for the core model. Accept or reject it as a whole.\n\n**Proposed structure:**\n\n1. **Growth model.** Dragon mass M(t) follows a logistic curve\n   M(t) = M_max / (1 + ((M_max - M0)/M0) · exp(-r·t)) anchored to the two\n   given points (M(0) = 10 kg, M(1 yr) = 35 kg, the midpoint of 30-40 kg),\n   with the growth rate r and the asymptote M_max treated as free structural\n   parameters. Because the problem statement does not fix adult mass, I\n   propose a reference adult mass M_max = 40,000 kg (comparable to a large\n   theropod scaled up, within the physical plausibility band for a\n   flying/walking creature) with an explicit sensitivity range\n   M_max ∈ [10,000, 100,000] kg, and a reference age t_ref = 100 years\n   (centuries-old, consistent with \"living today\") with a sensitivity range\n   t_ref ∈ [50, 200] years. The growth rate r is back-calculated from the\n   two anchor points at the reference M_max and re-derived at the sensitivity\n   endpoints, so the whole growth trajectory stays anchored to the given\n   data.\n\n2. **Energy model.** Daily maintenance demand = 70 · M^β kcal/day (Kleiber),\n   with the exponent β treated as a structural sensitivity parameter over\n   β ∈ [0.67, 0.75, 1.0] (surface-area law, Kleiber, isometric), per the\n   external data. The activity multiplier for a mobile, flying predator is\n   taken as a single structural parameter k_act ∈ [2, 5] × BMR (the range\n   spanning typical field metabolic rates of free-living active mammals),\n   flagged as an assumption.\n\n3. **Caloric intake and food chain.** The dragon's daily metabolizable-energy\n   requirement is met from prey of body mass in the range [1, 50] × dragon\n   mass at hatch/young stages and [0.01, 0.1] × dragon mass at adult stages\n   (i.e., prey-size class shifts with growth — a structural assumption\n   reflecting the allometric scaling of gape and handling capability).\n   Assimilation efficiency η ∈ [0.15, 0.30] of consumed prey mass as\n   metabolizable energy (per the external data's carnivore scaling note).\n   Trophic transfer from prey biomass to primary producer biomass uses a\n   single structural efficiency ε_trophic = 0.10 (one order of magnitude, the\n   standard 10% ecological rule), with a sensitivity range ε_trophic ∈\n   [0.05, 0.20].\n\n4. **Area model.** Required foraging area A(t) = (daily prey-biomass\n   requirement at climate c) / (net primary productivity of prey biomass at\n   climate c, converted to animal biomass via ε_trophic). Climate c ∈\n   {arid, temperate, arctic} enters only through the NPP value used —\n   per your Exchange 1 boundary, climate does not modify the dragon's\n   maintenance term. I propose to take the three climates' net primary\n   productivity of herbivore-supporting biomass as a structural ratio,\n   arid : temperate : arctic = 0.2 : 1.0 : 0.4 (a relative ordering with\n   explicit uncertainty band, flagged as an assumption), rather than absolute\n   NPP values, so the area comparison across climates is a ratio that is\n   robust to the absolute scale.\n\n5. **Community/assistance model.** For a provisioning fraction p ∈ [0, 1],\n   the community must supply p × (dragon's daily metabolizable energy) as\n   food, plus the remainder (1-p) is foraged from the wild. The minimum\n   human community size N_community(p) is computed as: (daily human labor\n   cost to produce and deliver that food) / (per-capita sustainable food\n   production capacity of the community's base economy), with the community's\n   base economy assumed to be a mixed pastoral-agricultural system with a\n   per-capita food surplus capacity parameterized as a single structural\n   value with an explicit sensitivity range. p is swept over\n   p ∈ {0, 0.25, 0.5, 0.75, 1.0}.\n\n6. **Letter deliverable.** The climate comparison from item 4 (the area\n   ratios arid : temperate : arctic) directly feeds the two-page letter to\n   G.R.R. Martin: the letter's guidance on moving dragons between arid,\n   temperate, and arctic regions is stated in terms of these ratios and the\n   sensitivity ranges, not absolute values.\n\n7. **Real-world analog.** The transferable structure (allometric energy\n   scaling + trophic-chain area requirement + provisioning-fraction\n   community sizing) is mapped to managing large free-ranging megafaara\n   (e.g., reintroduction of large herbivores or apex predators such as\n   wolves or large felids) where the same questions arise: how much habitat\n   area does the population need, how does climate/productivity shift that\n   area, and how large a human community must participate in or support the\n   program at varying levels of direct provisioning.\n\nPlease accept or reject this structure as a whole.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the structure in Exchange 2. The most plausible structural flaw\nin that proposal was that it imposed a single asymptotic adult mass M_max and\na single logistic growth shape on a creature whose growth the problem\nstatement explicitly says is \"dependent on conditions and amount of food\navailable\" — i.e., the growth trajectory is itself an outcome of the\nenergy-balance model, not a free input parameterized by M_max. I therefore\nrevise the structure minimally as follows:\n\n**Revised structure.** Remove M_max and r as free parameters. Instead:\n- Mass M(t) is the state variable of the energy-balance ODE:\n  dM/dt = η · (food intake rate at M(t), climate c) − (maintenance demand at\n  M(t) + k_act · BMR(M(t))) / ΔH_growth, where ΔH_growth is the energetic\n  cost of depositing 1 kg of body mass (a single structural constant with an\n  explicit sensitivity range). Growth is therefore endogenous: food\n  abundance and climate (through prey biomass productivity) set the growth\n  trajectory, and the two anchor points (10 kg at hatching, 30-40 kg at one\n  year) are used to calibrate the *food-abundance parameter* at the reference\n  climate, not to fit M_max and r.\n- The logistic curve is retained only as a *check*: the calibrated\n  energy-balance trajectory must reproduce 30-40 kg at one year within the\n  given band; if it does not, the food-abundance parameter is the one\n  adjusted, not the growth shape.\n- All other elements of the Exchange 2 structure (Kleiber scaling with β\n  sensitivity, activity multiplier k_act, assimilation efficiency η, trophic\n  efficiency ε_trophic, climate ratio arid:temperate:arctic, provisioning\n  fraction p community sizing, letter deliverable, real-world analog) are\n  unchanged.\n\nGiven this revised structure, what is the specific case, boundary condition,\nor failure mode that would break the mechanism — i.e., at which boundary of\nthe defined sensitivity ranges (M via the energy-balance ODE, β ∈ [0.67,\n0.75, 1.0], k_act ∈ [2, 5], η ∈ [0.15, 0.30], ε_trophic ∈ [0.05, 0.20],\nclimate ratio, p ∈ [0, 1], t_ref ∈ [50, 200] yr) would the model's\nconclusions flip or become internally inconsistent?"
+            ],
+            "expert_answers": [
+              "1. **Age/mass domain.** The statement supports parameterizing age as a variable with an explicit reference value, not a single canonical age. It fixes mass only at two points and says dragons \"continue to grow throughout their life depending on conditions and food,\" so age must be a free variable; the \"living today\" dragons are centuries old, so anchoring deliverables to one defended age contradicts the text.\n\n2. **Community/assistance mapping.** The wording \"varying levels of assistance that can be provided\" points to a direct provisioning fraction of caloric intake (0–100%), since assistance is something provided to the dragon, not land-use or protection. It must be consistent with caloric intake and community size; area follows from foraging, not assistance.\n\n3. **Climate mechanism boundary.** The text settles only prey biomass productivity and hence required foraging area. It asks whether climate \"make[s] a big difference in the resources required,\" framing climate through resource availability, not the dragon's own metabolism or activity pattern.",
+              "reject",
+              "The mechanism breaks at the low-food / high-cost corner: with β = 1.0 (isometric), k_act = 5, η = 0.15, and the arid climate ratio (0.2), the maintenance term scales linearly with M while assimilated intake scales with prey productivity, so dM/dt goes negative at the calibration point — the ODE cannot reproduce 30–40 kg at one year for any food-abundance value, and the \"adjust the food parameter\" check has no solution. The model then predicts shrinkage instead of growth, flipping every downstream conclusion (area, community size, letter guidance). A second flip: at t_ref = 200 yr with β = 0.67, maintenance grows sublinearly, so the same food parameter that fits year one drives unbounded mass, making adult mass and area diverge without bound."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_6ea5a8e8f516",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9083333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9333333333333332,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p1_20260930_123018/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The problem definition is clear, with explicit goals and well-identified components for each sub-task, directly supporting the overall problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are well-structured, interrelated, and comprehensively cover all key aspects of the problem without significant deviations or omissions.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively addresses all problem requirements with clear, quantitative outputs. It uses a practical framework for provisioning levels and maps findings to real-world wildlife management, providing actionable insights for decision-making and narrative guidance.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, utilizing established principles like Kleiber's law, trophic efficiency, and NPP. It integrates physiological and ecological models with sound mathematical structures (ODEs), ensuring the assumptions and methods are theoretically justified and domain-appropriate.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing transparent inference, robust structural insights, and clear conclusions that effectively address the problem's core ecological questions.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific structural and data biases, quantifying their impact via sensitivity analysis, and clearly explaining the direction of potential errors in the results.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, numerically defined with ranges, and rigorously justified using ecological principles and sensitivity analysis, ensuring a robust foundation for the model.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate ecological and mathematical methods (energy-balance ODE, trophic chain analysis) that logically reflect the problem constraints and provide robust, transferable insights.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.9020833333333333,
+      "interaction_cost": 0.8699335094970877,
+      "interaction_penalty": 0.04349667547485439,
+      "net_utility": 0.858586657858479,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2449,
+          "total_expert_latency_seconds": 4.33,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9162243830337045,
+          "latency_cost_component": 0.2658890444185472,
+          "interaction_cost": 0.8664897532134819,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2836,
+          "total_expert_latency_seconds": 4.76,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9334431644517339,
+          "latency_cost_component": 0.2782171975404646,
+          "interaction_cost": 0.8733772657806935,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2019_F",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling whether a universal, decentralized, digital currency is possible, and my deliverable must (a) characterize the currency system itself — its consensus/security mechanism and the economic conditions under which it is viable — and (b) analyze how such a currency affects existing banking systems and nation-based currencies. The empirical anchors I have are the World Bank Findex figures (≈1.4 billion unbanked adults, ≈5.4 billion adults total) and the Bitcoin proof-of-work energy consumption (≈100 TWh/yr).\n\nThe problem statement leaves three structural/definitional questions unsettled that I cannot resolve from the text, the data, or standard theory alone. I need the logical boundaries and interpretations, not magnitudes or empirical constants:\n\n1. **Scope of \"universal\" and \"decentralized\".** The text pairs these with \"internal security like blockchain\" and with a contrast to bank/government oversight, but it never defines what the mechanism must satisfy. What is the minimal set of structural properties that a currency system must exhibit to count as both universal (usable across all jurisdictions, including the unbanked, with no membership gate) and decentralized (no single institution whose failure or corruption breaks it)? Which of these properties are hard constraints, and which are tradeable against the security and regulatory concerns the text raises?\n\n2. **The meaning of the viability objective.** \"Is it possible?\" is the question, but the model needs a formal criterion. What should the model treat as the core objective function — the long-run stability of the currency's purchasing power (no inflation/deflation spiral, no loss of trust), the net welfare of adopting it (inclusion gains minus security/energy costs), or the co-existence condition under which it can operate alongside nation-based currencies without collapsing them? In short: which interpretation of \"possible\" — technically feasible, economically stable, or co-existing with existing monetary systems — is the one the model should target as its feasibility criterion?\n\n3. **The boundary between the currency's own security and the governance that the text warns about.** The text worries simultaneously about (i) the security of the currency itself and (ii) the illicit use (tax sheltering, illegal purchases) that anonymity enables, while also praising the departure from restrictive oversight. What is the logical domain of the design variable I should model — i.e., is anonymity/privacy a parameter of the currency mechanism itself, a separate regulatory overlay imposed by jurisdictions, or both? This determines whether \"security\" and \"illicit-use risk\" live in one model layer or two, which in turn determines how the banking/nation-currency impact analysis connects to the core mechanism.\n\nPlease give the interpretation and the logical boundaries for each of these three, so I can parameterize the core mechanism without inventing data.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your answer — co-existence as the binding feasibility criterion, technical feasibility and economic stability as constraints on it, privacy as a two-layer variable — I propose the following specific structural configuration for the model. Please accept or reject it as a whole.\n\n**Core mechanism (the currency itself).** A three-block structure:\n\n- **Block A — Consensus and security layer.** The currency uses a proof-of-stake (delegated) consensus mechanism rather than proof-of-work. I treat security budget S (the value of stake at risk against a 51% attack) and energy cost E as the two key parameters, calibrated so that E is an order-of-magnitude below the PoW baseline (~100 TWh/yr) that the data give me, and S is the economic security condition. I do not assume the stake is risk-free: I model the dominant loss mechanism in this layer as **stake dilution and validator capture** — the two transformations that actually erode security in stake-based systems, rather than assuming idealized validators.\n\n- **Block B — Monetary-stability layer.** Purchasing power is governed by an explicit supply rule. I model the currency's money supply M as a function of a fixed issuance schedule, and stability as the condition that the real value (in terms of a basket of goods) does not drift beyond a bounded band over the model horizon. The dominant transformation here is **seigniorage vs. inflation** — I model the issuance as the source of potential inflation, with the band as the stability constraint.\n\n- **Block C — Co-existence and adoption layer (the binding feasibility criterion).** Adoption of the currency by the unbanked and by the underbanked follows a Bass-diffusion process, anchored to the Findex figures: initial unbanked pool ≈1.4 billion, total adults ≈5.4 billion, and the observed ~17 percentage-point gain in developing-economy account ownership over 4 years as the empirical rate anchor. The co-existence feasibility criterion is that the currency's adoption share does not force a collapse of the existing nation-based currency's seigniorage or monetary-policy capacity below a survivable threshold.\n\n**Secondary deliverables mapped into the structure:**\n- The *banking-system impact* analysis is Block C's output: I model the share of banking-intermediated payment flow that the currency displaces, and the effect on banks' lending capacity.\n- The *nation-currency impact* is also Block C's output: I model the seigniorage and monetary-policy-capacity erosion as a function of adoption share.\n- The *illicit-use / regulatory* concern is a **regulatory-overlay parameter R** that acts on Block A's privacy outputs (per your two-layer answer): R constrains the achievable privacy level, and the model reports the equilibrium at which the overlay and the mechanism's privacy parameter meet. R is not a standard-valued parameter — I define its sensitivity range as [0, 1] (from no regulatory overlay to maximal restrictive overlay) and the model will report where in that range the feasibility conclusion flips.\n\n**One structural hypothesis to test, stated as a single self-consistent mechanism:** the currency is feasible iff (i) it meets the three hard constraints (permissionless, no single point of failure, settlement finality) in Block A, (ii) it holds the purchasing-power band in Block B, and (iii) the co-existence criterion in Block C holds simultaneously with the regulatory overlay R at some achievable privacy level.\n\nPlease accept or reject this specific configuration.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou accepted the three-block structure. I will build it with these sensitivity ranges on the parameters that lack a standard value: the regulatory-overlay parameter R ∈ [0,1] (no overlay → maximal restrictive overlay), the purchasing-power band half-width δ (bounded inflation/deflation tolerance), the co-existence survivable threshold θ (the minimum share of existing-currency seigniorage/monetary-policy capacity that must survive), and the stake-security parameter S (value of stake at risk vs. a 51% attack).\n\nGive me the specific case — the concrete boundary condition, regime, or failure mode — that would break this mechanism, i.e., a configuration of these ranges and the underlying assumptions under which the currency fails to be feasible even though the structure is formally intact. I want the case that most threatens the feasibility conclusion, specifically the one where a conclusion that is \"feasible\" at the center of the parameter space flips to \"not feasible\" at a boundary of the defined ranges. This directly informs the bias analysis and the robustness discussion in the final report.\n\nTo be concrete, the candidates I am weighing, and I want you to pick or name the one that is the genuine breaker (not advice — the breaking case itself):\n\n- **The R → 1 boundary:** the regulatory overlay becomes maximal (full transaction surveillance / no privacy), which neutralizes the \"departure from restrictive oversight\" that is the currency's stated value proposition and collapses the adoption incentive.\n- **The θ boundary:** adoption of the currency by the unbanked grows fast enough that the co-existence criterion (survivable seigniorage/monetary-policy threshold θ) is violated — the nation-based currency is displaced before it can be absorbed, so the \"co-existence\" feasibility criterion fails.\n- **The S → minimal boundary:** the stake security budget is just barely enough against a 51% attack, and a modest change in the value of the staked currency (a purchasing-power dip within the δ band) tips the security below the break-even, so the \"economic security\" constraint is violated from the monetary-stability side.\n- **The δ → narrow boundary:** the purchasing-power band is held very tight (near-zero inflation tolerance), and the issuance schedule needed to fund the network pushes the supply rule against the band, so stability fails.\n\nWhich of these (or a different case you name) is the genuine counterexample — the specific boundary condition that breaks the accepted mechanism and flips the feasibility conclusion?"
+        ],
+        "expert_answers": [
+          "1. **Universal/decentralized minimal properties.** Hard constraints: permissionless participation (no membership gate, works for unbanked), no single point of failure in consensus, and settlement finality without a trusted intermediary. Tradeable: validator identity, energy cost, throughput, and privacy level. \"Universal\" is a usability/access property; \"decentralized\" is a control-distribution property — keep them separate, since a system can be one without the other.\n\n2. **Viability objective.** The text's \"possible\" is not one criterion but a conjunction: technical feasibility is the entry condition, economic stability (purchasing-power/trust) is the survival condition, and co-existence with nation-based currencies is the acceptance condition. Model co-existence as the binding feasibility criterion; the other two are constraints on it.\n\n3. **Anonymity domain.** Both layers. Privacy is a mechanism parameter (what the protocol reveals); illicit-use risk is a regulatory overlay (what jurisdictions permit). Model them as two layers, with the overlay acting on the mechanism's outputs.",
+          "accept",
+          "The genuine breaker is the **S → minimal boundary coupled to the δ band** — the cross-layer case, not any single-layer boundary.\n\nConcrete configuration: S is set at the 51%-attack break-even (stake value at risk ≈ attack cost), and δ is narrow enough that a purchasing-power dip *within* the allowed band still reduces the real value of staked currency. Because S is denominated in the currency's own units, the dip lowers the cost of acquiring a controlling stake below the attack payoff. Block B's stability constraint is satisfied (the dip is inside δ), yet Block A's security constraint fails — the two blocks are formally intact but jointly infeasible.\n\nThis is the case that flips: at the center of the parameter space S has slack and δ has width, so feasibility holds; at the S-minimal/δ-narrow corner the monetary layer silently undermines the security layer. The R→1 and θ cases are single-layer and detectable; this one is not, because each block's own criterion passes."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_6ea5a8e8f516",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8479166666666667,
+      "dimension_scores": {
+        "analysis_evaluation": 0.85,
+        "modeling_rigorousness_evaluation": 0.8500000000000001,
+        "practicality_and_scientificity_evaluation": 0.8166666666666668,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for both sub-tasks. Task 1 explicitly targets the feasibility of a universal, decentralized currency by breaking it down into structural properties, security mechanisms, and economic viability. Task 2 clearly aims to analyze the impact on existing banking and national currencies. The goals are explicit, directly addressing the core question of possibility and the secondary question of consequences. The identification of key components (consensus, stability, co-existence) is accurate and relevant to the problem requirements.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers the main aspects of the problem effectively. Task 1 addresses the core feasibility question, while Task 2 addresses the implications for existing systems, which is a key part of the problem statement. The sub-tasks are logically interrelated, with Task 2 depending on the characteristics established in Task 1. However, the coverage could be slightly more comprehensive by explicitly including the security concerns and illicit transaction risks mentioned in the background as a distinct analytical component or within the security mechanism analysis, rather than just implying it under \"internal security.\" Overall, the scope is mostly covered with minor omissions in explicit risk analysis.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and well-justified by empirical data and logical constraints, though the linear displacement assumption is a simplification.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model structure is logical and comprehensive, using a three-block approach and conjunction-based feasibility to realistically reflect the problem's complexity.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing specific quantitative evidence, logical inference paths, and a nuanced interpretation of the model's implications for both feasibility and systemic impact.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying data, structural, and logical biases. It effectively mitigates risk by clearly defining the boundaries and conditions of validity, although some biases are noted as limitations rather than mathematically corrected.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model provides a clear, actionable framework for assessing feasibility by quantifying security, stability, and co-existence margins. It uses appropriate diffusion models calibrated with real data, offering meaningful insights for decision-making regarding the impact on existing banking systems and the viability of a universal currency.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, integrating game theory for security, monetary economics for stability, and the Bass diffusion model for adoption. It uses a logical conjunction of constraints to define feasibility, demonstrating a strong theoretical basis and interdisciplinary approach to the problem.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 2,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_F",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling whether a universal, decentralized, digital currency is possible, and my deliverable must (a) characterize the currency system itself — its consensus/security mechanism and the economic conditions under which it is viable — and (b) analyze how such a currency affects existing banking systems and nation-based currencies. The empirical anchors I have are the World Bank Findex figures (≈1.4 billion unbanked adults, ≈5.4 billion adults total) and the Bitcoin proof-of-work energy consumption (≈100 TWh/yr).\n\nThe problem statement leaves three structural/definitional questions unsettled that I cannot resolve from the text, the data, or standard theory alone. I need the logical boundaries and interpretations, not magnitudes or empirical constants:\n\n1. **Scope of \"universal\" and \"decentralized\".** The text pairs these with \"internal security like blockchain\" and with a contrast to bank/government oversight, but it never defines what the mechanism must satisfy. What is the minimal set of structural properties that a currency system must exhibit to count as both universal (usable across all jurisdictions, including the unbanked, with no membership gate) and decentralized (no single institution whose failure or corruption breaks it)? Which of these properties are hard constraints, and which are tradeable against the security and regulatory concerns the text raises?\n\n2. **The meaning of the viability objective.** \"Is it possible?\" is the question, but the model needs a formal criterion. What should the model treat as the core objective function — the long-run stability of the currency's purchasing power (no inflation/deflation spiral, no loss of trust), the net welfare of adopting it (inclusion gains minus security/energy costs), or the co-existence condition under which it can operate alongside nation-based currencies without collapsing them? In short: which interpretation of \"possible\" — technically feasible, economically stable, or co-existing with existing monetary systems — is the one the model should target as its feasibility criterion?\n\n3. **The boundary between the currency's own security and the governance that the text warns about.** The text worries simultaneously about (i) the security of the currency itself and (ii) the illicit use (tax sheltering, illegal purchases) that anonymity enables, while also praising the departure from restrictive oversight. What is the logical domain of the design variable I should model — i.e., is anonymity/privacy a parameter of the currency mechanism itself, a separate regulatory overlay imposed by jurisdictions, or both? This determines whether \"security\" and \"illicit-use risk\" live in one model layer or two, which in turn determines how the banking/nation-currency impact analysis connects to the core mechanism.\n\nPlease give the interpretation and the logical boundaries for each of these three, so I can parameterize the core mechanism without inventing data.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your answer — co-existence as the binding feasibility criterion, technical feasibility and economic stability as constraints on it, privacy as a two-layer variable — I propose the following specific structural configuration for the model. Please accept or reject it as a whole.\n\n**Core mechanism (the currency itself).** A three-block structure:\n\n- **Block A — Consensus and security layer.** The currency uses a proof-of-stake (delegated) consensus mechanism rather than proof-of-work. I treat security budget S (the value of stake at risk against a 51% attack) and energy cost E as the two key parameters, calibrated so that E is an order-of-magnitude below the PoW baseline (~100 TWh/yr) that the data give me, and S is the economic security condition. I do not assume the stake is risk-free: I model the dominant loss mechanism in this layer as **stake dilution and validator capture** — the two transformations that actually erode security in stake-based systems, rather than assuming idealized validators.\n\n- **Block B — Monetary-stability layer.** Purchasing power is governed by an explicit supply rule. I model the currency's money supply M as a function of a fixed issuance schedule, and stability as the condition that the real value (in terms of a basket of goods) does not drift beyond a bounded band over the model horizon. The dominant transformation here is **seigniorage vs. inflation** — I model the issuance as the source of potential inflation, with the band as the stability constraint.\n\n- **Block C — Co-existence and adoption layer (the binding feasibility criterion).** Adoption of the currency by the unbanked and by the underbanked follows a Bass-diffusion process, anchored to the Findex figures: initial unbanked pool ≈1.4 billion, total adults ≈5.4 billion, and the observed ~17 percentage-point gain in developing-economy account ownership over 4 years as the empirical rate anchor. The co-existence feasibility criterion is that the currency's adoption share does not force a collapse of the existing nation-based currency's seigniorage or monetary-policy capacity below a survivable threshold.\n\n**Secondary deliverables mapped into the structure:**\n- The *banking-system impact* analysis is Block C's output: I model the share of banking-intermediated payment flow that the currency displaces, and the effect on banks' lending capacity.\n- The *nation-currency impact* is also Block C's output: I model the seigniorage and monetary-policy-capacity erosion as a function of adoption share.\n- The *illicit-use / regulatory* concern is a **regulatory-overlay parameter R** that acts on Block A's privacy outputs (per your two-layer answer): R constrains the achievable privacy level, and the model reports the equilibrium at which the overlay and the mechanism's privacy parameter meet. R is not a standard-valued parameter — I define its sensitivity range as [0, 1] (from no regulatory overlay to maximal restrictive overlay) and the model will report where in that range the feasibility conclusion flips.\n\n**One structural hypothesis to test, stated as a single self-consistent mechanism:** the currency is feasible iff (i) it meets the three hard constraints (permissionless, no single point of failure, settlement finality) in Block A, (ii) it holds the purchasing-power band in Block B, and (iii) the co-existence criterion in Block C holds simultaneously with the regulatory overlay R at some achievable privacy level.\n\nPlease accept or reject this specific configuration.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou accepted the three-block structure. I will build it with these sensitivity ranges on the parameters that lack a standard value: the regulatory-overlay parameter R ∈ [0,1] (no overlay → maximal restrictive overlay), the purchasing-power band half-width δ (bounded inflation/deflation tolerance), the co-existence survivable threshold θ (the minimum share of existing-currency seigniorage/monetary-policy capacity that must survive), and the stake-security parameter S (value of stake at risk vs. a 51% attack).\n\nGive me the specific case — the concrete boundary condition, regime, or failure mode — that would break this mechanism, i.e., a configuration of these ranges and the underlying assumptions under which the currency fails to be feasible even though the structure is formally intact. I want the case that most threatens the feasibility conclusion, specifically the one where a conclusion that is \"feasible\" at the center of the parameter space flips to \"not feasible\" at a boundary of the defined ranges. This directly informs the bias analysis and the robustness discussion in the final report.\n\nTo be concrete, the candidates I am weighing, and I want you to pick or name the one that is the genuine breaker (not advice — the breaking case itself):\n\n- **The R → 1 boundary:** the regulatory overlay becomes maximal (full transaction surveillance / no privacy), which neutralizes the \"departure from restrictive oversight\" that is the currency's stated value proposition and collapses the adoption incentive.\n- **The θ boundary:** adoption of the currency by the unbanked grows fast enough that the co-existence criterion (survivable seigniorage/monetary-policy threshold θ) is violated — the nation-based currency is displaced before it can be absorbed, so the \"co-existence\" feasibility criterion fails.\n- **The S → minimal boundary:** the stake security budget is just barely enough against a 51% attack, and a modest change in the value of the staked currency (a purchasing-power dip within the δ band) tips the security below the break-even, so the \"economic security\" constraint is violated from the monetary-stability side.\n- **The δ → narrow boundary:** the purchasing-power band is held very tight (near-zero inflation tolerance), and the issuance schedule needed to fund the network pushes the supply rule against the band, so stability fails.\n\nWhich of these (or a different case you name) is the genuine counterexample — the specific boundary condition that breaks the accepted mechanism and flips the feasibility conclusion?"
+            ],
+            "expert_answers": [
+              "1. **Universal/decentralized minimal properties.** Hard constraints: permissionless participation (no membership gate, works for unbanked), no single point of failure in consensus, and settlement finality without a trusted intermediary. Tradeable: validator identity, energy cost, throughput, and privacy level. \"Universal\" is a usability/access property; \"decentralized\" is a control-distribution property — keep them separate, since a system can be one without the other.\n\n2. **Viability objective.** The text's \"possible\" is not one criterion but a conjunction: technical feasibility is the entry condition, economic stability (purchasing-power/trust) is the survival condition, and co-existence with nation-based currencies is the acceptance condition. Model co-existence as the binding feasibility criterion; the other two are constraints on it.\n\n3. **Anonymity domain.** Both layers. Privacy is a mechanism parameter (what the protocol reveals); illicit-use risk is a regulatory overlay (what jurisdictions permit). Model them as two layers, with the overlay acting on the mechanism's outputs.",
+              "accept",
+              "The genuine breaker is the **S → minimal boundary coupled to the δ band** — the cross-layer case, not any single-layer boundary.\n\nConcrete configuration: S is set at the 51%-attack break-even (stake value at risk ≈ attack cost), and δ is narrow enough that a purchasing-power dip *within* the allowed band still reduces the real value of staked currency. Because S is denominated in the currency's own units, the dip lowers the cost of acquiring a controlling stake below the attack payoff. Block B's stability constraint is satisfied (the dip is inside δ), yet Block A's security constraint fails — the two blocks are formally intact but jointly infeasible.\n\nThis is the case that flips: at the center of the parameter space S has slack and δ has width, so feasibility holds; at the S-minimal/δ-narrow corner the monetary layer silently undermines the security layer. The R→1 and θ cases are single-layer and detectable; this one is not, because each block's own criterion passes."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_6ea5a8e8f516",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8250000000000001,
+          "dimension_scores": {
+            "analysis_evaluation": 0.85,
+            "modeling_rigorousness_evaluation": 0.8000000000000002,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r1p2_20260930_123018/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for both sub-tasks. Task 1 explicitly targets the feasibility of a universal, decentralized currency by breaking it down into structural properties, security mechanisms, and economic viability. Task 2 clearly aims to analyze the impact on existing banking and national currencies. The goals are explicit, directly addressing the core question of possibility and the secondary question of consequences. The identification of key components (consensus, stability, co-existence) is accurate and relevant to the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers the main aspects of the problem effectively. Task 1 addresses the core feasibility question, while Task 2 addresses the implications for existing systems, which is a key part of the problem statement. The sub-tasks are logically interrelated, with Task 2 depending on the characteristics established in Task 1. However, the coverage could be slightly more comprehensive by explicitly including the security concerns and illicit transaction risks mentioned in the background as a distinct analytical component or within the security mechanism analysis, rather than just implying it under \"internal security.\" Overall, the scope is mostly covered with minor omissions in explicit risk analysis.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and well-justified by empirical data and logical constraints, though the linear displacement assumption is a simplification.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model structure is logical and comprehensive, using a three-block approach and conjunction-based feasibility to realistically reflect the problem's complexity.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative evidence, logical inference paths, and a nuanced interpretation of the model's implications for both feasibility and systemic impact.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying data, structural, and logical biases. It effectively mitigates risk by clearly defining the boundaries and conditions of validity, although some biases are noted as limitations rather than mathematically corrected.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides a clear, actionable framework for assessing feasibility by quantifying security, stability, and co-existence margins. It uses appropriate diffusion models calibrated with real data, offering meaningful insights for decision-making regarding the impact on existing banking systems and the viability of a universal currency.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, integrating game theory for security, monetary economics for stability, and the Bass diffusion model for adoption. It uses a logical conjunction of constraints to define feasibility, demonstrating a strong theoretical basis and interdisciplinary approach to the problem.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2019_F",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p2_20260930_123018",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p2_20260930_123018/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nGap 1 (most consequential — structural/definitional): The problem asks whether a \"universal, decentralized, digital currency\" is possible, and frames the tension as private security (privacy, no bank/government oversight) against government risk (illicit use, tax sheltering). The statement never settles what \"universal\" or \"decentralized\" means logically, and these two readings are the load-bearing variables of the whole feasibility model. What are the valid logical boundaries / interpretations you would impose:\n(a) \"Universal\" — a single global ledger accepted by all jurisdictions, or a interoperable set of currencies with a universal unit of account? Is \"universal acceptance\" a design requirement or an emergent equilibrium outcome the model should predict?\n(b) \"Decentralized\" — no single institution can control issuance/validation (governance decentralization), no single node is required for operation (operational decentralization), or no single party controls users' keys (censorship resistance)? Which of these must hold for the currency to count as satisfying the problem's demand, and may the others be traded off?\n\nGap 2 (deliverable mapping): The statement raises two secondary analyses the deliverable must cover: (i) impact on existing banking systems and nation-based currencies, and (ii) protection of assets against regional inflation and currency manipulation. Which structural element of the core feasibility model (consensus/securities parameterization, adoption dynamics, or the stability/monetary-policy analysis) is the correct carrier for each of these two analyses, i.e., which core mechanism is transferable and which must be treated distinctly for the policy/generalization component?\n\nGap 3 (objective-function reading): \"Feasible\" needs a logical definition. Should feasibility be read as a binary design question (does a consistent architecture exist that meets the settled definitions?), as a quantitative stability question (does the currency hold its function — store of value, medium of exchange — under the identified stress mechanisms?), or as a threshold question (is it achievable above some minimum population share N₀ of the unbanked, using the Findex anchor)? Which reading should the core model settle first, and what is the valid domain of the adoption variable (share of the ~1.4 billion unbanked adults, bounded 0–1) that the model is asked to predict?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nProposing one coherent structural configuration for the feasibility model, built on the settled boundaries (universal = universal unit of account over interoperable ledgers; acceptance = emergent; governance decentralization = necessary condition; operational decentralization and censorship resistance = tradeable; stability analysis treated distinctly from adoption; deliverable order: binary design → stability → inclusion threshold over x ∈ [0,1] of the ~1.4 B unbanked adults).\n\n**Structure (S): three interlocking components.**\n\n**S1 — Consensus/securities core (the binary design question).** A delegated-proof-of-stake (DPoS) design with a fixed committee of d delegators (range d ∈ [21, 101], the range used by established designs) and stake-weighted voting with a quorum fraction q (range q ∈ [1/3, 2/3]). Security parameterization:\n- Finality probability P_fin(t) per block time t, from the stake concentration λ = max single-stake / total stake (sensitivity range λ ∈ [0.01, 0.30], i.e., 1%–30% held by the largest party — this is the structural parameter with no universally accepted standard value; the model carries it as a declared uncertainty interval, not a point value);\n- 51%-attack / long-range-attack cost C_attack = the fraction of stake that must be captured, with the tradeable censorship-resistance lever modeled as a per-validator liveness requirement (a validator offline past the liveness bound ℓ loses voting rights; ℓ is a design constant, range [5, 60] minutes).\nThe design question is settled as: does ∃ (d, q, λ in range) such that P_fin ≥ 1 − ε with ε ≤ 10⁻⁴ per block, under the dominant loss mechanism being validator collusion (a fraction f of the committee colluding; f < q̄, the complement quorum), and the dominant energy mechanism being the PoW baseline from CBECI (~100–125 TWh/yr) that DPoS must beat by an order-of-magnitude margin E_dpos ≪ E_pow as the efficiency acceptance criterion? Collusion is treated as the first-order failure mode, not an idealized negligible interaction.\n\n**S2 — Adoption/interoperability layer (carries the banking & nation-currency impact analysis).** A Bass–logistic diffusion for the adoption share x(t) ∈ [0,1] over the unbanked population N₀ ≈ 1.4 B: dx/dt = p·(1−x) + q_ad·x(1−x), anchored to the Findex empirical trajectory (~17 pp gain in developing-economy account ownership over 4 years) for calibration of the effective adoption rate. The banking-impact output is defined as the displacement function D(t) = x(t)·(banking-replacement elasticity η ∈ [0.2, 0.8] — declared sensitivity range, no standard value), i.e., the share of incumbent bank transaction volume displaced.\n\n**S3 — Stability/monetary-policy layer (treated distinctly, carries inflation & manipulation protection).** A money-supply and exchange-rate stability condition: the currency's unit of account is stable if its issuance rate ι(t) is bounded by a rule-based cap ι ≤ ι_max (range ι_max ∈ [0%, 5%] per year, declared interval) and the reserve/collateral backing ratio ρ ∈ [0.5, 1.0] holds. Inflation-protection claim = the currency's price level variance against the basket of national currencies is lower when ι ≤ ι_max; manipulation-resistance = no single national authority can move ι or ρ (a consequence of governance decentralization, not a separate mechanism).\n\n**Interface between deliverables:** S2's displacement D(t) feeds the banking-impact sub-analysis; S3's stability condition is the criterion for the inflation-protection sub-analysis; S1's feasibility (∃ valid (d,q,λ)) gates both — if S1 fails, the deliverable is \"infeasible as specified, feasible under weakened condition X.\"\n\nAccept or reject this structure as a whole. If rejected, state the specific structural flaw (e.g., DPoS collusion treatment, the S2/S3 deliverable split, or the declared sensitivity ranges).",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure in Exchange 2 was rejected. The minimal revision that addresses the flaw I identified — that S1's feasibility was gated on a stake-concentration λ that the problem provides no data to support (asking the expert to accept a specific λ range is an empirical-magnitude request, which the consultation rules prohibit) — is:\n\n**Revised structure S′.** S1's design question is reframed as a *parameter-free logical* feasibility check: \"does there exist a governance mechanism satisfying (i) no single institution controls issuance/validation (governance decentralization, the necessary condition from Exchange 1), (ii) a well-defined liveness/finality rule, (iii) an energy budget asymptotically below the PoW baseline (~100–125 TWh/yr from CBECI)?\" — without committing to a specific consensus family or specific stake-concentration value. The specific mechanism (DPoS, BFT, sharded PoS, or hybrid) is the *output* the model is asked to characterize, not an input assumption. S2 and S3 are unchanged. The declared sensitivity intervals (η, ι_max, ρ) remain, but λ is replaced by the qualitative constraint \"stake/governance weight must be sufficiently dispersed that no single party's removal or collusion alone breaks finality,\" which is a structural condition, not a magnitude.\n\n**Question:** What specific case, boundary condition, or failure mode breaks this revised structure S′? In particular: (a) does the parameter-free S1 framing avoid the flaw or merely relocate it (e.g., by hiding the magnitude decision inside the \"characterize the mechanism\" output, where it still must be settled without data)? (b) at the boundary of the declared sensitivity ranges — ι_max at its upper end (5% per year) with ρ at its lower end (0.5), or η at its upper end (0.8) — does S3's stability conclusion or S2's banking-impact conclusion flip sign or become indeterminate, and if so, is that flip a model artifact or a genuine structural limit the report must state? (c) is there a case in which governance decentralization (the necessary condition) holds but the currency still fails the problem's feasibility test — e.g., via the tradeable conditions (operational decentralization, censorship resistance) failing in a way that undermines the universal-unit-of-account reading?"
+            ],
+            "expert_answers": [
+              "(a) \"Universal\" should be read as a universal unit of account over an interoperable set of ledgers, not one global ledger; universal acceptance is an emergent equilibrium the model predicts, not a design requirement.\n\n(b) Governance decentralization (no single institution controls issuance/validation) is the necessary condition; operational decentralization and censorship resistance are tradeable, not required.\n\nGap 2: Adoption dynamics carries the banking/nation-currency impact; the stability/monetary-policy analysis carries inflation and manipulation protection — treat the latter distinctly, not as transferable.\n\nGap 3: Settle the binary design question first, then stability, then the threshold. Adoption domain: 0–1 share of the ~1.4 billion unbanked adults.",
+              "reject",
+              "(c) Governance decentralization can hold while feasibility still fails: a single jurisdiction mandates that its residents' wallets/validators use a permissioned gateway (or bans self-custody), so issuance/validation remains institutionally decentralized yet the universal-unit-of-account reading collapses — the currency is not universally usable, only universally issuable. That case breaks S′ because S1's parameter-free check certifies the necessary condition and never tests the tradeable conditions that the universal-account reading actually requires."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_6ea5a8e8f516",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8708333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.85,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_13/train_parent_1/runs/round_13/r2p2_20260930_123018/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly settling ambiguous terms like \"universal\" and \"decentralized\" to create a testable binary feasibility question. The goals are explicit: S1 addresses design feasibility with specific logical checks (governance, liveness, energy), S2 focuses on monetary stability and inflation protection, and S3 targets adoption dynamics and banking impact. The separation of concerns is logical, and the deliverables for each task are well-stated, making the overall problem definition highly clear and structured.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated and cover the core aspects of the problem: feasibility, stability, and adoption/impact. S1 establishes the technical possibility, S2 validates the economic utility (stability), and S3 models the real-world transition and impact on existing systems. This sequence effectively addresses the prompt's questions about possibility, security/stability, and effects on banking/nation-currencies. However, the coverage of \"security\" is somewhat implicit in S1's governance/consensus constraints rather than being a distinct focus, and the link between S2's stability and S3's adoption could be more explicitly defined as a dependency, though the current structure is mostly coherent and comprehensive.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative outcomes, transparent inference logic, and a balanced discussion of model strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying data, model, and structural biases, and mitigating their impact through sensitivity analysis and clear conditional statements.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides concrete, quantifiable insights (energy efficiency, adoption timelines) that directly support decision-making for currency design and policy, effectively translating theoretical constraints into practical operational metrics.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is grounded in solid theoretical foundations from computer science and economics, with clearly justified assumptions and a logical, principle-based derivation process that avoids arbitrary data fitting.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified with empirical anchors, and handle uncertainty through declared sensitivity ranges, ensuring a robust and rational foundation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model employs appropriate and standard methods (Bass diffusion, logical checks) that realistically reflect the problem's structure, with rigorous calibration and handling of data limitations.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        }
+      ],
+      "refined_report_utility": 0.8479166666666667,
+      "interaction_cost": 0.8711353536461257,
+      "interaction_penalty": 0.04355676768230629,
+      "net_utility": 0.8043598989843603,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2850,
+          "total_expert_latency_seconds": 4.61,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9340211175888908,
+          "latency_cost_component": 0.27402444412549887,
+          "interaction_cost": 0.8736084470355563,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2565,
+          "total_expert_latency_seconds": 3.55,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9216556506417375,
+          "latency_cost_component": 0.24074786150916774,
+          "interaction_cost": 0.868662260256695,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T12:42:08.842258",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_6ea5a8e8f516",
+  "workflow": {
+    "name": "Quantitative Rigor & Deliverable Alignment",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 9) focuses on structural and deliverable alignment but was rejected in Round 10 for similarity. The training evidence for the current parent shows high scores in analysis and practicality but lower scores in modeling rigorousness (0.79) and result/bias analysis (0.75), with specific feedback noting that biases are identified but 'active correction methods are limited to sensitivity checks rather than structural adjustments' and that assumptions 'lack detailed justification for key model inputs'. The previous failed round (Round 11) attempted to add a 'Bias Quantification Rule' but was rejected for similarity to Round 9 (similarity 0.9146), likely because it was too close to the existing rejection handling logic. This new patch introduces a 'Quantitative Rigor Rule' that is distinct from the previous attempts by explicitly linking the *proposal* in Exchange 2 to defining sensitivity ranges for unpinned parameters, and then forcing Exchange 3 to test the boundaries of those specific ranges. This addresses the judge's feedback on rigorousness and bias analysis more directly than the previous 'Bias Quantification Rule' which focused on post-hoc report design, and differs from Round 9 by adding this specific quantitative constraint to the interaction flow rather than just deliverable mapping.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted. The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\n**Quantitative Rigor Rule:** When formulating the gaps for Exchange 2, the agent must identify any structural parameter or assumption that lacks a standard, universally accepted value in the provided data. The proposed structure must explicitly define the sensitivity range or uncertainty interval for these parameters. If the expert accepts the structure, Exchange 3 must specifically target the boundary of these defined ranges to verify if the model's conclusions remain stable or flip. This ensures that the final report's bias analysis is grounded in the specific structural uncertainties validated during the consultation, rather than generic sensitivity checks.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables. Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism, explicitly stating the assumed sensitivity range for any parameter lacking a standard value.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context, specifically testing the stability of the conclusions against the defined sensitivity ranges. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted. The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\n**Quantitative Rigor Rule:** When formulating the gaps for Exchange 2, the agent must identify any structural parameter or assumption that lacks a standard, universally accepted value in the provided data. The proposed structure must explicitly define the sensitivity range or uncertainty interval for these parameters. If the expert accepts the structure, Exchange 3 must specifically target the boundary of these defined ranges to verify if the model's conclusions remain stable or flip. This ensures that the final report's bias analysis is grounded in the specific structural uncertainties validated during the consultation, rather than generic sensitivity checks.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables. Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism, explicitly stating the assumed sensitivity range for any parameter lacking a standard value.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context, specifically testing the stability of the conclusions against the defined sensitivity ranges. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted. The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\n**Quantitative Rigor Rule:** When formulating the gaps for Exchange 2, the agent must identify any structural parameter or assumption that lacks a standard, universally accepted value in the provided data. The proposed structure must explicitly define the sensitivity range or uncertainty interval for these parameters. If the expert accepts the structure, Exchange 3 must specifically target the boundary of these defined ranges to verify if the model's conclusions remain stable or flip. This ensures that the final report's bias analysis is grounded in the specific structural uncertainties validated during the consultation, rather than generic sensitivity checks.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables. Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism, explicitly stating the assumed sensitivity range for any parameter lacking a standard value.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context, specifically testing the stability of the conclusions against the defined sensitivity ranges. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_6ea5a8e8f516",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 12,
+    "parent_workflow_ids": [
+      "interaction_workflow_bc49a013c7df"
+    ],
+    "training_batch": [
+      "2018_B",
+      "2019_D"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2019_A",
+    "2019_F"
+  ],
+  "absolute_utility": 0.875,
+  "interaction_cost": 0.8705344315716067,
+  "interaction_penalty": 0.04352672157858034,
+  "net_utility": 0.8314732784214196,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

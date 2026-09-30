@@ -1,0 +1,641 @@
+{
+  "round": 1,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7432331360773089,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.875,
+    "modeling_rigorousness_evaluation": 0.6791666666666667,
+    "practicality_and_scientificity_evaluation": 0.7250000000000001,
+    "result_and_bias_analysis_evaluation": 0.8625
+  },
+  "problem_results": [
+    {
+      "problem_id": "2015_B",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a generic planning model for a search of a lost plane that\ncrashed in open water with no signals, using the standard SAR objective\nmaximizing expected probability of success, POS = POA x POD, with POA a\nspatial prior (error-ellipse centered at the last fix, spread by\nnavigation uncertainty and oceanic current/wind drift over elapsed time) and\nPOD sensor-specific effective sweep width.\n\nWhat the work cannot yet settle, and what the text and the two data items\n(Koopman POS decomposition; SOLAS 30-day afloat bound) do not carry:\n\n1. A representative magnitude for navigation uncertainty at the last reliable\n   fix of a long-range over-ocean flight in a no-signal window: on what\n   scale (km of radial position error) should the initial error ellipse be\n   parameterized, and over what elapsed time window should drift spread\n   dominate that ellipse?\n\n2. A scale for how fast the dominant POD (visual/EO-IR on surface targets)\n   decays with age of loss once flares have burned out and rafts have started\n   degrading — days or weeks — so the time-dependent weighting of early\n   search is calibrated.\n\n3. A sense of the planning horizon an organizer would actually budget: on\n   what order of elapsed days after loss should the model's allocation\n   optimization be run, given that the deliverable must stay generic over\n   ocean region, target aircraft type, and sensor platform?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your first reply (drift dominates beyond 1-3 days; visual POD\ndecays over 1-2 weeks; ~30-day horizon), the model now assigns, under a\nfixed budget:\n\n- Days 0-3: EO/IR visual aircraft carry most of the budget, hunting\n  rafts and surface debris in a tight ellipse (1-sigma ~10-18 km) at the\n  last fix.\n- Days 3-10: side-looking SAR radar takes over as the primary tool over\n  the drifting debris field (1-sigma grows to ~45-66 km); the towed sonar\n  and magnetometer begin a parallel salvage phase near the last fix.\n- Days 10-30: the budget is split between SAR over the drift cloud and\n  towed sonar / magnetometer over the settled-wreck region; EO/IR visual\n  recedes as rafts and flares decay.\n\nDo you accept this time-phased, sensor-appropriate allocation structure —\nearly visual/EO-IR, mid SAR, late SAR+sonar/magnetometer salvage — as\nthe organizing principle of the generic search plan?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe model's mechanism, now accepted in principle, is: a Gaussian prior at\nthe last fix, advected and spread by surface current over elapsed time;\nPOD per sensor from effective sweep width, range, sea state and age of\nloss; and a budgeted greedy allocation that phases EO/IR visual (early),\nSAR (mid) and sonar/magnetometer (late) across two priors (drifted cloud\nfor surface targets, settled region at the last fix for the wreck).\n\nWhich single case would break this mechanism, or on which case does it\nfail? For example: a very long no-signal window so the last fix is days\nstale and the prior is dominated by accumulated navigation error rather\nthan oceanic drift; a target that sinks quickly with little floating\ndebris (so the surface-phase sensors find nothing and the salvage phase\nhas the whole budget but no time); a high-latitude search where ice and\npolar night shut down visual and SAR for weeks; or a search whose\norganizer cannot commit vessels for the first week. Name the case that\nbreaks the mechanism."
+        ],
+        "expert_answers": [
+          "1. Navigation uncertainty at the last reliable fix for a long-range over-ocean flight is typically on the order of a few kilometres to a few tens of kilometres (radial, 1-sigma), driven by inertial/INS drift and satellite-update gaps; drift spread from currents and wind dominates the ellipse beyond roughly 1–3 days, after which the ellipse grows at the local surface-current speed (order 0.1–1 km/h) rather than at navigation-error rates.\n\n2. Visual/EO-IR POD against surface debris decays over days to a few weeks: useful detection of intact rafts and large debris persists for roughly the first 1–2 weeks, then falls as rafts degrade, sink, or disperse; beyond about 3–4 weeks POD for small targets is effectively negligible.\n\n3. A defensible generic planning horizon is on the order of 30 days after loss, matching the SOLAS afloat-survival bound, with allocation optimization run over that window and re-run as new drift/POD information arrives.",
+          "accept",
+          "The case that breaks it: a target that sinks quickly with little floating debris. The Gaussian prior is advected by surface current, but the wreck is not — it descends to a settled region displaced by its own ballistic/drift descent, not by surface drift. So the \"settled region at the last fix\" prior is wrong, and the surface-phase sensors find nothing while the salvage phase inherits a mislocated prior and no time."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_05df287cb4d3",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8333333333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8500000000000001,
+        "modeling_rigorousness_evaluation": 0.7749999999999999,
+        "practicality_and_scientificity_evaluation": 0.8583333333333334,
+        "result_and_bias_analysis_evaluation": 0.8500000000000001
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope as a generic mathematical model for open-water search planning, explicitly incorporating the constraints of no signals, variable aircraft types, and heterogeneous search sensors. The goal is well-stated as a planning tool that outputs search locations and sensor assignments based on inputs like last fix, elapsed time, and budget. The definition is precise, directly addressing the core requirements of the problem without ambiguity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers the core mathematical modeling requirement in Task 1. However, Task 2 (writing a non-technical press paper) is a communication deliverable, not a mathematical sub-problem. While it supports the overall context, it does not contribute to the logical decomposition of the mathematical model itself. The core mathematical components (drift, detection probability, optimization) are not explicitly broken down into further mathematical sub-tasks, but the high-level definition in Task 1 is sufficient to guide the modeling process.",
+            "score": 7
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed quantitative outputs, sensitivity insights, and a logical interpretation that effectively explains the model's inference and practical implications.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying specific model, data, and structural biases (e.g., fast-sinking targets) and explaining mitigation strategies, though some biases remain inherent to the generic nature of the model.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, integrating physical drift, sensor limitations, and cost constraints to provide actionable search strategies. It offers clear decision support through optimization and parameter sensitivity analysis, directly addressing the problem's operational needs.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, utilizing advection-diffusion equations and probabilistic detection models grounded in physical reality. It correctly distinguishes between surface and deep-sea dynamics and uses appropriate mathematical optimization techniques, demonstrating a deep understanding of the domain.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are clear and grounded in standard search theory, but lack depth on distribution specifics and sensitivity to horizon constraints.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses a standard, field-validated framework (Koopman) that logically structures the search problem, though implementation details on dynamic updating are sparse.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 2,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2015_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a generic planning model for a search of a lost plane that\ncrashed in open water with no signals, using the standard SAR objective\nmaximizing expected probability of success, POS = POA x POD, with POA a\nspatial prior (error-ellipse centered at the last fix, spread by\nnavigation uncertainty and oceanic current/wind drift over elapsed time) and\nPOD sensor-specific effective sweep width.\n\nWhat the work cannot yet settle, and what the text and the two data items\n(Koopman POS decomposition; SOLAS 30-day afloat bound) do not carry:\n\n1. A representative magnitude for navigation uncertainty at the last reliable\n   fix of a long-range over-ocean flight in a no-signal window: on what\n   scale (km of radial position error) should the initial error ellipse be\n   parameterized, and over what elapsed time window should drift spread\n   dominate that ellipse?\n\n2. A scale for how fast the dominant POD (visual/EO-IR on surface targets)\n   decays with age of loss once flares have burned out and rafts have started\n   degrading — days or weeks — so the time-dependent weighting of early\n   search is calibrated.\n\n3. A sense of the planning horizon an organizer would actually budget: on\n   what order of elapsed days after loss should the model's allocation\n   optimization be run, given that the deliverable must stay generic over\n   ocean region, target aircraft type, and sensor platform?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your first reply (drift dominates beyond 1-3 days; visual POD\ndecays over 1-2 weeks; ~30-day horizon), the model now assigns, under a\nfixed budget:\n\n- Days 0-3: EO/IR visual aircraft carry most of the budget, hunting\n  rafts and surface debris in a tight ellipse (1-sigma ~10-18 km) at the\n  last fix.\n- Days 3-10: side-looking SAR radar takes over as the primary tool over\n  the drifting debris field (1-sigma grows to ~45-66 km); the towed sonar\n  and magnetometer begin a parallel salvage phase near the last fix.\n- Days 10-30: the budget is split between SAR over the drift cloud and\n  towed sonar / magnetometer over the settled-wreck region; EO/IR visual\n  recedes as rafts and flares decay.\n\nDo you accept this time-phased, sensor-appropriate allocation structure —\nearly visual/EO-IR, mid SAR, late SAR+sonar/magnetometer salvage — as\nthe organizing principle of the generic search plan?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe model's mechanism, now accepted in principle, is: a Gaussian prior at\nthe last fix, advected and spread by surface current over elapsed time;\nPOD per sensor from effective sweep width, range, sea state and age of\nloss; and a budgeted greedy allocation that phases EO/IR visual (early),\nSAR (mid) and sonar/magnetometer (late) across two priors (drifted cloud\nfor surface targets, settled region at the last fix for the wreck).\n\nWhich single case would break this mechanism, or on which case does it\nfail? For example: a very long no-signal window so the last fix is days\nstale and the prior is dominated by accumulated navigation error rather\nthan oceanic drift; a target that sinks quickly with little floating\ndebris (so the surface-phase sensors find nothing and the salvage phase\nhas the whole budget but no time); a high-latitude search where ice and\npolar night shut down visual and SAR for weeks; or a search whose\norganizer cannot commit vessels for the first week. Name the case that\nbreaks the mechanism."
+            ],
+            "expert_answers": [
+              "1. Navigation uncertainty at the last reliable fix for a long-range over-ocean flight is typically on the order of a few kilometres to a few tens of kilometres (radial, 1-sigma), driven by inertial/INS drift and satellite-update gaps; drift spread from currents and wind dominates the ellipse beyond roughly 1–3 days, after which the ellipse grows at the local surface-current speed (order 0.1–1 km/h) rather than at navigation-error rates.\n\n2. Visual/EO-IR POD against surface debris decays over days to a few weeks: useful detection of intact rafts and large debris persists for roughly the first 1–2 weeks, then falls as rafts degrade, sink, or disperse; beyond about 3–4 weeks POD for small targets is effectively negligible.\n\n3. A defensible generic planning horizon is on the order of 30 days after loss, matching the SOLAS afloat-survival bound, with allocation optimization run over that window and re-run as new drift/POD information arrives.",
+              "accept",
+              "The case that breaks it: a target that sinks quickly with little floating debris. The Gaussian prior is advected by surface current, but the wreck is not — it descends to a settled region displaced by its own ballistic/drift descent, not by surface drift. So the \"settled region at the last fix\" prior is wrong, and the surface-phase sensors find nothing while the salvage phase inherits a mislocated prior and no time."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_05df287cb4d3",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8291666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8000000000000002,
+            "modeling_rigorousness_evaluation": 0.75,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p1_20260930_001633/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as a generic mathematical model for open-water search planning, explicitly incorporating the constraints of no signals, variable aircraft types, and heterogeneous search sensors. The goal is well-stated as a planning tool that outputs search locations and sensor assignments based on inputs like last fix, elapsed time, and budget. The definition is precise, directly addressing the core requirements of the problem without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers the core mathematical modeling requirement in Task 1. However, Task 2 (writing a non-technical press paper) is a communication deliverable, not a mathematical sub-problem. While it supports the overall context, it does not contribute to the logical decomposition of the mathematical model itself. The core mathematical components (drift, detection probability, optimization) are not explicitly broken down into further mathematical sub-tasks, but the high-level definition in Task 1 is sufficient to guide the modeling process.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative outputs, sensitivity insights, and a logical interpretation that effectively explains the model's inference and practical implications.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific model, data, and structural biases (e.g., fast-sinking targets) and explaining mitigation strategies, though some biases remain inherent to the generic nature of the model.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, integrating physical drift, sensor limitations, and cost constraints to provide actionable search strategies. It offers clear decision support through optimization and parameter sensitivity analysis, directly addressing the problem's operational needs.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing advection-diffusion equations and probabilistic detection models grounded in physical reality. It correctly distinguishes between surface and deep-sea dynamics and uses appropriate mathematical optimization techniques, demonstrating a deep understanding of the domain.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear and grounded in standard search theory, but lack depth on distribution specifics and sensitivity to horizon constraints.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses a standard, field-validated framework (Koopman) that logically structures the search problem, though implementation details on dynamic updating are sparse.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        },
+        {
+          "problem_id": "2015_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p1_20260930_001633",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p1_20260930_001633/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a generic, parameterized search-planning model for a lost aircraft over open ocean (last-known position and flight route A→B known, no signals, no data given). The model decomposes success as POS = POA × POD per Koopman search theory, with POA a spatial prior over the search region and POD a sensor-specific, age-dependent detection probability; heterogeneous search assets (SAR radar, EO/IR, towed magnetometer, sonar, surface-vessel magnetometer) are allocated by maximizing total POS under cost and time-of-day constraints.\n\nThree gaps the text and the gathered data do not carry, which branch the objective I write:\n\n1. **The single most consequential gap — the objective's horizon.** With no signal, detection decays with age of loss (flares within hours, raft integrity on the order of days, SOLAS 30-day afloat upper bound, fuel-sheen/floating debris dispersing). What single quantitative criterion should the planner optimize over the first, say, 14 days: is it (a) maximize the total probability of *any* first contact within the window, (b) maximize the *time-weighted* probability of detection (i.e., earlier finds worth more because POD for high-value, fast-decaying targets collapses with each day delayed), or (c) maximize the probability of recovering survivors specifically (raft/flares, a 30-day-bounded sub-objective)? Which of these is the one a search coordinator actually commits to, and does the answer change how much weight the model gives to fast-decaying vs. slow-decaying target classes in the first 72 hours?\n\n2. **The POA prior's concentration.** The spatial prior over the search region is driven by last-known position and route A→B, but the data carry no wind/current drift values and no aircraft type (hence no fuel-burn profile to bound the crash ellipse). What default dispersion (e.g., a crash-probability ellipse with what ratio of major to minor axis, and how large an area carries 70% of POA) should I assume for a long-range commercial jet over open ocean, and how strongly should that assumption dominate the POA grid — i.e., should I treat the crash-ellipse shape as a fixed, literature-typical prior, or as a parameter whose spread itself should be widened as a deliberate sensitivity dimension?\n\n3. **The cost currency.** The assets have very different per-day costs (military SAR air, commercial airliner converted for EO/IR, dedicated magnetometer ship, sonar-tow vessel) and very different effective sweep widths. In the allocation objective, should cost enter as a hard budget constraint with a single total budget, or as a soft per-asset weight so the model can trade off a slightly higher-cost, much-higher-POD asset against a cheaper, lower-POD one? And what currency (relative \"search-value per unit cost\" rather than dollars) is defensible when no dollar figures are given?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your reply that the horizon criterion is the gap and that a coordinator commits to one of the three, I now fix the model's default to (b): maximize time-weighted probability of detection over a 14-day window, with an `objective` parameter so a coordinator can switch to (a) any-first-contact or (c) survivor-recovery. I will now commit the following assumptions to the model and ask you to accept, reject, or rank the ones you would push back on:\n\n1. **Crash-ellipse shape (70% POA).** For a long-range commercial jet over open ocean with no wind/current data, I will assume a 70% crash-probability ellipse with a major-to-minor axis ratio of 3:1, the major axis aligned with the flight route A→B, centered on the last known position. The ellipse's area is a free sensitivity parameter. Is this shape and concentration defensible as a literature-typical prior, or would you reject the 3:1 ratio or the 70% figure, and what would you substitute?\n\n2. **Age-dependent POD decay functions.** With no signal, detection probability decays with elapsed time since loss. I will use three target classes with these default POD decay shapes (POD(t) as a function of hours since loss):\n   - Fast-decaying (flares, signaling devices): POD ≈ 1.0 for t < 6 h, then exponential decay to near-zero by ~24 h.\n   - Medium-decaying (intact rafts, life-rafts, visible fuselage, fuel sheen): POD starts at a sensor-specific baseline (0.3–0.6 for EO/IR and visual, 0.1–0.3 for SAR radar on floating targets) and decays with a characteristic time of ~5–7 days, bounded by the SOLAS 30-day afloat upper limit.\n   - Slow-decaying (debris field, magnetometer-detectable wreckage on the seafloor): POD is roughly constant over the search window but depends strongly on depth and sensor effective sweep width; I will model it as sensor-specific and depth-dependent rather than time-dependent.\n   Are these three classes and their decay time constants acceptable, or would you reject or re-rank them (e.g., should fuel sheen be in the fast class rather than medium, or should the magnetometer class carry a slow time-decay from sediment settling)?\n\n3. **Asset effectiveness parameters.** I will use the following representative effective sweep widths and relative costs (costs in arbitrary \"search-value units\" since no dollar figures are given) for four asset classes:\n   - Military SAR radar aircraft: effective sweep width ~50 km, relative cost 5.0.\n   - Commercial airliner with EO/IR: effective sweep width ~20 km, relative cost 2.0.\n   - Dedicated magnetometer ship (towed): effective sweep width ~5 km (surface), relative cost 3.0.\n   - Sonar-tow vessel: effective sweep width ~10 km, relative cost 4.0.\n   The planner maximizes Σ(POA_i × POD_i) / cost_i across assets and grid cells, subject to each asset's per-day coverage rate (sweep width × speed × duty cycle). Are these sweep-width and cost figures in the right ballpark for a planning-level model, or would you reject any of them and give a more defensible substitute?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the three sets of planning-level parameters I committed in Exchange 2 (the 3:1 / 70% crash ellipse, the three-class POD decay time constants, and the four-asset sweep-width/cost figures) without specifying which. I have therefore demoted all of them to clearly-labeled placeholder defaults, each swept as a free parameter in the submission's sensitivity analysis, rather than fixed constants. Before I finalize the model, I need to know what would break it, so I can state the failure modes honestly in the submission rather than paper over them.\n\nThree counterexample gaps, each targeting a specific mechanism in the current design:\n\n1. **What breaks the POA prior when the loss was not near the last-known position?** The model's POA is a crash-ellipse centered on the last known position with the major axis along route A→B. MH370 showed the aircraft could deviate far from its filed route before fuel exhaustion. What is the concrete case — a particular flight geometry, a particular point of fuel exhaustion, a particular wind/current regime — in which the ellipse-centered POA prior is badly wrong, and what structural change to the POA construction (e.g., a drift-displaced ellipse, a route-corridor prior, a fuel-burn-bounded search region rather than a fixed shape) would cover that case? Which of those three structural variants would you say is the one that actually holds up against the MH370-style deviation, and which would you rule out as a dead end?\n\n2. **What breaks the time-weighted objective's first-72-hour weighting?** The default objective (b) discounts each day's detection contribution by an elapsed-time factor. If the discount factor is set too aggressively, the model will over-commit expensive high-POD assets in the first 72 hours to chase fast-decaying targets (flares, rafts) and starve the later, cheaper-but-slower seafloor-debris search that is often where the ultimate recovery happens. What is the specific value of the discount factor — or the specific elapsed-time at which the fast-decaying target class has decayed below a useful POD threshold — at which the model's asset mix flips from \"chase the raft\" to \"start the magnetometer,\" and is that flip at a realistic 72-hour mark or does the model as currently parameterized flip too early or too late?\n\n3. **What breaks the cost-normalized allocation Σ(POA_i × POD_i)/cost_i?** This objective rewards cheap assets with moderate POD over expensive assets with high POD whenever the ratio favors the former. The concrete counterexample: a dedicated magnetometer ship (low sweep width, moderate cost) searching a small high-POA patch at depth, versus a SAR radar aircraft (wide sweep, high cost) searching a large low-POA area. At what relative cost ratio and POA contrast does the cost-normalized objective choose the SAR aircraft over the magnetometer ship even though the magnetometer ship has a higher absolute detection probability for the actual target (seafloor wreckage), and is there a structural correction — e.g., a floor on the number of high-POD-for-the-target asset-days the model must commit regardless of cost — that fixes this without breaking the objective in the cases where it is correct?"
+            ],
+            "expert_answers": [
+              "The horizon criterion is the gap: the text fixes no objective, and (a), (b), (c) are not interchangeable — they imply different asset mixes and different first-72-hour weighting. A coordinator commits to one; the model cannot choose it internally.",
+              "reject",
+              "The magnetometer-vs-SAR case breaks it: when the target is seafloor wreckage, POD_mag is high but confined to a small high-POA patch, while SAR's wide sweep spreads a low POD over a large low-POA area. Because the objective divides by cost, any POA contrast large enough that POA_mag·POD_mag/cost_mag falls below POA_SAR·POD_SAR/cost_SAR makes it pick SAR — even though SAR cannot detect the actual target at all. The failure is structural, not parametric: cost-normalization treats all POD as commensurable, but a sensor with zero POD for the target class should never win on cost. The correction is a target-class feasibility mask (assets with POD≈0 for the target are excluded before normalization), not a floor on asset-days."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_05df287cb4d3",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8375,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.7999999999999999,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.8333333333333334
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p1_20260930_001633/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as a generic, parameterized model for allocating heterogeneous search assets to find a lost aircraft in open water. The goals are explicitly stated, including representing spatial uncertainty, time-dependent detectability of various signatures, and optimizing search effort. The inclusion of a non-technical paper as a secondary deliverable is a reasonable addition for communication, though the core mathematical goals are well-defined and aligned with the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks effectively cover the core components of the problem: spatial uncertainty, detectability, asset heterogeneity, and optimization. The dependencies between these elements are logical, as detectability and asset capabilities inform the allocation strategy. The coverage is comprehensive, addressing the need for a generic model applicable to different planes and sensors. There are no significant deviations or missing key parts, ensuring the sub-tasks directly support the final goal of assisting search planners.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is very clear, interpretable, and provides deep insights into the model's logic and limitations, effectively supporting decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying data and model biases, and effectively correcting structural biases like feasibility masking, though some approximations remain.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, incorporating realistic constraints like asset feasibility masks and time-decay PODs. It provides actionable search plans via a computationally efficient greedy algorithm and addresses specific operational objectives, though it lacks dynamic Bayesian updating for new data.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, utilizing standard search theory metrics (POA, POD, POS) and physically justified assumptions like exponential decay for detection probability. It correctly integrates domain-specific constraints, such as sensor feasibility, ensuring the mathematical framework aligns with real-world physical limitations.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated and generally reasonable, using standard search theory concepts. However, they oversimplify dynamic factors like debris drift and environmental deviations, treating the search area as static rather than evolving, which limits the model's realism for extended search operations.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses Koopman's search theory, which is highly appropriate for this problem. The structure correctly decomposes success probability and accounts for heterogeneous assets and target decay rates, providing a scientifically sound and realistic framework for search optimization.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        }
+      ],
+      "refined_report_utility": 0.8333333333333334,
+      "interaction_cost": 0.8512780086204725,
+      "interaction_penalty": 0.04256390043102363,
+      "net_utility": 0.7907694329023097,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1220,
+          "total_expert_latency_seconds": 3.62,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8344601841277554,
+          "latency_cost_component": 0.24317380382356363,
+          "interaction_cost": 0.8337840736511022,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2571,
+          "total_expert_latency_seconds": 2.68,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9219298589746069,
+          "latency_cost_component": 0.20702780069972554,
+          "interaction_cost": 0.8687719435898428,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2014_C",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 2: judgment)\n\nFor the Erdos1 co-author network (the ~511 researchers who coauthored with Erdős, excluding Erdős himself), I propose to define node influence as a convex combination of two components, each computed on the same induced network:\n\n- a **betweenness centrality** component (fraction of all-pairs shortest paths passing through the node, Fruchterman–Reingold normalized, rescaled to [0,1]), capturing \"connects important researchers\";\n- a **degree-based component** (degree normalized by max degree), capturing volume of collaboration.\n\nSpecifically: Influence(v) = 0.6 × BC_norm(v) + 0.4 × Deg_norm(v), and I will report the top-20 most influential researchers under this composite.\n\nDo you accept this choice of measure and weighting, or reject it?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nSince you rejected the 0.6·betweenness + 0.4·degree composite, I propose to replace it with a single structural measure as the primary influence ranking of Erdos1 researchers: the **k-shell index** (K-core / k-core decomposition, i.e., the largest k for which the node survives iterative peeling of all degree-1 vertices), reported alongside betweenness, eigenvector and degree as secondary views, and taking the top-20 by k-shell as the influential set.\n\nDo you accept this choice, or reject it?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nBoth the betweenness/degree composite and the k-shell index have been rejected as the primary influence measure for Erdos1. I am now weighing a third candidate: an **h-index-style measure on the network** — for node v, let h(v) be the largest h such that v has at least h co-authors whose own degrees (number of Erdos1 collaborators) are each at least h; influence = h(v).\n\nWhat case in this co-author network would break this mechanism — which plausible network configuration, or which class of researcher, would it misrank (e.g., over- or under-estimate influence relative to the problem's intent of \"important works / connecting important researchers\")?"
+        ],
+        "expert_answers": [
+          "reject",
+          "reject",
+          "The case that breaks it: a researcher whose co-authors are individually high-degree but who sits in a dense, redundant clique — e.g., a member of a large mutually-coauthoring group (a prolific subfield's core). Every neighbor clears the degree threshold, so h(v) is large, yet v is structurally replaceable: removing v leaves the clique connected and no shortest path is lengthened. h(v) over-estimates this \"passenger in a big group.\"\n\nConversely, it under-estimates the bridge/broker: a researcher with few co-authors, each of modest degree, who alone links two otherwise separate Erdos1 communities. Their degrees are below the threshold, so h(v) stays small, though they are precisely the \"connects important researchers\" node the problem targets.\n\nSo the mechanism misranks by rewarding membership in high-degree clusters and penalizing sparse structural brokers."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_05df287cb4d3",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.7375,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.5833333333333334,
+        "practicality_and_scientificity_evaluation": 0.5916666666666667,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for all six tasks, accurately reflecting the problem requirements. Specifically, Task 1 correctly identifies the exclusion of Erdős and the need to filter out non-Erdos1 nodes, which is a critical constraint. Task 2 explicitly mentions brokerage and collaboration volume as proxies for influence. Task 3 covers both paper influence and the extension to other entities. Task 4 specifies a concrete domain (film) and constraints, showing a clear plan for implementation. Task 5 and 6 are also well-defined. The goals are explicit and aligned with the ICM 2014 prompt.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically structured and cover all aspects of the problem. There is a clear dependency flow: building the network (Task 1) enables the development of measures (Task 2), which are then applied to papers (Task 3) and a new domain (Task 4). The final discussion (Task 5) and report (Task 6) synthesize the previous work. No key parts are missing, and the decomposition directly supports the final goal of analyzing influence in networks. The choice of a specific film franchise for Task 4 is a reasonable interpretation of \"completely different set of data\" to ensure feasibility and depth.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering a reproducible pipeline that addresses all problem constraints, uses robust aggregation methods for clear decision support, and extends to new domains with strategic optimization frameworks.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model adheres to strong scientific principles, utilizing validated network algorithms and theoretically justified assumptions for network generation and influence calculation, demonstrating deep domain understanding.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, well-validated against baselines, and provides strong interpretability of network metrics with explicit discussion of strengths and weaknesses.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying both data and model biases, and appropriately contextualizes the results to mitigate the impact of synthetic data limitations.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler admits to using a synthetic graph instead of the required real data for Task 1, which undermines the validity of the specific analysis. Additionally, the manual construction of citation links in Task 3 is subjective and lacks the rigor of using available real-world citation databases.",
+            "score": 4
+          },
+          "analysis_2": {
+            "reason": "The selection of centrality measures and the Borda aggregation method are theoretically sound and well-justified. However, the rationality is limited by the application of these methods to a synthetic dataset rather than the actual required data, preventing the model from realistically reflecting the specific problem instance.",
+            "score": 6
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2014_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p2_20260930_001633",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p2_20260930_001633/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe must build the Erdos1 co-author network (the subgraph induced by Erdös's\ndirect co-authors, Erdös himself excluded). The raw `Erdos1.htm` listing is not\npresent in the workspace, web search is prohibited, and the only empirical data\nfile we hold (external_data.md) confirms the network should contain 511\nvertices with the adjacency file format \"511 / degree / Erdös-2 count / name /\nneighbors\" but does not carry the data itself.\n\nThree gaps we cannot settle from what we have:\n\n1. **Data source (most consequential).** Since we cannot fetch the Erdos1\n   file and cannot search, how should the 511-vertex adjacency be obtained so\n   the analysis is genuine rather than fabricated? Specifically: is a\n   literature-reported aggregate (e.g., degree distribution moments,\n   largest-component fraction, known hubs such as R. Graham / S. R. Raghavan /\n   E. R. Canfield with Erdös-1 co-authorship, and the published 511 count) an\n   acceptable basis, or must the solver state as an explicit, flagged modeling\n   assumption that node labels are reconstructed from the documented Erdos1\n   structure and that the analysis proceeds on a *realistic surrogate* Erdos1\n   network consistent with all documented constraints (511 vertices,\n   Erdös-2 co-author lists discarded, no Erdös node)?\n\n2. **Scope of \"influence measures\" for Task 2.** The problem asks for\n   \"influence measure(s) to determine who in this network has significant\n   influence... Consider who has published important works or connects\n   important researchers.\" We cannot fetch per-author publication records\n   either. Which interpretation should govern: (a) pure network-structural\n   influence (centrality family: degree, betweenness, eigenvector/k-core,\n   Bonacich), or (b) a weighted model where \"published important works\" is\n   proxied by a structural feature (e.g., author's own Erdös-1 degree, or\n   number of distinct research fields they co-authored in)? The choice branches\n   the entire Task 2 modeling.\n\n3. **Task 3 paper-set scope.** The addendum lists 15 foundational network-science\n   papers. Do you expect the solver to analyze the full 15-paper list, or is a\n   defensible subset (e.g., 6-8 canonical works: Erdös-Rényi 1959,\n   Watts-Strogatz 1998, Barabási-Albert 1999, Albert-Barabási 2002, Newman\n   2001 PNAS, Newman 2003 SIAM, Kleinberg 2000, Watts-Dodds-Newman 2002)\n   acceptable given that a full citation-data build for all 15 is not feasible\n   from local files? This determines the size of the citation-influence model.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your reply 1: I confirmed the raw Erdos1 file is absent from every\nlocal source (checked the sibling experiment trees, no data files exist), web\nsearch is prohibited, so I will construct a **flagged surrogate Erdos1 network**:\n511 vertices, no Erdös node, edge set generated from an Erdös-1 co-authorship\nstructure with a documented hub-dominated degree distribution (Erdös co-authored\nwith a small set of extremely prolific partners — Canfield, Graham, Hare, etc. —\nand a long tail of one-paper co-authors), then validate against external_data.md\nItem 1 (511 vertices) and Item 2 (largest component 85–92%, mean collaborators\n3.6–15). Three judgment items to accept/reject/rank:\n\n1. **Rank the influence-measure family for Task 2.** Given \"who has significant\n   influence within the network... connects important researchers,\" which\n   ordering of centrality measures should define the final \"influence\" ranking?\n   My proposed default: (i) betweenness (connecting important researchers —\n   structural brokerage), (ii) eigenvector/Bonacich (connected to other\n   influential people), (iii) degree (volume of collaboration), (iv) k-core\n   (robustness of embeddedness). Do you accept this order, or should\n   degree-first (raw collaboration volume) lead, given the network is a\n   *collaboration* network where degree is the direct observable?\n\n2. **Composite score.** Should the final \"significant influence\" list be a\n   single composite (e.g., equal-weight z-score sum of the accepted measures,\n   reported with a sensitivity analysis that drops/reweights each component),\n   or should I present the four rankings separately and only *flag* the\n   intersection (authors appearing in the top decile of ≥3 measures) as \"most\n   significant\"? I lean composite-with-sensitivity-analysis; accept or reject?\n\n3. **Surrogate validation threshold.** For the flagged surrogate to be\n   considered adequate, I propose: (a) exactly 511 vertices, (b) largest\n   connected component ≥ 85% of vertices, (c) mean degree within [3.6, 15],\n   (d) power-law-ish tail: top-5 vertices holding ≥ 10% of all edges. Which of\n   these is most important to hold strictly (and I may relax the others if\n   the generator cannot hit all four simultaneously)?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nBuilding on your reply 2 (a reject of my default framing, which I read as\n\"govern the ranking by a mechanism, don't hand-pick a metric ordering in\nadvance\"): my plan is a *single* influence score per researcher built from\ndocumented structural roles rather than a fixed metric ordering — (i) betweenness\nshare (bridging role), (ii) Bonacich centrality (influence-by-association,\nwhich also absorbs \"connects important researchers\"), and (iii) a degree\ncontribution share — then a *role classification* (hub / broker / core-embedded)\nthat explains WHY an author ranks where, with a leave-one-metric-out sensitivity\nsweep as the robustness check. Before I commit to that mechanism, what would\nbreak it? Specifically, name the counterexample you most expect:\n\n1. **Metric-collinearity failure.** In a small, dense collaboration core,\n   betweenness, eigenvector, and degree tend to be highly correlated (the\n   few hubs that everything routes through also have the highest degree and\n   the highest Bonacich score). If my \"single influence score\" is dominated by\n   one correlated block, does the leave-one-out sweep fail to expose that —\n   i.e., is the sweep I planned (drop metric A, B, or C one at a time) the\n   wrong diagnostic for a collinear set, and what counterexample breaks it\n   (e.g., a mid-degree broker whose betweenness is high but whose Bonacich\n   is low precisely because it bridges two otherwise-disconnected dense\n   cliques)?\n\n2. **Surrogate-validation gaming.** My surrogate is generated to *satisfy* the\n   four external-data constraints (511 vertices, LCC ≥85%, mean degree in\n   [3.6,15], top-5 ≥10% of edges). Could a generator satisfy all four yet\n   produce a network on which the influence ranking is structurally\n   meaningless (e.g., one giant near-clique plus a handful of isolated\n   leaves, so betweenness collapses to ~0 for almost everyone and the\n   \"broker\" role class is empty)? Which of my four validation criteria is\n   the one that, even if met, does NOT protect the ranking from that failure,\n   and what additional structural check (e.g., a non-trivial fraction of\n   vertices with betweenness > 0, or a minimum LCC diameter) should I add?\n\n3. **Role-classification boundary.** My hub/broker/core-embedded classes are\n   defined by thresholds on the three metrics. Where is the most likely\n   misclassification — an author who is genuinely a \"hub\" by degree but whom\n   the classification would label \"core-embedded\" because the threshold\n   is set relative to a surrogate degree distribution that doesn't match the\n   real Erdos1 tail — and should the thresholds be absolute (e.g., degree ≥\n   20, the documented scale of Erdös's most prolific co-authors) rather than\n   relative to the surrogate's own distribution?"
+            ],
+            "expert_answers": [
+              "The gap that cannot be settled from the text and data is the **actual adjacency of the 511-vertex Erdos1 network**: the raw file is absent, web search is prohibited, and `external_data.md` supplies only the count and format, not the edges. No magnitude, rate, or constraint in the statement fixes which specific co-author pairs are linked, so the solver must either obtain the genuine file or explicitly flag a surrogate network as a modeling assumption.",
+              "reject",
+              "The counterexample that breaks the mechanism: a **mid-degree broker bridging two dense cliques**. Betweenness is high, degree moderate, Bonacich low (its neighbors are peripheral within their own cliques), so the single score and the leave-one-out sweep both misrank it — dropping any one metric leaves the other two agreeing on the wrong ordering, and the sweep cannot expose collinearity because it never tests the *joint* block. The diagnostic that breaks is leave-one-out itself: it detects single-metric dominance, not a correlated block masking an orthogonal role. The case that fails is precisely the broker the problem asks you to find."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_05df287cb4d3",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.65,
+            "practicality_and_scientificity_evaluation": 0.3,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r1p2_20260930_001633/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler provides a highly precise and clear definition for each sub-task. Goals are explicitly stated (e.g., \"extract the correct node set,\" \"defensible influence ranking\"), and key components like scope and limitations are well-identified. The exclusion of Erdos is consistently emphasized, showing a deep understanding of the problem constraints. The integration of Task 6 into the other tasks is a strategic choice that maintains clarity in the machine-readable format. Overall, the problem definition is completely clear and actionable.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks cover all six requirements of the original problem. There is a logical dependency flow: Task 1 builds the network, Task 2 develops measures on it, Task 3 applies similar logic to papers, Task 4 tests transferability, and Task 5 discusses utility. All sub-tasks directly support the final goal of analyzing influence. The coverage is comprehensive, with no key parts missing. The modeler correctly identifies the interrelation between structural measures and influence metrics, ensuring the decomposition is coherent and complete.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is very clear, interpretable, and effectively explains the model's inference process while highlighting strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying data, model, and ethical biases, and providing appropriate contextual corrections and limitations.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, transparently acknowledge data limitations, and are rigorously justified using documented structural properties and validation against known baselines, making them reasonable and consistent with the problem constraints.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model employs appropriate network science metrics (Betweenness, Bonacich, Eigenvector) tailored to specific influence mechanisms, with logical justifications for method choices and robust handling of directed vs. undirected structures across tasks.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model fails to process the actual required data, relying instead on a synthetic surrogate network, which makes the results irrelevant to the specific problem. The alternative dataset in Task 4 is too small to demonstrate practical scalability.",
+                "score": 3
+              },
+              "analysis_2": {
+                "reason": "The model violates scientific principles by using a fabricated surrogate network instead of the actual data, leading to results that are not empirically grounded. The arbitrary assumptions for network generation lack scientific justification.",
+                "score": 3
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        },
+        {
+          "problem_id": "2014_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 2: judgment)\n\nFor the Erdos1 co-author network (the ~511 researchers who coauthored with Erdős, excluding Erdős himself), I propose to define node influence as a convex combination of two components, each computed on the same induced network:\n\n- a **betweenness centrality** component (fraction of all-pairs shortest paths passing through the node, Fruchterman–Reingold normalized, rescaled to [0,1]), capturing \"connects important researchers\";\n- a **degree-based component** (degree normalized by max degree), capturing volume of collaboration.\n\nSpecifically: Influence(v) = 0.6 × BC_norm(v) + 0.4 × Deg_norm(v), and I will report the top-20 most influential researchers under this composite.\n\nDo you accept this choice of measure and weighting, or reject it?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nSince you rejected the 0.6·betweenness + 0.4·degree composite, I propose to replace it with a single structural measure as the primary influence ranking of Erdos1 researchers: the **k-shell index** (K-core / k-core decomposition, i.e., the largest k for which the node survives iterative peeling of all degree-1 vertices), reported alongside betweenness, eigenvector and degree as secondary views, and taking the top-20 by k-shell as the influential set.\n\nDo you accept this choice, or reject it?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nBoth the betweenness/degree composite and the k-shell index have been rejected as the primary influence measure for Erdos1. I am now weighing a third candidate: an **h-index-style measure on the network** — for node v, let h(v) be the largest h such that v has at least h co-authors whose own degrees (number of Erdos1 collaborators) are each at least h; influence = h(v).\n\nWhat case in this co-author network would break this mechanism — which plausible network configuration, or which class of researcher, would it misrank (e.g., over- or under-estimate influence relative to the problem's intent of \"important works / connecting important researchers\")?"
+            ],
+            "expert_answers": [
+              "reject",
+              "reject",
+              "The case that breaks it: a researcher whose co-authors are individually high-degree but who sits in a dense, redundant clique — e.g., a member of a large mutually-coauthoring group (a prolific subfield's core). Every neighbor clears the degree threshold, so h(v) is large, yet v is structurally replaceable: removing v leaves the clique connected and no shortest path is lengthened. h(v) over-estimates this \"passenger in a big group.\"\n\nConversely, it under-estimates the bridge/broker: a researcher with few co-authors, each of modest degree, who alone links two otherwise separate Erdos1 communities. Their degrees are below the threshold, so h(v) stays small, though they are precisely the \"connects important researchers\" node the problem targets.\n\nSo the mechanism misranks by rewarding membership in high-degree clusters and penalizing sparse structural brokers."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_05df287cb4d3",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.5166666666666667,
+            "practicality_and_scientificity_evaluation": 0.8833333333333333,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_1/initial_train_parent_1/runs/round_1/r2p2_20260930_001633/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for all six tasks, accurately reflecting the problem requirements. Specifically, Task 1 correctly identifies the exclusion of Erdős and the need to filter out non-Erdos1 nodes, which is a critical constraint. Task 2 explicitly mentions brokerage and collaboration volume as proxies for influence. Task 3 covers both paper influence and the extension to other entities. Task 4 specifies a concrete domain (film) and constraints, showing a clear plan for implementation. Task 5 and 6 are also well-defined. The goals are explicit and aligned with the ICM 2014 prompt.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured and cover all aspects of the problem. There is a clear dependency flow: building the network (Task 1) enables the development of measures (Task 2), which are then applied to papers (Task 3) and a new domain (Task 4). The final discussion (Task 5) and report (Task 6) synthesize the previous work. No key parts are missing, and the decomposition directly supports the final goal of analyzing influence in networks. The choice of a specific film franchise for Task 4 is a reasonable interpretation of \"completely different set of data\" to ensure feasibility and depth.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a reproducible pipeline that addresses all problem constraints, uses robust aggregation methods for clear decision support, and extends to new domains with strategic optimization frameworks.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model adheres to strong scientific principles, utilizing validated network algorithms and theoretically justified assumptions for network generation and influence calculation, demonstrating deep domain understanding.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, well-validated against baselines, and provides strong interpretability of network metrics with explicit discussion of strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying both data and model biases, and appropriately contextualizes the results to mitigate the impact of synthetic data limitations.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler admits to using a synthetic graph instead of the required real data for Task 1, which undermines the validity of the specific analysis. Additionally, the manual construction of citation links in Task 3 is subjective and lacks the rigor of using available real-world citation databases.",
+                "score": 4
+              },
+              "analysis_2": {
+                "reason": "The selection of centrality measures and the Borda aggregation method are theoretically sound and well-justified. However, the rationality is limited by the application of these methods to a synthetic dataset rather than the actual required data, preventing the model from realistically reflecting the specific problem instance.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.7375,
+      "interaction_cost": 0.8360632149538385,
+      "interaction_penalty": 0.04180316074769193,
+      "net_utility": 0.6956968392523081,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2219,
+          "total_expert_latency_seconds": 3.08,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9046503219696636,
+          "latency_cost_component": 0.22342337704119936,
+          "interaction_cost": 0.8618601287878654,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 739,
+          "total_expert_latency_seconds": 2.86,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.7756657527995293,
+          "latency_cost_component": 0.2146157952667509,
+          "interaction_cost": 0.8102663011198117,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T01:01:55.171239",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_05df287cb4d3",
+  "workflow": {
+    "name": "Information-Gap consultation policy",
+    "purpose": "Solve the task autonomously by default, and spend the expert budget only on the gaps the work cannot close itself: an un-derivable magnitude, constraint, or reading, whose answer would branch the work and has a landing place in the deliverable.",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nHead each question with the number of the operator whose meaning matches its most\nconsequential gap.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nHead each question with the number of the operator whose meaning matches its most\nconsequential gap.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_05df287cb4d3"
+  },
+  "evolution_operator": "initial_workflow",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "initial_train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2015_B",
+    "2014_C"
+  ],
+  "absolute_utility": 0.7854166666666667,
+  "interaction_cost": 0.8436706117871555,
+  "interaction_penalty": 0.04218353058935778,
+  "net_utility": 0.7432331360773089,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

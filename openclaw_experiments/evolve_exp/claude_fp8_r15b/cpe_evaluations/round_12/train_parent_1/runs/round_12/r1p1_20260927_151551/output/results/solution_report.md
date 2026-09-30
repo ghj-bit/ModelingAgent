@@ -1,0 +1,87 @@
+# Solution
+
+## Subtask 1: Assess the three options available to the Zambezi River Authority (ZRA) for addressing the deteriorating state of the Ka
+
+### Problem
+
+Assess the three options available to the Zambezi River Authority (ZRA) for addressing the deteriorating state of the Kariba Dam (2015 Institute of Risk Management of South Africa warning): (Option 1) repair the existing Kariba Dam, (Option 2) rebuild the existing Kariba Dam, or (Option 3) remove Kariba and replace it with a series of 10-20 smaller dams along the Zambezi. The assessment must be brief (two pages), provide an overview of potential costs and benefits of each option, and support a recommendation to ZRA management. Scope: order-of-magnitude cost/benefit comparison, not a feasibility study; the detailed Option 3 analysis is Requirement 2.
+
+### Analysis
+
+Assumptions and method. (1) The 2015 warning frames Kariba as needing maintenance; repair is the low-cost near-term option, rebuild is the mid-cost option, and Option 3 is the high-cost but functionally transformative option. (2) Costs are order-of-magnitude ranges built from transparent unit-cost assumptions (per-dam-class capex + civil works), per the expert directive (round 2): ranges, not point estimates, because the problem asks for an overview, not a feasibility study. (3) Benefits quantified: hydropower (Kariba 4,000 MW / 18 TWh/yr; cascade 2,600 MW / 11.7 TWh/yr at $0.05/MWh) and flood-damage avoidance (cascade attenuates the 10,000 m3/s design flood to a final peak of 1677 m3/s vs Kariba's single-dam release of ~3,000 m3/s; avoided peak 1323 m3/s x 10 days x $100M per m3/s-day = $1323M per design-flood event). Irrigation/water supply and tourism/ecosystem effects are discussed qualitatively (too assumption-heavy for a two-page overview). (4) 30-yr horizon, 1.5% O&M rate; no formal NPV (order-of-magnitude gaps make the ranking insensitive to discount rate). (5) Option 3's design is the balanced cascade from Requirement 2: headwater lake D0 (120 km3, functional twin of Lake Kariba) + 12 attenuation dams (4.2 km3 each), pooled storage 170.4 km3 (within the expert's 150-180 band).
+
+### Modeling Process
+
+Cost model (USD bn, ranges): Option 1 repair = 0.4-1.0 (dam reinforcement, spillway repair, powerhouse refurbishment, 5-10 yr construction). Option 2 rebuild = 1.2-3.0 (demolish-and-rebuild the 128 m arch + full restoration, 10-15 yr). Option 3 = 9.4-15.2 (dam structures 7.2, spillway 0.5, powerhouse 2.4, transmission 0.4, resettlement + environmental 1.2; 15-20 yr construction). Per-dam class costs: headwater $1,800M, large (>=30 m) $450M, small (<30 m) $300M. Benefit model: power revenue = TWh/yr x $0.05/MWh; flood avoidance = avoided_m3s x 10 days x $100M/m3s-day. 30-yr cost/benefit: Option 1 ~0.7-1.8 (repair cost 0.4-1.0 vs 30-yr benefits ~5-8 at current Kariba output); Option 2 ~2.5-6.0; Option 3 ~1.5-3.0 (30-yr benefits from cascade power + flood avoidance). The exact C/B ratios are order-of-magnitude; the ranking (Option 1 cheapest, Option 3 most beneficial but 10-20x the cost) is robust to the unit-cost assumptions.
+
+### Outcome Analysis
+
+Results. Option 1 (repair): capex $0.4-1.0 bn, preserves Kariba's current 4,000 MW / 18 TWh/yr output, minimal resettlement, 5-10 yr construction, but leaves the single-point-of-failure risk (one dam protecting the whole basin) and does not address the 2015 warning's structural concerns. Option 2 (rebuild): capex $1.2-3.0 bn, restores Kariba to design condition, 10-15 yr construction, same single-dam risk profile, higher cost than repair with no functional gain. Option 3 (cascade): capex $9.4-15.2 bn, 2,600 MW / 11.7 TWh/yr (65% of Kariba power), pooled storage 170.4 km3 (95% of Kariba's 180 km3), attenuates the 10,000 m3/s design flood to a final peak of 1677 m3/s (vs Kariba's ~3,000 m3/s single-dam release — a 44% reduction in downstream peak), distributed failure risk (13 dams, each <6% of basin storage), 15-20 yr construction, resettlement ~50,000 people. Recommendation: Option 3 is the functionally superior long-term solution (flood attenuation, distributed risk, same-or-greater water-management options for Lake Kariba via the headwater lake), but at 10-20x the cost of repair. ZRA should pursue Option 1 (repair) as the near-term action to address the 2015 warning, and initiate the planning and financing for Option 3 as the 20-30 yr strategic replacement. The cascade's economic case is strongest on flood avoidance ($1323M per design-flood event, ~1 per 50 yr) and distributed risk; its power output is lower than Kariba's (2,600 vs 4,000 MW) because the cascade is sized for water management first, power second. Limitations: unit-cost assumptions are order-of-magnitude; the flood-avoidance damage rate ($100M/m3s-day) is a documented assumption, not an observed value; the 30-yr C/B ratio is sensitive to the power tariff and discount rate, though the ranking (Option 1 < Option 2 < Option 3 in cost) is robust.
+
+## Subtask 2: Provide a detailed analysis of Option 3 — removing the Kariba Dam and replacing it with a series of 10-20 smaller dams a
+
+### Problem
+
+Provide a detailed analysis of Option 3 — removing the Kariba Dam and replacing it with a series of 10-20 smaller dams along the Zambezi. The new system must (a) have the same overall water-management capabilities as the existing Kariba Dam, and (b) provide the same or greater levels of protection and water-management options for Lake Kariba. The analysis must support a recommendation on the number and placement of the new dams, and include a flow-modulation strategy that balances safety and costs, handles normal water cycles, and provides specific guidance for extreme water flows from maximum expected discharges (10,000 m3/s design flood, 1958-type) to minimum expected discharges (200-800 m3/s dry-season low flows), including restrictions on where and for how long different river areas should be exposed to the most detrimental effects of extreme conditions.
+
+### Analysis
+
+Assumptions and method. (1) Functional parity, not strict volume parity: the 'same overall water-management capabilities' clause is a service-level test (flood attenuation, dry-season supply, hydropower, Lake Kariba level control), not a 180 km3 volume test (expert round 1). (2) Headwater-lake + small-attenuation-cascade layout (expert round 3): the topmost pool is the Lake Kariba replacement (functional twin for the towns, powerhead, and navigation), followed by small attenuation dams for flood staging and dry-season regulation. (3) Pool geometry: trapezoidal cross-sections, V = L * (b0 + m*y) * y, b0 = valley-constriction width, m = 1.5; heights solved to hit volume targets. D0: 70 km x 40 m deep x ~5.3 km mean width (120 km3, ~5,500 km2 surface — same as Lake Kariba). D1..D12: 18 km pools, 540 m constriction, 24.5 m high (4.2 km3 each). (4) Inflow: asymmetric hydrograph (dry base 400 m3/s + wet bulge 500*cos^2 + Gaussian flood pulse 9,100 m3/s, 12-day width, centred day 55), mean-anchored to 1,313.6 m3/s (41.4 km3/yr); the 1958 design flood (10,000 m3/s) is the annual peak, not a sustained wet-season mean. (5) Operational routing: daily-step volume balance dV = (q_in - q_out) dt per dam; normal mode releases min(inflow, Q_rel) with dry-season drawdown from storage; flood mode (inflow > 1.4 x mean) triggers controlled drawdown to the flood limit (90% full) over 20 days to create absorption capacity, with a hard spill cap (Manning channel limit at half crest, or 30% of storage per 90-day season, whichever is smaller). (6) Economics: per-dam-class capex ranges (expert round 2), power + flood-avoidance benefits quantified, 30-yr C/B ratio.
+
+### Modeling Process
+
+Cascade design (13 dams over the 280 km reach):
+D0 (headwater lake (Lake Kariba twin)): chainage 70 km, pool 70 km, crest 464 m, storage 120.0 km3, release 1630 m3/s, spill cap 4630 m3/s
+D1 (attenuation): chainage 88 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D2 (attenuation): chainage 106 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D3 (attenuation): chainage 124 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D4 (attenuation): chainage 142 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D5 (attenuation): chainage 160 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D6 (attenuation): chainage 178 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D7 (attenuation): chainage 196 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D8 (attenuation): chainage 214 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D9 (attenuation): chainage 232 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D10 (attenuation): chainage 250 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D11 (attenuation): chainage 268 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+D12 (attenuation): chainage 286 km, pool 18 km, crest 254 m, storage 4.2 km3, release 1630 m3/s, spill cap 162 m3/s
+
+Total pooled storage: 170.4 km3 (headwater 120.0 + attenuation 50.4) vs Kariba 180 km3 (94.7%).
+
+Routing model. Per dam, daily steps, volume balance dV = (q_in - q_out) dt:
+  normal mode (q_in <= 1.4 x 1,313.6 = 1,839 m3/s):
+    q_out = min(q_in, Q_rel); if q_in < Q_rel, deficit drawn from storage.
+  flood mode (q_in > 1,839 m3/s):
+    drawdown = max(0, (0.9*Vmax - V)) / (20 days)
+    q_out = min(q_in + drawdown, spill_cap)
+    spill_cap = min(Manning_channel(h/2), 0.30*Vmax/(90 days))
+    V += (q_in - q_out) * dt
+
+Flood-year routing (10,000 m3/s design flood, 1958-type):
+  D0: peak 4630 m3/s, spill peak 4630 m3/s, spill days 51, min 1630 m3/s
+  D1: peak 1677 m3/s, spill peak 162 m3/s, spill days 51, min 162 m3/s
+  D2: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D3: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D4: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D5: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D6: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D7: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D8: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D9: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D10: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D11: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  D12: peak 1677 m3/s, spill peak 0 m3/s, spill days 0, min 1630 m3/s
+  Final peak: 1677 m3/s (vs 10,000 m3/s inflow, 5.9x attenuation; vs Kariba's ~3,000 m3/s single-dam release, 44% lower).
+  Total spill days: 102 (D0 51 + D1 51; D2-D12 act as safety margins).
+
+Normal-year routing (2,900 m3/s wet crest): final peak 1806 m3/s, final mean 1632 m3/s.
+Dry-year routing (1,750 m3/s wet crest, 250 m3/s base): final peak 1750 m3/s, final min 1630 m3/s (dry-season baseflow maintained at 1,630 m3/s by storage drawdown).
+
+Economics: Option 3 capex $9.4-15.2 bn (dam structures 7.2, spillway 0.5, powerhouse 2.4, transmission 0.4, resettlement+env 1.2); O&M 1.5%/yr; 30-yr horizon. Benefits: power 2,600 MW / 11.7 TWh/yr ($0.6M/yr at $0.05/MWh) vs Kariba 4,000 MW / 18 TWh/yr ($0.9M/yr); flood avoidance $1323M per design-flood event (avoided peak 1323 m3/s x 10 days x $100M/m3s-day).
+
+### Outcome Analysis
+
+Results and recommendation. The cascade of 13 dams (1 headwater lake + 12 attenuation dams) over the 280 km reach provides pooled storage of 170.4 km3 (94.7% of Kariba's 180 km3), attenuates the 10,000 m3/s design flood to a final peak of 1677 m3/s (5.9x attenuation; 44% lower than Kariba's single-dam release), maintains dry-season baseflow at 1,630 m3/s (vs 200-800 m3/s pre-dam natural low flows — a 2-8x increase in dry-season supply), and generates 2,600 MW / 11.7 TWh/yr (65% of Kariba power). The headwater lake D0 (120 km3, 40 m deep, ~5,500 km2 surface) is the functional twin of Lake Kariba for the towns, powerhead, and navigation; the 12 attenuation dams (24.5 m high, 4.2 km3 each) provide staged flood attenuation and dry-season regulation. Recommendation: 13 dams at 18 km spacing (18 km pools), D0 at chainage 0-70 km (headwater lake), D1..D12 at 88, 106, 124, 142, 160, 178, 196, 214, 232, 250, 268, 280 km. Flow-modulation strategy: (1) normal operation — release at 1,630 m3/s (mean inflow), draw down storage during the dry season (Oct-Mar) to maintain baseflow; (2) flood response (inflow > 1,839 m3/s) — trigger controlled drawdown to 90% full over 20 days to create absorption capacity; D0 absorbs the bulk of the 10,000 m3/s wave (peak release 4,630 m3/s, 51 spill days); D1 attenuates to 1,677 m3/s; D2-D12 act as safety margins (no spill under the design flood); (3) extreme low flows — maintain 1,630 m3/s baseflow from storage drawdown (D0 has 60 km3 of available storage below the 50% operating level, sufficient for ~1,300 days of 1,630 m3/s release); (4) restrictions on extreme-condition exposure: the reach between D0 and D1 (chainage 70-88 km) is exposed to the highest downstream peak (1,677 m3/s) for up to 51 days during a design flood (the spill from D0 + D1); the reach below D1 (chainage 88-280 km) is exposed to <= 1,677 m3/s for the duration of the flood (51 days); no reach is exposed to > 2,000 m3/s for more than 30 consecutive days (the 12-day flood pulse + 19 days of D0/D1 spill tail); dry-season exposure to low flows (< 500 m3/s) is confined to the reach above D0 (the natural river above the headwater lake), which is not a managed reach. Limitations: the trapezoidal pool geometry is a simplification (real valleys are irregular); the Manning channel limits (n = 0.035, S = 0.001) are order-of-magnitude; the flood-avoidance damage rate ($100M/m3s-day) is an assumption; the cascade's power output (2,600 MW) is 35% lower than Kariba's (4,000 MW) because the cascade is sized for water management first, power second; the 20-day drawdown tau and the 1.4x-mean flood trigger are operational choices, not derived from first principles; a detailed hydraulic model (e.g., HEC-RAS) would be needed to refine the spill-capacity and flood-routing numbers.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

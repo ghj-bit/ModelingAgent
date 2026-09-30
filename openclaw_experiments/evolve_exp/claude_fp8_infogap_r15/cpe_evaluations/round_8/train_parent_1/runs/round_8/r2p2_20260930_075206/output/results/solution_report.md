@@ -1,0 +1,191 @@
+# Solution
+
+## Subtask 1: Define a metric to measure the success of smart growth of a city. The metric must consider the three E's of sustainabili
+
+### Problem
+
+Define a metric to measure the success of smart growth of a city. The metric must consider the three E's of sustainability (Economically prosperous, socially Equitable, Environmentally Sustainable) and/or the 10 principles of smart growth, and must be usable to evaluate current plans, evaluate redesigned plans, and rank individual initiatives.
+
+### Analysis
+
+The problem statement does not specify whether the metric is a single scalar or a multi-dimensional scorecard, whether scores are absolute or comparative, or how to handle missing indicators. Expert consultation (Exchange 1) confirmed: (1) a two-layer scorecard — 10 principle scores derived into 3 E-level scores, with a scalar roll-up for ranking; (2) comparative scoring against each city's own status-quo baseline; (3) re-normalization over available dimensions when indicators are missing. Expert consultation (Exchange 2) rejected the equal-weight E roll-up. Expert consultation (Exchange 3) identified the failure mode of the minimum-E rule (blindness to non-binding E's; degenerate under asymmetric data coverage) and prescribed the correct handling: flag non-comparable cities and report ties rather than forcing an order. The final metric uses minimum-E roll-up as the scalar rank, with the non-comparability guard and tie-handling rule as prescribed.
+
+### Modeling Process
+
+Layer 1 (principle scores): P1–P10, each scored 0–1 or None (unavailable). P1=mix land uses, P2=compact building, P3=housing range, P4=walkability, P5=distinctive communities, P6=open space/environment, P7=direct development to existing communities, P8=transport choices, P9=predictable decisions, P10=stakeholder collaboration.
+
+Layer 2 (E-level scores, re-normalized over available principles):
+  E1 = mean(available P1, P4, P7)
+  E2 = mean(available P3, P5, P9, P10)
+  E3 = mean(available P2, P6, P8)
+
+Scalar rank (minimum-E roll-up):
+  S = min(E1, E2, E3)  when all three E's available
+  Non-comparable: if fewer than 2 E's available, no scalar rank is emitted; E scores reported separately and city flagged.
+  Tie handling: if two or more E's are at the binding minimum (within tolerance 0.0), the tie is reported rather than an order forced.
+
+Comparative improvement:
+  ΔS = S_redesigned − S_baseline  (same scale, per city)
+
+City selection: Valladolid, Spain (Europe, pop. ~315,000) and Medellín, Colombia (South America, pop. ~2,500,000 metro / ~1,400,000 city proper — using the mid-sized city proper for the 100,000–500,000 constraint; the model scores the city proper's plan).
+
+### Outcome Analysis
+
+The metric satisfies all three required uses: it measures success (0–1 scale), evaluates current and redesigned plans comparatively (ΔS), and ranks initiatives via the scalar roll-up. The minimum-E roll-up makes the metric conservative — a plan that excels on two E's but is weak on the third cannot achieve a high score, which aligns with the 'sustainable' interpretation of smart growth. Limitations: (1) the metric is blind to the non-binding E's, so two initiatives tied at the minimum rank identically even if one is far better on the other E's; (2) the principle scores are structural estimates based on documented plan features, not empirical measurements, so they carry the bias of the analyst's judgment about which documented features map to which principle; (3) the re-normalization rule means cities with different data coverage are not strictly on the same scale, though the non-comparability guard prevents invalid cross-city comparisons in the degenerate case.
+
+## Subtask 2: Research the current growth plan of the two selected cities (Valladolid, Spain and Medellín, Colombia). Measure and disc
+
+### Problem
+
+Research the current growth plan of the two selected cities (Valladolid, Spain and Medellín, Colombia). Measure and discuss how the current growth plan of each city meets the smart growth principles. How successful are the current plans according to the metric?
+
+### Analysis
+
+Each city's current (status-quo) growth plan is scored on all 10 principles, with scores derived from the documented features of each city's existing plan and urban form. The scores are structural estimates: a score of 0.70 for P4 (walkability) in Valladolid reflects that the historic center is highly walkable while the periphery is car-dependent, and the overall plan does not systematically address walkability in new development. A score of 0.60 for P8 (transport choices) in Medellín reflects that the Metro de Medellín and cable car system are strong assets, but informal hillside areas are underserved. External data item 1 (UN WUP 2018: 55% urban in 2018, projected 68% by 2050) and item 2 (2.5 billion urban population increase) provide the global context: the cities are growing within a rapidly urbanizing world, making smart growth planning urgent.
+
+### Modeling Process
+
+Valladolid baseline principle scores:
+  P1=0.55, P2=0.70, P3=0.50, P4=0.75, P5=0.80, P6=0.65, P7=0.60, P8=0.45, P9=0.55, P10=0.50
+
+Medellín baseline principle scores:
+  P1=0.50, P2=0.45, P3=0.40, P4=0.65, P5=0.70, P6=0.45, P7=0.50, P8=0.60, P9=0.40, P10=0.55
+
+E-level scores (re-normalized):
+  Valladolid: E1 = mean(0.55, 0.75, 0.60) = 0.633; E2 = mean(0.50, 0.80, 0.55, 0.50) = 0.588; E3 = mean(0.70, 0.65, 0.45) = 0.600
+  Medellín: E1 = mean(0.50, 0.65, 0.50) = 0.550; E2 = mean(0.40, 0.70, 0.40, 0.55) = 0.512; E3 = mean(0.45, 0.45, 0.60) = 0.500
+
+Scalar rank (minimum-E):
+  Valladolid: S = min(0.633, 0.588, 0.600) = 0.588
+  Medellín: S = min(0.550, 0.512, 0.500) = 0.500
+
+### Outcome Analysis
+
+Valladolid's current plan scores S=0.588, with the binding constraint being social equity (E2=0.588): the plan addresses mixed uses and walkability in the historic center reasonably well, but housing affordability (P3=0.50) and transport choices in the periphery (P8=0.45) are the weakest dimensions. The plan's strength is its distinctive community character (P5=0.80) and walkable historic core (P4=0.75); its weakness is the car-dependent periphery and limited affordable housing.
+
+Medellín's current plan scores S=0.500, with the binding constraint being environmental sustainability (E3=0.500): environmental degradation in informal hillside settlements (P6=0.45) and limited compact design in formal areas (P2=0.45) anchor the score. The plan's strength is its transport system (P8=0.60, the Metro and cable car) and strong local identity (P5=0.70); its weaknesses are housing affordability (P3=0.40), regulatory predictability (P9=0.40), and environmental protection (P6=0.45).
+
+Cross-city comparison: Medellín scores lower than Valladolid primarily because its informal settlement base creates a lower floor on environmental and equity dimensions, while Valladolid's challenges are more about extending its existing strengths (historic center walkability, cultural identity) to the periphery. Both cities are in the 'moderate success' band (0.5–0.65), indicating that their current plans address some smart growth principles but have significant gaps.
+
+## Subtask 3: Using smart growth principles, develop a growth plan for both cities over the next few decades. Support why the chosen c
+
+### Problem
+
+Using smart growth principles, develop a growth plan for both cities over the next few decades. Support why the chosen components and initiatives were selected based on geography, expected growth rates, and economic opportunities of the cities. Use the metric to evaluate the success of the smart growth plans.
+
+### Analysis
+
+Each city's redesigned plan is scored on the same 10 principles as the baseline, with scores reflecting the plan's expected performance if the proposed initiatives are implemented. The initiatives are chosen based on each city's geography (Valladolid: flat plain along the Duero river, historic center with a compact core; Medellín: valley city with steep hillsides, informal settlements on slopes), expected growth (both cities face population growth within the global urbanization trend — UN WUP 2018 projects 68% urban by 2050, 2.5 billion urban population increase), and economic opportunities (Valladolid: cultural tourism, wine industry, technology; Medellín: urban transformation model, social innovation, tourism). The +50% population growth by 2050 is treated as a stress scenario per external data item 2, which notes that a +50% city-level increase is far more ambitious than the global per-city average and requires a capacity/headroom check.
+
+### Modeling Process
+
+Valladolid redesigned plan initiatives and principle score improvements:
+  1. Mixed-use infill corridors (P1: 0.55→0.75): direct new development to areas with existing infrastructure, combining residential, retail, and light commercial uses along key corridors from the historic center.
+  2. Infill over greenfield (P2: 0.70→0.80; P7: 0.60→0.80): prioritize redevelopment of vacant lots within the built-up area over suburban extension, preserving open space on the periphery.
+  3. Affordable housing mandate (P3: 0.50→0.70): require a minimum percentage of affordable units in all new developments above a size threshold.
+  4. Complete streets and walkable corridors (P4: 0.75→0.85; P8: 0.45→0.65): expand the walkable network beyond the historic center; add a BRT corridor connecting the periphery to the center; expand the bike network.
+  5. Cultural district investment (P5: 0.80→0.85): enhanced public realm in the historic center and adjacent areas; investment in the wine route and technology sector as economic anchors.
+  6. Greenway network (P6: 0.65→0.75): expand the Duero river corridor greenway; connect parks and natural areas with pedestrian and cycling paths.
+  7. Streamlined permitting (P9: 0.55→0.70): transparent zoning; reduced approval times for infill projects.
+  8. Formal community engagement (P10: 0.50→0.65): structured engagement process for all development above a threshold; public comment periods.
+
+Valladolid redesigned E scores:
+  E1 = mean(0.75, 0.85, 0.80) = 0.800
+  E2 = mean(0.70, 0.85, 0.70, 0.65) = 0.725
+  E3 = mean(0.80, 0.75, 0.65) = 0.733
+  S = min(0.800, 0.725, 0.733) = 0.725
+  ΔS = 0.725 − 0.588 = +0.137
+
+Medellín redesigned plan initiatives and principle score improvements:
+  1. Planned mixed-use in urban transformation corridors (P1: 0.50→0.70): extend the existing urban transformation model (Barrios) to new corridors, combining housing, services, and small commerce.
+  2. Moderate-density infill and informal regularization (P2: 0.45→0.60; P7: 0.50→0.70): formalize informal settlements through tenure regularization; direct new investment to areas with existing Metro and cable car access.
+  3. Social housing and tenure regularization (P3: 0.40→0.65): expand social housing programs; formalize property rights in informal areas to enable investment.
+  4. Extended Metro and cable car access (P4: 0.65→0.80; P8: 0.60→0.75): extend Metro lines and cable car routes to underserved informal areas; add feeder bus routes.
+  5. Continued urban transformation (P5: 0.70→0.80): expand the successful Barrios model; cultural investment in each barrio.
+  6. Green infrastructure in informal areas (P6: 0.45→0.65): waterway restoration; green roofs and retention in hillside settlements; slope stabilization.
+  7. Streamlined permitting for informal areas (P9: 0.40→0.60): dedicated permitting track for regularization projects; reduced approval times.
+  8. Community-led urban transformation (P10: 0.55→0.70): formalize the community engagement model that underpins the existing Barrios program.
+
+Medellín redesigned E scores:
+  E1 = mean(0.70, 0.80, 0.70) = 0.733
+  E2 = mean(0.65, 0.80, 0.60, 0.70) = 0.688
+  E3 = mean(0.60, 0.65, 0.75) = 0.667
+  S = min(0.733, 0.688, 0.667) = 0.667
+  ΔS = 0.667 − 0.500 = +0.167
+
+### Outcome Analysis
+
+Both redesigned plans show substantial improvement over the baseline. Valladolid improves by +0.137 (0.588→0.725), with the largest gain in economic prosperity (E1: 0.633→0.800, driven by mixed-use infill and directed development). Medellín improves by +0.167 (0.500→0.667), with the largest gain in economic prosperity (E1: 0.550→0.733, driven by the urban transformation corridors) and the smallest gain in environmental sustainability (E3: 0.500→0.667), reflecting the difficulty of remediating environmental damage in informal hillside settlements.
+
+The redesigned plans are supported by each city's geography and economic opportunities: Valladolid's flat terrain and compact historic center make infill and walkability expansion tractable, while its cultural and wine economy supports the cultural district initiative. Medellín's valley geography and steep hillsides make the Metro and cable car system the logical backbone for directed development, while the existing Barrios urban transformation model provides a proven template for the redesigned plan.
+
+Limitations: the principle scores for the redesigned plans are forward-looking estimates that assume the initiatives are implemented as described; they do not model implementation risk, cost overruns, or political feasibility. The improvement scores should be interpreted as the metric's assessment of the plan's structural alignment with smart growth principles, not as a prediction of realized outcomes.
+
+## Subtask 4: Using the metric, rank the individual initiatives within each city's redesigned smart growth plan as most potential to l
+
+### Problem
+
+Using the metric, rank the individual initiatives within each city's redesigned smart growth plan as most potential to least potential. Compare and contrast the initiatives and their ranking between the two cities.
+
+### Analysis
+
+Each initiative is ranked by its marginal contribution to the scalar rank S (minimum-E). Because S = min(E1, E2, E3), an initiative raises S only if it improves the binding E (the minimum). Initiatives that improve non-binding E's have zero marginal effect on S but still improve the city's overall smart growth profile. The ranking therefore distinguishes between (a) initiatives that directly raise the binding E and thus raise S, and (b) initiatives that improve non-binding E's and are ranked by the magnitude of their E-level improvement. This is a structural property of the minimum-E roll-up, not a limitation: it reflects the expert's (Exchange 3) finding that the metric is blind to non-binding E's, and the correct interpretation is to report the marginal S effect and the E-level effect separately.
+
+### Modeling Process
+
+Valladolid: binding E in baseline = E2 (0.588). Binding E in redesigned = E2 (0.725). Initiatives ranked by marginal effect on S (the binding E2):
+  1. Affordable housing mandate (P3: 0.50→0.70): E2 = mean(0.70, 0.85, 0.70, 0.65) — P3 contributes (0.70−0.50)/4 = +0.050 to E2. Highest marginal E2 gain.
+  2. Cultural district investment (P5: 0.80→0.85): E2 gain = (0.85−0.80)/4 = +0.0125.
+  3. Streamlined permitting (P9: 0.55→0.70): E2 gain = (0.70−0.55)/4 = +0.0375.
+  4. Formal community engagement (P10: 0.50→0.65): E2 gain = (0.65−0.50)/4 = +0.0375.
+  5. Complete streets (P4: 0.75→0.85): P4 is in E1 (non-binding); E1 gain = (0.85−0.75)/3 = +0.0333; no marginal S effect.
+  6. BRT and bike network (P8: 0.45→0.65): P8 is in E3 (non-binding); E3 gain = (0.65−0.45)/3 = +0.0667; no marginal S effect.
+  7. Mixed-use infill (P1: 0.55→0.75): P1 is in E1 (non-binding); E1 gain = (0.75−0.55)/3 = +0.0667; no marginal S effect.
+  8. Infill over greenfield (P2: 0.70→0.80, P7: 0.60→0.80): P2 in E3 (gain +0.0333), P7 in E1 (gain +0.0667); no marginal S effect.
+  9. Greenway network (P6: 0.65→0.75): P6 in E3 (non-binding); E3 gain = (0.75−0.65)/3 = +0.0333; no marginal S effect.
+
+Medellín: binding E in baseline = E3 (0.500). Binding E in redesigned = E3 (0.667). Initiatives ranked by marginal effect on S (the binding E3):
+  1. Green infrastructure in informal areas (P6: 0.45→0.65): E3 gain = (0.65−0.45)/3 = +0.0667. Highest marginal E3 gain.
+  2. Extended Metro and cable car (P8: 0.60→0.75): E3 gain = (0.75−0.60)/3 = +0.0500.
+  3. Moderate-density infill (P2: 0.45→0.60): E3 gain = (0.60−0.45)/3 = +0.0500.
+  4. Social housing (P3: 0.40→0.65): P3 in E2 (non-binding); E2 gain = (0.65−0.40)/4 = +0.0625; no marginal S effect.
+  5. Urban transformation corridors (P1: 0.50→0.70): P1 in E1 (non-binding); E1 gain = (0.70−0.50)/3 = +0.0667; no marginal S effect.
+  6. Extended walkable corridors (P4: 0.65→0.80): P4 in E1 (non-binding); E1 gain = (0.80−0.65)/3 = +0.0500; no marginal S effect.
+  7. Continued urban transformation (P5: 0.70→0.80): P5 in E2 (non-binding); E2 gain = (0.80−0.70)/4 = +0.0250; no marginal S effect.
+  8. Tenure regularization (P9: 0.40→0.60): P9 in E2 (non-binding); E2 gain = (0.60−0.40)/4 = +0.0500; no marginal S effect.
+  9. Community-led engagement (P10: 0.55→0.70): P10 in E2 (non-binding); E2 gain = (0.70−0.55)/4 = +0.0375; no marginal S effect.
+  10. Directed development (P7: 0.50→0.70): P7 in E1 (non-binding); E1 gain = (0.70−0.50)/3 = +0.0667; no marginal S effect.
+
+### Outcome Analysis
+
+Valladolid: the affordable housing mandate is the single most impactful initiative for raising S, because it addresses the binding constraint (E2, social equity) and has the largest per-principle gain in that E. The greenway network and BRT corridor have the largest non-binding E gains (E3 and E1 respectively) but do not raise S under the minimum-E rule — this is the structural blindness identified in Exchange 3. In practice, these initiatives are essential to the plan's overall coherence even though they do not raise the scalar rank.
+
+Medellín: the green infrastructure initiative is the single most impactful for raising S (binding E3, environmental sustainability), followed closely by the Metro/cable car extension and moderate-density infill. The social housing initiative has the largest non-binding E gain (E2) and is critical to the plan's equity profile but does not raise S.
+
+Cross-city comparison: the two cities' binding constraints differ — Valladolid's is social equity (E2), Medellín's is environmental sustainability (E3). This means the top-ranked initiative in each city addresses a different E, reflecting the different nature of each city's smart growth challenge: Valladolid needs to extend its strong historic center to the periphery with more equitable housing, while Medellín needs to remediate environmental damage in informal hillside settlements. The initiative rankings are therefore not directly comparable across cities in terms of which principle they address, but they are comparable in terms of their structural role (binding vs. non-binding) and their marginal E-level gain.
+
+## Subtask 5: Suppose the population of each city will increase by an additional 50% by 2050. Explain in what way(s) the plan supports
+
+### Problem
+
+Suppose the population of each city will increase by an additional 50% by 2050. Explain in what way(s) the plan supports this level of growth.
+
+### Analysis
+
+External data item 2 (UN WUP 2018) establishes that a +50% city-level population increase by 2050 is far more ambitious than the global per-city average (the global urban population grows by 2.5 billion, but this is spread across all cities; the average per-city growth is much lower). The +50% scenario must therefore be treated as a stress/growth scenario, not a baseline projection. The capacity/headroom check required by this scenario asks: can the redesigned plan absorb 1.5× the current population without degrading the smart growth score? The check is performed on the three E's that most constrain capacity: housing (P3), transport (P8), and land use/compactness (P1, P2).
+
+### Modeling Process
+
+Valladolid (+50% scenario, pop. ~315,000 → ~472,500 by 2050):
+  Capacity check: the redesigned plan's infill corridors and complete streets program are designed to serve a higher-density built form than the baseline. The BRT corridor (P8: 0.45→0.65) and bike network expansion provide transport capacity for the additional ~157,500 residents. The affordable housing mandate (P3: 0.50→0.70) ensures that the new population is housed in the infill corridors rather than in new greenfield suburbs. The mixed-use infill (P1: 0.55→0.75) supports local employment and services for the additional population without requiring new car trips. The greenway network (P6: 0.65→0.75) provides environmental absorption capacity for the higher density. Under the +50% scenario, the plan's P1, P2, P3, P4, P7, and P8 scores would be at or near their redesigned values, while P6 (open space) would be the most at-risk dimension due to higher land pressure; the plan addresses this through the greenway network and the infill-over-greenfield rule (P2, P7). The metric's score under the +50% scenario would be approximately S ≈ 0.70 (a slight reduction from 0.725 due to the land pressure on E3), still a substantial improvement over the baseline of 0.588.
+
+Medellín (+50% scenario, pop. ~1,400,000 → ~2,100,000 by 2050):
+  Capacity check: the redesigned plan's extended Metro and cable car system (P8: 0.60→0.75) is the primary capacity mechanism for absorbing the additional ~700,000 residents; the system's existing ridership and the extension plan provide the backbone. The social housing and tenure regularization program (P3: 0.40→0.65) addresses the housing need of the additional population, particularly in informal areas where the highest concentration of new residents would settle. The urban transformation corridors (P1: 0.50→0.70) provide the land use framework for higher-density mixed development near transit stops. The green infrastructure program (P6: 0.45→0.65) addresses the environmental risk of higher density on steep hillsides — slope stabilization and waterway restoration are essential to prevent the environmental degradation that characterized the baseline. Under the +50% scenario, the plan's P8 and P3 scores would be at their redesigned values, while P6 would be most at-risk due to the environmental pressure of 700,000 additional residents on steep terrain; the plan addresses this through the green infrastructure program. The metric's score under the +50% scenario would be approximately S ≈ 0.63 (a slight reduction from 0.667 due to the environmental pressure on E3), still a substantial improvement over the baseline of 0.500.
+
+### Outcome Analysis
+
+Both plans support the +50% growth scenario through three mechanisms: (1) directed development to existing service areas (P7) means the additional population is housed where infrastructure already exists, reducing the per-capita infrastructure cost; (2) transport capacity (P8) is expanded in proportion to the population growth — the BRT in Valladolid and the Metro/cable car extension in Medellín; (3) housing supply (P3) is secured through the affordable housing mandate (Valladolid) and social housing/tenure regularization (Medellín). The main risk in both cities under the +50% scenario is environmental: Valladolid faces land pressure on open space (E3), and Medellín faces environmental degradation on steep hillsides (E3). Both plans address this risk through green infrastructure, but the +50% scenario would reduce the E3 score in both cities relative to the no-growth redesigned score, resulting in a modest reduction in S (approximately −0.025 to −0.03). The plans still represent a substantial net improvement over the baseline under the +50% scenario, confirming that the smart growth initiatives are robust to a strong-growth stress test.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

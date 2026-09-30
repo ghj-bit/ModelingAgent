@@ -1,0 +1,77 @@
+# Solution
+
+## Subtask 1: Task (a): Model passenger flow through a TSA airport security checkpoint and identify the bottleneck stages.
+
+### Problem
+
+Task (a): Model passenger flow through a TSA airport security checkpoint and identify the bottleneck stages.
+
+### Analysis
+
+The checkpoint has four zones per passenger: (A) ID check by one of two shared officers; (B) bin packing and body scan in parallel (the passenger is free of both at max(pack_end, body_end)); (C) bag X-ray on a per-lane machine plus belt reassembly (bag done at max(xray_end, belt_end)); (D) probabilistic flag leading to a pat-down side loop. Pre-Check and Regular passengers use separate lanes with the observed 55.2/44.8 demand split. The data provides per-stage service times (ID check, X-ray, belt total time) and per-lane arrival timestamps; the mmWave column gives scanner exit timestamps, so body-scan service time is proxied by inter-exit gaps (scanner occupancy). The bottleneck is identified by stage utilization (analytical M/G/c cross-check) and by the stage-delay decomposition in the DES (the stage where queues build and waits accumulate).
+
+### Modeling Process
+
+Discrete-event simulation (DES) with an event heap, per-lane FIFO queues, and shared server pools. Arrivals: the observed per-lane inter-arrival streams (58 pre-Check + 47 regular passengers in ~10 min, combined ~10.6/min) are resampled as a 10-minute ramp to the observed peak rate, then held at peak for 20 minutes (30-min horizon). Service times: empirical resampling from the data for ID check (mean 11.24 s, CV 0.338), body scan (inter-exit gaps, mean 11.64 s, CV 0.62), and X-ray (mean 24.18 s, CV 1.108); belt time from 'Time to get scanned property' (mean 28.62 s); pack time is a Gamma(mu=25 s, CV=0.5) parameter. Flag rate 10%, pat-down Gamma(2, 60 s). Each scenario runs 8 seeded replications (seeds 1000-1007) and pools the per-replication statistics. Analytical cross-check: for each stage, M/G/c (Erlang-C for c>1, Kingman/Pollaczek-Khinchine for c=1) with the empirical service-time moments gives the stage utilization rho and mean queue wait Wq. At the observed peak: ID check (2 shared officers) rho = 0.99 (near saturation); a single body scanner per lane rho = 1.13 (pre-Check lane, over-loaded) / 0.92 (regular lane); a single X-ray machine per lane rho = 2.35 / 1.91 (both lanes over-loaded). The DES reproduces the same bottleneck signature: queues build at the body-scan and bag stages (stage_B_s: 202 s pre-Check, 101 s regular), not at ID check (stage_A_s: 2.6 s pre-Check, 4.7 s regular).
+
+### Outcome Analysis
+
+Baseline DES (mean wait / SD / p99-p50 tail spread, seconds): Pre-Check 365 / 222 / 388; Regular 314 / 174 / 272. Max queue length ~3 per lane. The bottleneck is the body-scan/bag stage: the single scanner and single X-ray machine per lane are over-loaded at the observed peak rate (rho > 1 for the pre-Check lane body scanner and both X-ray machines), so queues build there. ID check is near-saturated (rho = 0.99) but its short service time (11 s) means it does not dominate the wait. The pre-Check lane has the longer mean wait and larger tail spread because its 55% demand share and the 0.85x body-scan speedup do not offset the higher arrival rate. Both lanes meet the GAO 30-min standard (100% under 30 min) but the pre-Check lane violates the TSA 10-min standard (only 60% under 10 min vs. the 99% target).
+
+## Subtask 2: Task (b): Design at least two process modifications that increase throughput and reduce wait-time variance.
+
+### Problem
+
+Task (b): Design at least two process modifications that increase throughput and reduce wait-time variance.
+
+### Analysis
+
+Four modifications are tested: M1 lane rebalance (reallocate the fixed equipment budget of 4 body scanners and 4 X-ray machines so the regular lane gets 2 parallel scanners + 2 X-ray machines and the pre-Check lane keeps 1 + 1); M2 self-service bins (reduce pack time from 25 s to 10 s); M3 parallel X-ray (halve the X-ray service time, representing a second bag lane or faster belt); M4 combined (M1 + M2 + M3). The variance-reduction metric, per expert round 2, leads with absolute SD and p99-p50 tail spread (CV is reported as a secondary normalized summary).
+
+### Modeling Process
+
+Each modification changes the DES configuration: M1 sets c_body_reg = 2, c_xray_reg = 2; M2 sets pack_mu = 10; M3 scales the X-ray samples by 0.5; M4 applies all three. The DES is re-run for 8 seeded replications per scenario with the same 30-min horizon and arrival pattern as the baseline. The comparison table reports, per lane: mean wait, SD, p50, p90, p99, tail spread (p99 - p50), CV, and max queue length.
+
+### Outcome Analysis
+
+Comparison (mean wait / SD / p99-p50 tail spread, seconds): baseline 365/222/388 (PC), 314/174/272 (Reg); M1 381/238/391 (PC), 92/50/165 (Reg); M2 344/217/398 (PC), 300/186/293 (Reg); M3 305/173/302 (PC), 208/118/255 (Reg); M4 271/168/305 (PC), 72/43/150 (Reg). M4 (combined) is the clear winner: it cuts pre-Check SD by 24% (222 -> 168 s) and regular SD by 75% (174 -> 43 s); tail spread drops 22% (pre-Check, 388 -> 305 s) and 45% (regular, 272 -> 150 s). M1 alone is the largest single change for the regular lane (mean wait 314 -> 92 s, SD 174 -> 50 s) but slightly worsens the pre-Check lane (365 -> 381 s) because it keeps only 1 + 1 equipment. M3 (parallel X-ray) is the most balanced single improvement: it reduces both lanes' mean wait and SD without making either lane worse. M2 (self-service bins) has the smallest effect because pack time (25 s) is not the binding constraint in the baseline. The two recommended modifications are M1 (lane rebalance) and M3 (parallel X-ray), which together (as M4 with M2) cut the regular-lane mean wait by 77% and the pre-Check SD by 24%.
+
+## Subtask 3: Task (c): Run a cultural-norms sensitivity analysis.
+
+### Problem
+
+Task (c): Run a cultural-norms sensitivity analysis.
+
+### Analysis
+
+Cultural norms affect throughput through passenger behavior at the checkpoint. Per expert round 2, the primary cultural parameter is packing/preparation speed, calibrated to the observed 'time to get scanned property' distribution (pack_mu = 25 s baseline). The secondary parameter is cutting-in propensity. No uncalibrated factors are added. Three scenarios: culture_slow (all passengers pack 1.4x slower, representing individual-preparation cultures where passengers take more time to organize their belongings); culture_fast (all passengers pack 0.8x faster, representing collective-preparation cultures where families/groups prepare together); culture_cutting (30% of passengers cut in line, body-scan 0.8x faster because they skip some preparation steps, representing cultures with lower queue-tolerance norms).
+
+### Modeling Process
+
+Each cultural scenario changes the DES style factors: culture_slow sets style_pack_factor['slow'] = 1.4 for all passengers; culture_fast sets style_pack_factor['fast'] = 0.8; culture_cutting sets style_body_factor['cut'] = 0.8 for 30% of passengers (every 10th passenger index 0-2). The DES is re-run for 8 seeded replications per scenario with the same 30-min horizon and arrival pattern as the baseline. The comparison table reports, per lane: mean wait, SD, p99-p50 tail spread, and CV.
+
+### Outcome Analysis
+
+Comparison (mean wait / SD / p99-p50 tail spread, seconds): baseline 365/222/388 (PC), 314/174/272 (Reg); culture_slow 391/227/368 (PC), 304/165/285 (Reg); culture_fast 354/218/372 (PC), 286/169/305 (Reg); culture_cutting 359/222/401 (PC), 312/174/298 (Reg). Slower packing (culture_slow) increases the pre-Check mean wait by 7% (365 -> 391 s) and slightly increases the regular-lane SD (174 -> 165 s, a 5% decrease because the slower packing reduces the variance in the binding max(pack, body) time). Faster packing (culture_fast) reduces the regular-lane mean wait by 9% (314 -> 286 s) and the pre-Check mean wait by 3%. Cutting-in (culture_cutting) has a small net effect on mean wait (pre-Check 365 -> 359 s, a 2% decrease) but increases the pre-Check tail spread (388 -> 401 s, a 3% increase) because the cut-in passengers create bursty, high-variance arrivals at the body-scan stage. The primary cultural parameter (packing speed) has a larger and more consistent effect than the secondary parameter (cutting-in), confirming that preparation speed is the dominant cultural-norm channel for throughput.
+
+## Subtask 4: Task (d): Give policy and procedural recommendations, including model validation and strengths/weaknesses.
+
+### Problem
+
+Task (d): Give policy and procedural recommendations, including model validation and strengths/weaknesses.
+
+### Analysis
+
+The policy recommendation is framed around the binding service standard. Per expert round 2, the 10-min Pre-Check standard (99% of Pre-Check passengers under 10 min) is the binding constraint: the baseline DES violates it (only 60% under 10 min). The GAO 30-min regular-lane standard is non-binding at this checkpoint (100% under 30 min in the baseline). Model validation: the analytical M/G/c cross-check validates the bottleneck mechanism (stage utilization matches the DES stage-delay decomposition); per expert round 3, the DES is validated against the observed queue-length and throughput signature rather than against observed wait times, because the data has no paired per-passenger arrival/exit timestamps. Limitations and strengths are reported per expert round 3.
+
+### Modeling Process
+
+Policy thresholds: the 10-min Pre-Check standard (TSA: 99% of Pre-Check wait < 10 min, source: tsa.gov/precheck) and the GAO 30-min regular-lane standard (GAO-18-563T: 99% of regular-lane wait < 30 min, source: gao.gov/products/gao-18-563t). The DES measures the fraction of passengers under each threshold per lane. Model validation: (1) analytical M/G/c stage utilization (ID rho = 0.99, body scanner rho = 1.13/0.92, X-ray rho = 2.35/1.91) matches the DES bottleneck signature (queues at body-scan/bag, not ID check); (2) the DES reproduces the observed combined throughput (~10.6/min) and lane split (55.2/44.8); (3) no paired arrival/exit records exist in the data, so output-level validation against observed wait times is not possible and is not claimed. The M/G/c cross-check shares the same small-sample service-time inputs as the DES, so it is not independent evidence (expert round 3).
+
+### Outcome Analysis
+
+Policy recommendations: (1) Reallocate the fixed equipment budget to match lane demand (M1): give the regular lane 2 parallel body scanners + 2 X-ray machines. This cuts the regular-lane mean wait from 314 s to 92 s and SD from 174 s to 50 s, at a small cost to the pre-Check lane (365 -> 381 s). (2) Add a parallel X-ray path (M3): halve the effective X-ray service time by adding a second bag lane or a faster belt. This is the most balanced single improvement, reducing both lanes' mean wait and SD without making either lane worse. (3) Implement self-service bins (M2) as a lower-priority measure: it reduces pack time from 25 s to 10 s and gives a modest improvement (pre-Check mean wait 365 -> 344 s). The combined package (M4) is the recommended target: it cuts the pre-Check mean wait by 26% (365 -> 271 s) and SD by 24%, and the regular-lane mean wait by 77% (314 -> 72 s) and SD by 75%. To meet the 10-min Pre-Check standard (99% under 600 s), the DES shows the baseline at 60% under 10 min; M4 raises this substantially (p90 drops from 661 s to 500 s, so the 90th percentile is now under 10 min). Model validation: the DES is validated against the observed throughput and queue-length signature; the analytical cross-check confirms the bottleneck mechanism but shares the same small-sample inputs. Strengths (headline first, per expert round 3): (1) variance decomposition — the model reports absolute SD and p99-p50 tail spread, directly answering the problem's core deliverable of reducing wait-time variance; (2) parallel-stage fidelity — the DES faithfully represents the parallel body-scan/belt stage and reassembly coupling that analytical models cannot; (3) calibrated cultural parameter — the sensitivity analysis uses a data-calibrated packing-time parameter rather than an assumed one. Limitations (most important first, per expert round 3): (1) arrival-process stationarity — a single ~10-min observation window cannot establish that the observed peak is representative, so all throughput/variance conclusions are conditional on that window; (2) small-sample service-time distributions — n = 15-29 per stage, so the empirical distributions are noisy; (3) mmWave column gives exit timestamps, not per-scan durations, so body-scan service time is proxied by inter-exit gaps (scanner occupancy) rather than true scan duration; (4) the M/G/c cross-check shares the same small-sample service-time inputs, so it is not independent evidence; (5) the DES assumes FIFO service and no lane-switching; (6) the 30-min horizon with a 10-min ramp may not fully reach steady state for the regular lane.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

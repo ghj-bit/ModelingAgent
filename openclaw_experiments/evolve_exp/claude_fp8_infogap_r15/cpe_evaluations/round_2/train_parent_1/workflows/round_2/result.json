@@ -1,0 +1,655 @@
+{
+  "round": 2,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7015280159421116,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8666666666666667,
+    "modeling_rigorousness_evaluation": 0.6583333333333333,
+    "practicality_and_scientificity_evaluation": 0.575,
+    "result_and_bias_analysis_evaluation": 0.875
+  },
+  "problem_results": [
+    {
+      "problem_id": "2016_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nContext: Goodgrant donates $100,000,000 per year for five years (total $500M) to a prioritized 1-to-N list of U.S. colleges, and I am building a model that selects the schools, the investment per school, an ROI measure, and the funding duration. The data on hand are IPEDS institutional identifiers (UNITID, INSTNM, CITY, STABBR) and College Scorecard most-recent-cohort elements (GRAD_DEBT_MDN10YR_SUPP, RPY_3YR_RT_SUPP, C150_4_POOLED_SUPP, C200_L4_POOLED_SUPP, md_earn_wne_p10, gt_25k_p6). None of these carries the magnitudes below.\n\nThe scorecard data and problem text do not supply the ground-truth magnitudes needed to parameterize the core mechanism. What are the standard orders of magnitude you would use for:\n\n1. The per-institution addressable population of students whose outcomes a $5-25M multi-year grant could plausibly shift (e.g., typical 6-year enrollment of a mid-size four-year school, and the share of that enrollment in the low-income/first-generation population such a grant targets)?\n2. The realistic magnitude of the outcome shift such a grant can produce in the ROI outcome variables — median earnings 10 years after entry (md_earn_wne_p10) and the share earning >$25k six years after entry (gt_25k_p6) — in percentage points of outcome and/or dollars per student, and over what time scale (how many of the five years before it shows up)?\n3. The cost baseline against which \"return\" is computed for a charitable funder: the incremental annual per-student cost of the interventions a grant can buy (e.g., tutoring, advising, completion support), or, if you would not set a per-student cost, what is the natural denominator the foundation should treat as the investment (the full grant per school)?\n\nThese are magnitudes, not judgments: I need the numbers so the ROI formula and the per-school budget allocation can be parameterized before I propose a specific allocation structure.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 guidance (declare the unidentifiable magnitudes, bound them by assumption; the only defensible ROI denominator is the grant amount itself), I re-examined the scorecard file: it does carry UGDS (undergraduate headcount), PCTPELL (Pell share), RET_FT4 (4-year retention), NPT4 average net price, and the outcome fields (md_earn_wne_p10, gt_25k_p6). So the target population (UGDS × PCTPELL) and a cost context (net price) are identifiable from the data; the only parameters I must assume are the outcome-shift magnitude and its lag, which I will declare and bound explicitly.\n\nI propose this one coherent structure for the selection and allocation. Do you accept or reject it?\n\n1. **Potential score** (demonstrated potential for effective use of private funding) per school = mean of three min–max–normalized components: (a) need = UGDS × PCTPELL; (b) headroom = the gap between the school's md_earn_wne_p10 and the national 75th percentile of md_earn_wne_p10 (floored at zero); (c) demonstrated effectiveness = RET_FT4 × gt_25k_p6 (a school's own record of converting enrollment into degrees and into earnings above the $25k threshold).\n\n2. **Candidate list**: the top 40 schools by potential score, each funded every year for all five years (no rotation).\n\n3. **Allocation**: $100,000,000 per year distributed across the 40 schools proportionally to their potential scores, subject to a $5,000,000 per-school annual cap and a $2,000,000 per-school annual floor, with the residual redistributed proportionally among uncapped schools.\n\n4. **ROI**: for school i, ROI_i = [n_i × ΔE_i × 5 × (1 + 4-year tail share)] / G_i, where n_i = UGDS_i × PCTPELL_i (Pell-eligible headcount), ΔE_i = η × max(0, E75 − md_earn_wne_p10_i) with η a declared adoption rate (base case η = 0.25) and E75 the national 75th percentile of median earnings 10 years after entry computed from the data, and G_i the total five-year grant to that school (the denominator you identified as the only one the data support).\n\nThis is one structural hypothesis; I am not asking you to rank alternatives. Accept, reject, or name the single change you would make.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 structure without specifying which element. Following the policy fallback, I proceed with the most plausible corrected version: **potential score** = mean of normalized need (UGDS × PCTPELL), headroom (gap of md_earn_wne_p10 to the national 75th percentile, floored at 0), and demonstrated effectiveness (RET_FT4 × gt_25k_p6); **selection** = top 40 schools, funded all five years; **allocation** = proportional to need (not to the composite score), with a $5M annual cap and $2M annual floor; **ROI** = (Pell headcount × declared earnings gain η × headroom × 5 years + 4-year tail) / 5-year grant, with η and the tail share declared assumptions and the grant itself as denominator.\n\nGiven that structure, what is the specific case, boundary condition, or failure mode that would break it — the scenario in which this selection-and-allocation mechanism produces a poor investment, so I can state the model's limits explicitly in the bias analysis and robustness discussion?"
+        ],
+        "expert_answers": [
+          "I can't supply those magnitudes as if they were standard constants — they aren't in the data, and inventing them would be fabricating the model's core parameters. What the problem text and scorecard fields genuinely lack:\n\n1. **Target population**: no field gives enrollment counts, low-income/first-generation share, or Pell receipt. UNITID/INSTNM/CITY/STABBR are identifiers only; the cohort elements are rates and medians, not headcounts. So \"students plausibly affected per grant\" is unidentifiable from the given data.\n\n2. **Outcome shift**: md_earn_wne_p10 and gt_25k_p6 are cross-sectional cohort outcomes, not panel observations. No pre/post variation exists, so no causal effect size — in points or dollars — can be estimated or assumed; the lag structure is likewise unobservable.\n\n3. **Cost denominator**: no expenditure, per-student cost, or intervention-price variable appears in either dataset. The only defensible denominator the data support is the grant amount itself, allocated per school.\n\nThese are gaps to be declared and bounded by assumption, not filled with borrowed numbers.",
+          "reject",
+          "The case that breaks it: a school with large UGDS × PCTPELL but near-zero headroom (md_earn_wne_p10 already at or above the national 75th percentile). Its need term dominates the composite score, so it is selected, and because allocation is proportional to need it receives one of the largest grants — yet its floored headroom is zero, so its ROI numerator is zero and the investment returns nothing. The mechanism systematically over-funds high-enrollment, high-Pell schools that are already at the earnings frontier, and the $2M floor guarantees they are funded even when their ROI is zero."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_c8ac03cd254d",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8479166666666667,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8916666666666666,
+        "modeling_rigorousness_evaluation": 0.8416666666666667,
+        "practicality_and_scientificity_evaluation": 0.7666666666666666,
+        "result_and_bias_analysis_evaluation": 0.8916666666666666
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope by specifying the budget ($100M/yr), duration (5 years), and the specific data sources (IPEDS and Scorecard). The goals are explicitly stated as identifying schools, allocating funds, defining ROI, and creating a prioritized list. The analysis correctly identifies the need to merge datasets on UNITID and acknowledges the constraint of avoiding duplication with other foundations. The problem definition is precise, actionable, and aligns well with the background requirements, leaving little ambiguity about what needs to be solved.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks logically decompose the problem into selection, allocation, ROI definition, and final reporting. Task 1 (Selection) feeds into Task 2 (Allocation) and Task 3 (ROI), which together inform Task 4 (Final List). This structure covers all key components: identifying schools, determining amounts/durations, defining charitable ROI, and producing the deliverable. There is no significant deviation or missing key part; the dependencies are clear, and the coverage is comprehensive relative to the problem requirements.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed inference paths, robustness checks, and interpretable metrics that effectively support decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key data and model biases, implementing specific corrections like the headroom gate, and proposing future validation methods.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified. They effectively handle data limitations by declaring parameters like the adoption rate, and the operationalization of constraints (like no-duplication via headroom) is logical and defensible.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods such as normalization for ranking and constrained water-filling for allocation. The ROI definition is suitable for a charity, and the inclusion of outcome lags shows a realistic understanding of the problem structure.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, providing a clear, actionable investment strategy with specific school recommendations, grant amounts, and ROI estimates. It effectively uses operational constraints (caps/floors) and logical gates to ensure the solution is feasible and tailored to the charitable context, directly supporting decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using a defensible statistical framework for ROI and a mathematically rigorous allocation algorithm. While it relies on some arbitrary parameters and linear assumptions, these are standard and justified in the context of the problem, demonstrating a strong understanding of the domain and scientific principles.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2016_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nContext: Goodgrant donates $100,000,000 per year for five years (total $500M) to a prioritized 1-to-N list of U.S. colleges, and I am building a model that selects the schools, the investment per school, an ROI measure, and the funding duration. The data on hand are IPEDS institutional identifiers (UNITID, INSTNM, CITY, STABBR) and College Scorecard most-recent-cohort elements (GRAD_DEBT_MDN10YR_SUPP, RPY_3YR_RT_SUPP, C150_4_POOLED_SUPP, C200_L4_POOLED_SUPP, md_earn_wne_p10, gt_25k_p6). None of these carries the magnitudes below.\n\nThe scorecard data and problem text do not supply the ground-truth magnitudes needed to parameterize the core mechanism. What are the standard orders of magnitude you would use for:\n\n1. The per-institution addressable population of students whose outcomes a $5-25M multi-year grant could plausibly shift (e.g., typical 6-year enrollment of a mid-size four-year school, and the share of that enrollment in the low-income/first-generation population such a grant targets)?\n2. The realistic magnitude of the outcome shift such a grant can produce in the ROI outcome variables — median earnings 10 years after entry (md_earn_wne_p10) and the share earning >$25k six years after entry (gt_25k_p6) — in percentage points of outcome and/or dollars per student, and over what time scale (how many of the five years before it shows up)?\n3. The cost baseline against which \"return\" is computed for a charitable funder: the incremental annual per-student cost of the interventions a grant can buy (e.g., tutoring, advising, completion support), or, if you would not set a per-student cost, what is the natural denominator the foundation should treat as the investment (the full grant per school)?\n\nThese are magnitudes, not judgments: I need the numbers so the ROI formula and the per-school budget allocation can be parameterized before I propose a specific allocation structure.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 guidance (declare the unidentifiable magnitudes, bound them by assumption; the only defensible ROI denominator is the grant amount itself), I re-examined the scorecard file: it does carry UGDS (undergraduate headcount), PCTPELL (Pell share), RET_FT4 (4-year retention), NPT4 average net price, and the outcome fields (md_earn_wne_p10, gt_25k_p6). So the target population (UGDS × PCTPELL) and a cost context (net price) are identifiable from the data; the only parameters I must assume are the outcome-shift magnitude and its lag, which I will declare and bound explicitly.\n\nI propose this one coherent structure for the selection and allocation. Do you accept or reject it?\n\n1. **Potential score** (demonstrated potential for effective use of private funding) per school = mean of three min–max–normalized components: (a) need = UGDS × PCTPELL; (b) headroom = the gap between the school's md_earn_wne_p10 and the national 75th percentile of md_earn_wne_p10 (floored at zero); (c) demonstrated effectiveness = RET_FT4 × gt_25k_p6 (a school's own record of converting enrollment into degrees and into earnings above the $25k threshold).\n\n2. **Candidate list**: the top 40 schools by potential score, each funded every year for all five years (no rotation).\n\n3. **Allocation**: $100,000,000 per year distributed across the 40 schools proportionally to their potential scores, subject to a $5,000,000 per-school annual cap and a $2,000,000 per-school annual floor, with the residual redistributed proportionally among uncapped schools.\n\n4. **ROI**: for school i, ROI_i = [n_i × ΔE_i × 5 × (1 + 4-year tail share)] / G_i, where n_i = UGDS_i × PCTPELL_i (Pell-eligible headcount), ΔE_i = η × max(0, E75 − md_earn_wne_p10_i) with η a declared adoption rate (base case η = 0.25) and E75 the national 75th percentile of median earnings 10 years after entry computed from the data, and G_i the total five-year grant to that school (the denominator you identified as the only one the data support).\n\nThis is one structural hypothesis; I am not asking you to rank alternatives. Accept, reject, or name the single change you would make.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange 2 structure without specifying which element. Following the policy fallback, I proceed with the most plausible corrected version: **potential score** = mean of normalized need (UGDS × PCTPELL), headroom (gap of md_earn_wne_p10 to the national 75th percentile, floored at 0), and demonstrated effectiveness (RET_FT4 × gt_25k_p6); **selection** = top 40 schools, funded all five years; **allocation** = proportional to need (not to the composite score), with a $5M annual cap and $2M annual floor; **ROI** = (Pell headcount × declared earnings gain η × headroom × 5 years + 4-year tail) / 5-year grant, with η and the tail share declared assumptions and the grant itself as denominator.\n\nGiven that structure, what is the specific case, boundary condition, or failure mode that would break it — the scenario in which this selection-and-allocation mechanism produces a poor investment, so I can state the model's limits explicitly in the bias analysis and robustness discussion?"
+            ],
+            "expert_answers": [
+              "I can't supply those magnitudes as if they were standard constants — they aren't in the data, and inventing them would be fabricating the model's core parameters. What the problem text and scorecard fields genuinely lack:\n\n1. **Target population**: no field gives enrollment counts, low-income/first-generation share, or Pell receipt. UNITID/INSTNM/CITY/STABBR are identifiers only; the cohort elements are rates and medians, not headcounts. So \"students plausibly affected per grant\" is unidentifiable from the given data.\n\n2. **Outcome shift**: md_earn_wne_p10 and gt_25k_p6 are cross-sectional cohort outcomes, not panel observations. No pre/post variation exists, so no causal effect size — in points or dollars — can be estimated or assumed; the lag structure is likewise unobservable.\n\n3. **Cost denominator**: no expenditure, per-student cost, or intervention-price variable appears in either dataset. The only defensible denominator the data support is the grant amount itself, allocated per school.\n\nThese are gaps to be declared and bounded by assumption, not filled with borrowed numbers.",
+              "reject",
+              "The case that breaks it: a school with large UGDS × PCTPELL but near-zero headroom (md_earn_wne_p10 already at or above the national 75th percentile). Its need term dominates the composite score, so it is selected, and because allocation is proportional to need it receives one of the largest grants — yet its floored headroom is zero, so its ROI numerator is zero and the investment returns nothing. The mechanism systematically over-funds high-enrollment, high-Pell schools that are already at the earnings frontier, and the $2M floor guarantees they are funded even when their ROI is zero."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_c8ac03cd254d",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8625,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.75,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p1_20260930_020636/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope by specifying the budget ($100M/yr), duration (5 years), and the specific data sources (IPEDS and Scorecard). The goals are explicitly stated as identifying schools, allocating funds, defining ROI, and creating a prioritized list. The analysis correctly identifies the need to merge datasets on UNITID and acknowledges the constraint of avoiding duplication with other foundations. The problem definition is precise, actionable, and aligns well with the background requirements, leaving little ambiguity about what needs to be solved.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks logically decompose the problem into selection, allocation, ROI definition, and final reporting. Task 1 (Selection) feeds into Task 2 (Allocation) and Task 3 (ROI), which together inform Task 4 (Final List). This structure covers all key components: identifying schools, determining amounts/durations, defining charitable ROI, and producing the deliverable. There is no significant deviation or missing key part; the dependencies are clear, and the coverage is comprehensive relative to the problem requirements.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed inference paths, robustness checks, and interpretable metrics that effectively support decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases, implementing specific corrections like the headroom gate, and proposing future validation methods.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified. They effectively handle data limitations by declaring parameters like the adoption rate, and the operationalization of constraints (like no-duplication via headroom) is logical and defensible.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods such as normalization for ranking and constrained water-filling for allocation. The ROI definition is suitable for a charity, and the inclusion of outcome lags shows a realistic understanding of the problem structure.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, providing a clear, actionable investment strategy with specific school recommendations, grant amounts, and ROI estimates. It effectively uses operational constraints (caps/floors) and logical gates to ensure the solution is feasible and tailored to the charitable context, directly supporting decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using a defensible statistical framework for ROI and a mathematically rigorous allocation algorithm. While it relies on some arbitrary parameters and linear assumptions, these are standard and justified in the context of the problem, demonstrating a strong understanding of the domain and scientific principles.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2016_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p1_20260930_020636",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p1_20260930_020636/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Goodgrant Foundation's investment strategy: $100M/year for\nfive years (starting July 2016) split among a prioritized candidate list drawn\nfrom the IPEDS/College Scorecard data (2,977 candidate institutions, 7,804\ninstitution-level records with metrics: `gt_25k_p6` share of students earning\n>$25k 6 years post-enrollment, `md_earn_wne_p10` median earnings 10 years\npost-enrollment, 4-year retention `RET_FT4`, first-year net price\n`C150_4_POOLED_SUPP`, debt and repayment fields, enrollment `UGDS`).\n\nMy planned core mechanism is: rank schools on \"potential for effective use of\nprivate funding\" — defined as a school's demonstrated student value added\n(e.g., `gt_25k_p6` and `md_earn_wne_p10` against benchmarks), adjusted for\nfinancial vulnerability (net price, Pell share, retention) — then allocate the\nannual budget to the top of that ranked list, and compute a per-school ROI as\nthe student-earnings benefit generated per dollar donated.\n\nBefore I parameterize this mechanism, I need the baseline magnitudes and\nconstraints that the problem statement and the two data files do not carry:\n\n1. What is a defensible baseline annual operating grant scale per school in\n   programs of this kind (typical magnitude per institution for a $100M/yr\n   national portfolio — i.e., what order of magnitude per school, and therefore\n   how many schools the portfolio can plausibly cover)?\n2. What per-student, per-year earnings-improvement magnitude (in dollars or as\n   a fraction of the ~$46k national mean / $56.5k median household income) is a\n   realistic, defensible \"strong positive effect\" that a targeted grant is\n   expected to produce — the number that should anchor the numerator of my\n   ROI definition?\n3. What effect-decay horizon should I assume for a grant of this duration —\n   over how many years after the 5-year funding window does the effect on\n   student performance persist, and at roughly what retention rate (e.g.,\n   what fraction of the effect remains 5–10 years after the last dollar)?\n\nPlease give the typical magnitudes and time-scales used by education\nphilanthropy of this size, so the ROI formula and allocation are anchored to\nground truth rather than arbitrary choices.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nI profiled the two data files. All 2,977 candidate schools in the IPEDS UID\nfile match the Scorecard file. Among the 1,630 schools with complete core\nmetrics: `gt_25k_p6` (share earning >$25k 6 yrs post-enrollment) mean 0.571\n(median 0.568); `md_earn_wne_p10` (median earnings 10 yrs post-entry) mean\n$37.0k (median $35.4k); net first-year price `C150_4_POOLED_SUPP` mean 0.51\n(median 0.50); Pell share `PCTPELL` mean 0.41 (median 0.39); 4-yr retention\n`RET_FT4` mean 0.736 (median 0.749); enrollment `UGDS` median 2,312 (p75\n5,912). 1,574 schools are public, 1,361 private.\n\nPer your reply, the magnitudes are my defended modeling choices, not data.\nI therefore put this single specific structural hypothesis to you, to accept\nor reject (with the correction, if rejected):\n\n**Hypothesis.**\n1. **Ranking** — rank schools on a composite \"effective use of private\n   funding\" score: a value-added term (school's `gt_25k_p6` and\n   `md_earn_wne_p10` against the national mean ~$46k / $25k benchmarks)\n   combined with a need/vulnerability term (high `PCTPELL` share, high net\n   price `C150_4_POOLED_SUPP`, low `RET_FT4`, high `PCTFLOAN`), i.e. weight\n   demonstrated earnings performance and financial vulnerability together,\n   not performance alone.\n2. **Per-school grant scale** — assume a baseline of $1.5M per school per\n   year (order $1M–$2M), so the $100M/yr budget covers a portfolio of ~60\n   schools per year, sized so the grant meaningfully exceeds marginal\n   operating cost for schools of median enrollment (~2,300 students → ~$650\n   per student-year).\n3. **Allocation rule** — allocate across the ranked list with diminishing\n   weights: the #1-ranked school receives the largest award and awards decay\n   geometrically down the list until the $100M/yr budget is exhausted,\n   rather than an equal split among a top-K cutoff.\n4. **ROI definition** — define per-school ROI as\n   (student-years affected over the grant horizon × annual per-student\n   earnings-improvement effect ΔE) ÷ (total dollars donated to that school\n   over the 5-year window), with ΔE a defended per-student, per-year\n   earnings-gain assumption of $1,500–$2,500 (≈ 3–5% of the ~$46k national\n   mean), and the effect assumed to persist over a 5-year post-grant\n   horizon with 50% average retention of the effect.\n5. **Time duration** — fund the same ~60 schools for the full 5-year window\n   (July 2016–July 2021) with fixed annual awards, so ROI is measured on\n   cumulative benefit ÷ cumulative cost.\n\nDo you accept this structural configuration (the composite value-added +\nvulnerability ranking, the ~$1.5M per-school scale giving ~60 schools, the\ndiminishing-weight allocation, the ΔE = $1,500–2,500/year ROI numerator, and\nthe 5-year persistence with 50% retention)? If any one element should change,\nstate which and what it should be.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the structural configuration I put to you in Exchange 2, but the\nreply did not say which element was wrong or what should replace it. I will\ntherefore proceed on the most plausible fallback for each element: keep the\nvalue-added + vulnerability composite ranking, but (a) replace the\ndiminishing-weight allocation with a plain top-K equal-award portfolio\n($100M/yr ÷ K), (b) anchor the per-student effect ΔE to a smaller, more\nconservative $1,000–$1,500/year (≈ 2–3% of the national mean) since the\ngrants are targeted at schools with weak current outcomes, and (c) report ROI\non a 3-year persistence horizon with 40% effect retention as the base case,\nbounding it above and below.\n\nAssuming that fallback structure stands, ask me the counterexample: which\nspecific case, boundary condition, or failure mode in this data would break the\nmechanism — for instance, a class of schools where the `gt_25k_p6` /\n`md_earn_wne_p10` value-added term systematically misreads the school's actual\npotential for effective use of private funding (e.g., for-profit or\ndistance-only institutions, small private colleges with suppressed/no\nearnings data, or public research universities where the per-student effect is\ndiluted by a very large enrollment base), so that the ranking and the ROI\nnumerator are both wrong in the same direction? State the case and why the\nmechanism fails on it, so I can put it directly into the bias analysis and\nrobustness discussion."
+            ],
+            "expert_answers": [
+              "I can't supply those three magnitudes as ground truth, because the problem statement and the two data files do not carry them, and I have no external benchmark I can defensibly assert as \"typical\" for this portfolio.\n\nWhat the work lacks, concretely:\n\n1. **Grant scale per school** — no per-institution award size, minimum viable grant, or administrative-cost floor appears anywhere in the data. The $100M/yr total is the only budget figure given; the split is a modeling choice, not a datum.\n\n2. **Earnings-improvement magnitude** — `gt_25k_p6` and `md_earn_wne_p10` are observed outcomes, not treatment effects. Nothing in the files identifies a causal per-student earnings gain attributable to a grant, so no numerator magnitude is recoverable.\n\n3. **Decay horizon and retention rate** — no longitudinal post-grant follow-up exists in the data; the cohorts are cross-sectional snapshots.\n\nThese are exactly the parameters the problem leaves to the team's defended assumptions.",
+              "reject",
+              "The case that breaks it: institutions whose `gt_25k_p6` and `md_earn_wne_p10` are computed only over the small, self-selected subset of students who have earnings records — chiefly very small private colleges and distance-only/for-profit institutions with low `UGDS` and suppressed or partial cohort reporting. There, the value-added term reads a survivorship-selected earnings figure as institutional effectiveness, so the school ranks high on \"effective use of private funding\" while its true per-student effect is unmeasured. The same selection inflates the ROI numerator, since ΔE is applied to the full enrollment base rather than the reporting subset. Ranking and ROI err in the same direction, and the top-K equal-award rule concentrates dollars on exactly these schools."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_c8ac03cd254d",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8333333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8833333333333333,
+            "modeling_rigorousness_evaluation": 0.7833333333333333,
+            "practicality_and_scientificity_evaluation": 0.7833333333333333,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p1_20260930_020636/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need for a defensible ROI metric, Task 2 focuses on the prioritized candidate list, and Task 3 addresses allocation and duration. The goals are explicit, such as defining the numerator/denominator for ROI and creating a composite scoring model. The analysis accurately reflects the charitable context and the specific data sources provided. There are no ambiguities in the stated objectives, making the problem definition completely clear and well-aligned with the prompt's demands.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all key components of the problem: ROI definition, school selection, investment allocation, and validation. The sub-tasks are logically interrelated; Task 1 provides the metric for Task 2 and 3, while Task 4 ensures robustness. There is no significant deviation from the goal. However, the task of \"avoiding duplication with other foundations\" (Gates/Lumina) is not explicitly assigned to a specific sub-task, though it might be implicitly handled in the eligibility filters of Task 2. Despite this minor implicit handling, the core mathematical modeling aspects are completely covered and well-structured.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, feasible, and directly solves the problem by providing a clear, actionable investment strategy with robust sensitivity analysis and meaningful decision-support insights.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using established value-added metrics and a transparent, testable framework for ROI and school selection, with justified assumptions and sensitivity analysis.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative outputs, sensitivity checks, and a transparent explanation of the inference process, effectively supporting the decision-making framework.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, effectively identifying survivorship bias and implementing filters to correct it, while transparently acknowledging the limitations of observational data for causal inference.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated and generally reasonable, particularly the definition of ROI and portfolio size, but the specific quantification of the marginal benefit (delta-E) is not fully detailed, leaving a minor gap in rigor.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (weighted composite of value and vulnerability) and addresses key biases (survivorship), demonstrating a rational and robust structure that effectively reflects the problem requirements.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8479166666666667,
+      "interaction_cost": 0.8553133545552976,
+      "interaction_penalty": 0.04276566772776488,
+      "net_utility": 0.8051509989389017,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1749,
+          "total_expert_latency_seconds": 4.35,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8767202495682817,
+          "latency_cost_component": 0.26648416172508843,
+          "interaction_cost": 0.8506880998273127,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2130,
+          "total_expert_latency_seconds": 4.3,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8998465232082061,
+          "latency_cost_component": 0.2649921682738655,
+          "interaction_cost": 0.8599386092832825,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2014_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Erdos1 co-author network: the ~511 researchers who co-authored with Erdős, with Erdős removed, edges = direct co-authorship between two Erdős-1 researchers (from Grossman's Erdos1 file / Erdos1 Graph listing, cross-checked against Newman's 2001 collaboration-network baselines for scale).\n\nWhat I need is the ground-truth scale of the *influence* side of the problem, which neither the problem statement nor that file carries:\n\n1. For the Erdos1 network, what order of magnitude should the top of the internal influence measure reach — i.e., roughly how many Erdos1-internal co-authorships does the most central Erdős co-author (e.g., Ronald Graham, George Purdy) actually have within the 511-node subgraph, versus their total Erdős-1 paper count? I will use this to check that my degree-based influence values have the right scale and that the internal-network signal is not drowned by the many Erdős-number-2 links that the file also lists.\n\n2. For Task 3 (foundational network-science papers), how many citation orders-of-magnitude separate a foundational paper from a mid-tier one in this field — i.e., should the most influential paper (candidate: Barabási & Albert 1999, \"Emergence of scaling in random networks\") sit roughly 10x above a mid-set paper like Snijders 2011, or only ~3–5x? I need this to calibrate the citation-weighted influence model for the ~16-paper set from the addendum, since I will not retrieve citation counts and must reason about relative magnitudes from publication year and role in the field.\n\nThese are magnitudes the data do not carry; the answer sets the validation targets for my influence measures.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nYou confirmed that scale targets must be measured, not supplied, and that internal degree requires intersecting co-author lists (an Erdos1 vertex's listed co-authors include Erdos-number-2 names that are not network vertices; the link to vertex v exists only if both endpoints are Erdos1 members).\n\nGiven that, I put this specific structural allocation of the influence model to your judgment — accept or reject it:\n\n**A single composite per-node influence score on the Erdos1 network, defined as a weighted blend of four graph quantities, in this order of importance:**\n1. **Internal degree** (co-authorships with other Erdos1 members) — weight 0.35: direct activity within the network;\n2. **Weighted betweenness** (fraction of shortest Erdos1-pair paths the node mediates, path weights uniform) — weight 0.30: role as bridge between important researchers, which is what \"connects important researchers\" in the problem text asks for;\n3. **Eigenvector centrality** (recursively, connected to well-connected co-authors) — weight 0.20: being embedded in the influential core;\n4. **PageRank** (damped flow, d = 0.85) — weight 0.15: robustness check that the ranking is stable under random-walk dynamics.\n\nEach term is min-max normalized over the 511 nodes before blending; the result is a 0–1 score whose top decile I report as the \"significant influence\" set. Rationale: degree alone rewards prolificity, betweenness alone rewards peripheral bridges (hub-spoke nodes in a star have maximal betweenness but are not influential), and the blend is the standard defense in the MCM context of a single scalar that a judge can rank.\n\nPlease accept or reject this specific four-term structure (including the weight ordering degree > betweenness > eigenvector > PageRank). If you reject it, name the single term or weight ordering you think is wrong and why.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the four-term blended structure (degree 0.35 / betweenness 0.30 / eigenvector 0.20 / PageRank 0.15) without naming the faulty term. My fallback for the Erdos1 ranking is therefore the two-term structure **internal degree + weighted betweenness** (each min-max normalized, blended 0.5/0.5), which still separates prolificity from bridging.\n\nGiven that fallback, please name the specific case, boundary condition, or failure mode in the Erdos1 network that would break it — i.e., a class of researchers for whom \"degree + betweenness\" assigns the wrong influence verdict. Concretely, I suspect two candidates and want you to pick the real one or name a third:\n\n- **Case A (the retired giant):** a researcher who co-authored with nearly everyone (high degree) but whose collaborations are all direct edges, so they mediate few shortest paths (low betweenness) — e.g., a hyperactive co-author in one cluster. Here degree dominates and the node is correctly ranked, or does a hub of a dense core actually get *mis-ranked* because the blend double-counts its centrality?\n- **Case B (the thin bridge):** a researcher of Erdos-number 1 whose only Erdos1 co-authorship links two large otherwise-disconnected clusters — very high betweenness, degree ~2. The blend would rank them near the top, but they have no \"important works\" and are a structural seam, not an influencer. Should the measure suppress this?\n- **Case C (the disconnected tail):** the Erdos1 subgraph is not fully connected (expected from Newman's 85–92% largest-component benchmark). Researchers in small components have betweenness defined only within their component; min-max normalization across the whole network then compresses all component-internal signal into near-zero scores, and a component-local hub looks invisible.\n\nWhich of A, B, C (or which other case) is the failure mode my bias/robustness section must address, and what correction would you expect — e.g., component-wise normalization, a degree floor for bridges, or something else?"
+        ],
+        "expert_answers": [
+          "I can't supply these magnitudes. Both are empirical quantities the problem statement and the Erdos1 file do not carry, and I have no independent ground truth for them: the internal co-authorship counts of Graham or Purdy within the 511-node subgraph, and the citation ratios among the addendum's papers, are exactly the data you say you will not retrieve. Any number I gave would be invented, not a validation target.\n\nWhat the text does settle: the file lists Erdős-1 links, so internal degree must be extracted by intersecting co-author lists, not read off line counts. Beyond that, the scale question is yours to measure.",
+          "reject",
+          "Case B is the failure mode: the thin bridge. A degree-2 node whose sole Erdos1 link joins two large clusters gets maximal betweenness, and a 0.5/0.5 blend ranks it near the top despite no important works — exactly the \"connects important researchers\" reading inverted into a structural seam. Case A is not a failure (a dense-core hub is genuinely influential); Case C is a normalization artifact, not a verdict error.\n\nThe correction is not component-wise normalization but a degree floor or betweenness weighted by endpoint importance, so bridging counts only when the bridged clusters are themselves influential."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_c8ac03cd254d",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.6395833333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8416666666666667,
+        "modeling_rigorousness_evaluation": 0.47500000000000003,
+        "practicality_and_scientificity_evaluation": 0.3833333333333333,
+        "result_and_bias_analysis_evaluation": 0.8583333333333334
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, accurately reflecting the original problem requirements. Task 1 correctly identifies the exclusion of Erdos and the need to filter out Erdos-number-2 outsiders, showing a precise understanding of the data structure. Task 2 and 3 clearly state the objectives of developing influence measures and analyzing foundational papers. However, the definition for Task 4 is slightly ambiguous as it merges the implementation requirement with the discussion points from Task 5, which could lead to confusion in execution. Overall, the goals are explicit and well-aligned with the problem statement.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks cover the main aspects of the problem but exhibit a deviation in scope coverage. Specifically, the modeler merges the discussion requirements of Task 5 (science, utility, and application of influence modeling) into Task 4. This creates a logical dependency issue where the final discussion is tied to the implementation task rather than being a standalone synthesis step. Additionally, Task 6 (writing the report) is completely omitted from the decomposition, which is a significant part of the deliverable. While the core analytical tasks are covered, the omission of the reporting task and the merging of discussion tasks reduce the completeness of the coverage.",
+            "score": 6
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The analysis is clear, quantitative, and interpretable, with explicit validation against benchmarks and a balanced discussion of model strengths and weaknesses.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model identifies and corrects a specific structural bias (thin-bridge inflation) using a weighted metric, and acknowledges limitations regarding data quality, demonstrating a thorough approach to bias management.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly stated and justified, particularly regarding the use of calibration data due to missing raw files and the specific construction of the influence metric to handle bridge nodes.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate network science metrics and logically addresses the specific challenges of the problem, such as the distinction between degree and betweenness, ensuring the structure reflects the actual dynamics of academic influence.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model relies on synthetic data generation instead of analyzing the required real-world dataset, rendering the results irrelevant to the specific problem and lacking practical utility for decision-making.",
+            "score": 3
+          },
+          "analysis_2": {
+            "reason": "The model employs theoretically sound network science metrics and algorithms, demonstrating strong scientific methodology, but its validity is limited by the use of synthetic data rather than empirical analysis.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2014_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building the Erdos1 co-author network: the ~511 researchers who co-authored with Erdős, with Erdős removed, edges = direct co-authorship between two Erdős-1 researchers (from Grossman's Erdos1 file / Erdos1 Graph listing, cross-checked against Newman's 2001 collaboration-network baselines for scale).\n\nWhat I need is the ground-truth scale of the *influence* side of the problem, which neither the problem statement nor that file carries:\n\n1. For the Erdos1 network, what order of magnitude should the top of the internal influence measure reach — i.e., roughly how many Erdos1-internal co-authorships does the most central Erdős co-author (e.g., Ronald Graham, George Purdy) actually have within the 511-node subgraph, versus their total Erdős-1 paper count? I will use this to check that my degree-based influence values have the right scale and that the internal-network signal is not drowned by the many Erdős-number-2 links that the file also lists.\n\n2. For Task 3 (foundational network-science papers), how many citation orders-of-magnitude separate a foundational paper from a mid-tier one in this field — i.e., should the most influential paper (candidate: Barabási & Albert 1999, \"Emergence of scaling in random networks\") sit roughly 10x above a mid-set paper like Snijders 2011, or only ~3–5x? I need this to calibrate the citation-weighted influence model for the ~16-paper set from the addendum, since I will not retrieve citation counts and must reason about relative magnitudes from publication year and role in the field.\n\nThese are magnitudes the data do not carry; the answer sets the validation targets for my influence measures.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nYou confirmed that scale targets must be measured, not supplied, and that internal degree requires intersecting co-author lists (an Erdos1 vertex's listed co-authors include Erdos-number-2 names that are not network vertices; the link to vertex v exists only if both endpoints are Erdos1 members).\n\nGiven that, I put this specific structural allocation of the influence model to your judgment — accept or reject it:\n\n**A single composite per-node influence score on the Erdos1 network, defined as a weighted blend of four graph quantities, in this order of importance:**\n1. **Internal degree** (co-authorships with other Erdos1 members) — weight 0.35: direct activity within the network;\n2. **Weighted betweenness** (fraction of shortest Erdos1-pair paths the node mediates, path weights uniform) — weight 0.30: role as bridge between important researchers, which is what \"connects important researchers\" in the problem text asks for;\n3. **Eigenvector centrality** (recursively, connected to well-connected co-authors) — weight 0.20: being embedded in the influential core;\n4. **PageRank** (damped flow, d = 0.85) — weight 0.15: robustness check that the ranking is stable under random-walk dynamics.\n\nEach term is min-max normalized over the 511 nodes before blending; the result is a 0–1 score whose top decile I report as the \"significant influence\" set. Rationale: degree alone rewards prolificity, betweenness alone rewards peripheral bridges (hub-spoke nodes in a star have maximal betweenness but are not influential), and the blend is the standard defense in the MCM context of a single scalar that a judge can rank.\n\nPlease accept or reject this specific four-term structure (including the weight ordering degree > betweenness > eigenvector > PageRank). If you reject it, name the single term or weight ordering you think is wrong and why.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the four-term blended structure (degree 0.35 / betweenness 0.30 / eigenvector 0.20 / PageRank 0.15) without naming the faulty term. My fallback for the Erdos1 ranking is therefore the two-term structure **internal degree + weighted betweenness** (each min-max normalized, blended 0.5/0.5), which still separates prolificity from bridging.\n\nGiven that fallback, please name the specific case, boundary condition, or failure mode in the Erdos1 network that would break it — i.e., a class of researchers for whom \"degree + betweenness\" assigns the wrong influence verdict. Concretely, I suspect two candidates and want you to pick the real one or name a third:\n\n- **Case A (the retired giant):** a researcher who co-authored with nearly everyone (high degree) but whose collaborations are all direct edges, so they mediate few shortest paths (low betweenness) — e.g., a hyperactive co-author in one cluster. Here degree dominates and the node is correctly ranked, or does a hub of a dense core actually get *mis-ranked* because the blend double-counts its centrality?\n- **Case B (the thin bridge):** a researcher of Erdos-number 1 whose only Erdos1 co-authorship links two large otherwise-disconnected clusters — very high betweenness, degree ~2. The blend would rank them near the top, but they have no \"important works\" and are a structural seam, not an influencer. Should the measure suppress this?\n- **Case C (the disconnected tail):** the Erdos1 subgraph is not fully connected (expected from Newman's 85–92% largest-component benchmark). Researchers in small components have betweenness defined only within their component; min-max normalization across the whole network then compresses all component-internal signal into near-zero scores, and a component-local hub looks invisible.\n\nWhich of A, B, C (or which other case) is the failure mode my bias/robustness section must address, and what correction would you expect — e.g., component-wise normalization, a degree floor for bridges, or something else?"
+            ],
+            "expert_answers": [
+              "I can't supply these magnitudes. Both are empirical quantities the problem statement and the Erdos1 file do not carry, and I have no independent ground truth for them: the internal co-authorship counts of Graham or Purdy within the 511-node subgraph, and the citation ratios among the addendum's papers, are exactly the data you say you will not retrieve. Any number I gave would be invented, not a validation target.\n\nWhat the text does settle: the file lists Erdős-1 links, so internal degree must be extracted by intersecting co-author lists, not read off line counts. Beyond that, the scale question is yours to measure.",
+              "reject",
+              "Case B is the failure mode: the thin bridge. A degree-2 node whose sole Erdos1 link joins two large clusters gets maximal betweenness, and a 0.5/0.5 blend ranks it near the top despite no important works — exactly the \"connects important researchers\" reading inverted into a structural seam. Case A is not a failure (a dense-core hub is genuinely influential); Case C is a normalization artifact, not a verdict error.\n\nThe correction is not component-wise normalization but a degree floor or betweenness weighted by endpoint importance, so bridging counts only when the bridged clusters are themselves influential."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_c8ac03cd254d",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6666666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.7166666666666667,
+            "modeling_rigorousness_evaluation": 0.5833333333333334,
+            "practicality_and_scientificity_evaluation": 0.5,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r1p2_20260930_020636/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, accurately reflecting the original problem requirements. Task 1 correctly identifies the exclusion of Erdos and the need to filter out Erdos-number-2 outsiders, showing a precise understanding of the data structure. Task 2 and 3 clearly state the objectives of developing influence measures and analyzing foundational papers. However, the definition for Task 4 is slightly ambiguous as it merges the implementation requirement with the discussion points from Task 5, which could lead to confusion in execution. Overall, the goals are explicit and well-aligned with the problem statement.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks cover the main aspects of the problem but exhibit a deviation in scope coverage. Specifically, the modeler merges the discussion requirements of Task 5 (science, utility, and application of influence modeling) into Task 4. This creates a logical dependency issue where the final discussion is tied to the implementation task rather than being a standalone synthesis step. Additionally, Task 6 (writing the report) is completely omitted from the decomposition, which is a significant part of the deliverable. While the core analytical tasks are covered, the omission of the reporting task and the merging of discussion tasks reduce the completeness of the coverage.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is clear, quantitative, and interpretable, with explicit validation against benchmarks and a balanced discussion of model strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies and corrects a specific structural bias (thin-bridge inflation) using a weighted metric, and acknowledges limitations regarding data quality, demonstrating a thorough approach to bias management.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated and justified, particularly regarding the use of calibration data due to missing raw files and the specific construction of the influence metric to handle bridge nodes.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate network science metrics and logically addresses the specific challenges of the problem, such as the distinction between degree and betweenness, ensuring the structure reflects the actual dynamics of academic influence.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model relies on synthetic data generation instead of analyzing the required real-world dataset, rendering the results irrelevant to the specific problem and lacking practical utility for decision-making.",
+                "score": 3
+              },
+              "analysis_2": {
+                "reason": "The model employs theoretically sound network science metrics and algorithms, demonstrating strong scientific methodology, but its validity is limited by the use of synthetic data rather than empirical analysis.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2014_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p2_20260930_020636",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p2_20260930_020636/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building the co-author network of Erdös's 511 direct co-authors (Erdös number 1), excluding Erdös himself. A co-authoring relationship between two Erdos1 authors typically spans a small, finite set of joint papers, so the natural edge weight is the number of joint papers w_ij.\n\nThe problem text and the provided data carry no distribution for this joint-paper count: how many joint papers do typical Erdös co-author pairs share? What is the typical magnitude, and what is the plausible upper end — specifically, on how large a fraction of edges does w_ij exceed 5 or exceed 10? This weight profile determines whether the Erdos1 network is close to simple (unweighted), and it sets the weighting scale for any weighted centrality or influence measure applied to the network.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on the previous reply, the joint-paper weight profile of the Erdos1 network is not carried by the text or data, so the influence measure for Task 2 is built as a composite on the unweighted co-author graph, where edge weights enter only as an optional robustness check. The specific structural hypothesis to test:\n\nNode influence I(i) = 0.45 * normalized_betweenness(i) + 0.30 * normalized_eigenvector(i) + 0.25 * normalized_degree(i), i.e. a betweenness-dominant composite, because in a network where Erdös is removed the most influential actors are those who connect important subgroups (brokers) rather than those with the largest raw collaboration counts; eigenvector centrality captures \"connected to influential peers\" and degree is retained as a popularity floor. The three component weights are fixed a priori at 0.45/0.30/0.25, and the top-influential researchers of the Erdos1 network are read off this single composite ranking.\n\nDo you accept or reject this specific weighting and structure of the influence measure?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nSince the betweenness-dominant composite (0.45/0.30/0.25) was rejected, the influence measure falls back to a degree-dominant composite on the Erdos1 co-author graph: I(i) = 0.5 * normalized_degree(i) + 0.3 * normalized_eigenvector(i) + 0.2 * normalized_betweenness(i), read as \"influence = the size of one's collaboration circle, reinforced by the standing of one's collaborators, with brokering role as a secondary channel.\"\n\nAssuming this structure, what is the specific case, boundary condition, or failure mode in which this degree-dominant measure breaks down or gives the wrong answer about who is most influential in the Erdos1 network?"
+            ],
+            "expert_answers": [
+              "The text and data give no joint-paper count distribution for Erdos1 pairs. What is missing is the empirical weight profile: the modal and median w_ij, the share of edges with w_ij = 1, and the tail fraction above 5 or 10. Without that, the weighting scale for any weighted centrality measure is unset.",
+              "reject",
+              "The failure case: a low-degree author whose few co-authors are otherwise disconnected from each other — a bridge between two large, mutually unlinked Erdos1 clusters. Degree and eigenvector both stay small (few ties, neighbors not central), so the 0.5/0.3 terms bury them, while their removal disconnects the network. Degree-dominance ranks prolific collaborators above such structural brokers, giving the wrong \"most influential\" answer."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_c8ac03cd254d",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6125,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9666666666666667,
+            "modeling_rigorousness_evaluation": 0.3666666666666667,
+            "practicality_and_scientificity_evaluation": 0.26666666666666666,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_2/train_parent_1/runs/round_2/r2p2_20260930_020636/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative validation, clear interpretation of network structures, and honest assessment of model strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying data, model, and representation biases, and providing logical mitigations that preserve the validity of the core conclusions.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model fails to use the provided real data, instead generating a synthetic network, which makes the analysis irrelevant to the actual problem. The application to a second dataset is too small and manual to be practical or scalable.",
+                "score": 2
+              },
+              "analysis_2": {
+                "reason": "The model is unscientific because it analyzes a synthetic, randomly generated network instead of the provided empirical data, invalidating the results. The arbitrary choice of parameters and lack of empirical grounding undermine the scientific validity of the conclusions.",
+                "score": 3
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, accurately reflecting the problem requirements. Key constraints, such as excluding Erdos from the network in Task 1, are explicitly noted. The objectives for developing influence measures, analyzing foundational papers, and generalizing the algorithm are stated with precision, ensuring the goals are explicit and aligned with the ICM 2014 problem statement.",
+                "score": 10
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are well-structured with clear dependencies, covering all required aspects of the problem from network construction to generalization and discussion. The decomposition ensures complete coverage of the goals, including specific data constraints and methodological discussions. There is no deviation from the core objective, and all steps support the final analysis of network influence.",
+                "score": 10
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The primary assumption of using a stochastic reconstruction due to \"missing\" data is unreasonable given the problem provides the data file. This invalidates the data-driven nature of the model. Other assumptions, like substituting conceptual graphs for citation data, are weakly justified.",
+                "score": 3
+              },
+              "analysis_2": {
+                "reason": "The model's rationality is low because it bypasses the provided data, using synthetic reconstructions instead. The methodological choices, such as ignoring betweenness centrality without data support, are not scientifically rigorous for the specific problem context.",
+                "score": 3
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.6395833333333334,
+      "interaction_cost": 0.8335660077602398,
+      "interaction_penalty": 0.04167830038801199,
+      "net_utility": 0.5979050329453214,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1747,
+          "total_expert_latency_seconds": 2.84,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8765859936194174,
+          "latency_cost_component": 0.21379035894240417,
+          "interaction_cost": 0.850634397447767,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 844,
+          "total_expert_latency_seconds": 2.22,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.7912440451817812,
+          "latency_cost_component": 0.1858101784965855,
+          "interaction_cost": 0.8164976180727125,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T02:56:01.987775",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_c8ac03cd254d",
+  "workflow": {
+    "name": "Sequential Structural Validation Policy",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy's rollouts show a failure mode where the agent spends multiple exchanges on Operator 2 (judgment) without first establishing the necessary parameters via Operator 1, or where Operator 2 is used to propose measures that are immediately rejected without a clear structural basis. In the 2014_C run, two consecutive Operator 2 queries were rejected, wasting the opportunity to establish ground truth or test structural limits. In the 2015_B run, the sequence was successful (1->2->3), leading to higher scores. This patch enforces a rigid 1->2->3 sequence to ensure that judgments are grounded in established parameters and that the final exchange is always dedicated to identifying failure modes (bias analysis), which directly addresses the 'modeling_rigorousness' and 'result_and_bias_analysis' criteria where the parent sometimes lost points due to sparse dynamic updating or untested assumptions.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the foundational magnitudes, rates, or constraints that the problem statement and provided data do not explicitly carry but which are required to parameterize the core mechanism. Do not ask for choices or judgments yet; establish the physical or logical ground truth first.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the values from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The decay rate of a key variable over time is not specified in the text. Operator 1 asks for the typical magnitude and time-scale of this decay.\n- Gap 2 (Exchange 2): Based on the decay rate, the agent proposes a specific time-phased allocation of resources. Operator 2 asks the expert to accept or reject this specific phased structure.\n- Gap 3 (Exchange 3): The agent asks which specific scenario (e.g., rapid change in environment, extreme initial condition) would cause this phased structure to fail. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the foundational magnitudes, rates, or constraints that the problem statement and provided data do not explicitly carry but which are required to parameterize the core mechanism. Do not ask for choices or judgments yet; establish the physical or logical ground truth first.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the values from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The decay rate of a key variable over time is not specified in the text. Operator 1 asks for the typical magnitude and time-scale of this decay.\n- Gap 2 (Exchange 2): Based on the decay rate, the agent proposes a specific time-phased allocation of resources. Operator 2 asks the expert to accept or reject this specific phased structure.\n- Gap 3 (Exchange 3): The agent asks which specific scenario (e.g., rapid change in environment, extreme initial condition) would cause this phased structure to fail. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the foundational magnitudes, rates, or constraints that the problem statement and provided data do not explicitly carry but which are required to parameterize the core mechanism. Do not ask for choices or judgments yet; establish the physical or logical ground truth first.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the values from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The decay rate of a key variable over time is not specified in the text. Operator 1 asks for the typical magnitude and time-scale of this decay.\n- Gap 2 (Exchange 2): Based on the decay rate, the agent proposes a specific time-phased allocation of resources. Operator 2 asks the expert to accept or reject this specific phased structure.\n- Gap 3 (Exchange 3): The agent asks which specific scenario (e.g., rapid change in environment, extreme initial condition) would cause this phased structure to fail. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_c8ac03cd254d",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 1,
+    "parent_workflow_ids": [
+      "interaction_workflow_05df287cb4d3"
+    ],
+    "training_batch": [
+      "2015_B",
+      "2014_C"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2016_C",
+    "2014_C"
+  ],
+  "absolute_utility": 0.74375,
+  "interaction_cost": 0.8444396811577687,
+  "interaction_penalty": 0.042221984057888434,
+  "net_utility": 0.7015280159421116,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

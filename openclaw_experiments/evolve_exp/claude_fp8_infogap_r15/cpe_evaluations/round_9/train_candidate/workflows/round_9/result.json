@@ -1,0 +1,655 @@
+{
+  "round": 9,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7996319448180339,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8666666666666667,
+    "modeling_rigorousness_evaluation": 0.8374999999999999,
+    "practicality_and_scientificity_evaluation": 0.8500000000000001,
+    "result_and_bias_analysis_evaluation": 0.8166666666666667
+  },
+  "problem_results": [
+    {
+      "problem_id": "2019_D",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building an evacuation model for the Louvre (2019 D). I have the doorway capacity\nconstant (≈1.3 persons/s per meter of effective width), the free-flow speed (1.34 m/s,\n0.85–1.85), and the building scale (72,735 m² over 5 floors, 4 main entrances). I do not\ninvent magnitudes; I need the logical boundary that the statement does not settle.\n\nThe problem requires the model to serve several distinct deliverables: (a) evacuating\nvisitors while (b) letting emergency personnel enter quickly, (c) identifying\nbottlenecks, (d) staying adaptable across threat types, and (e) generalizing to other\nlarge crowded structures.\n\nThe text never defines what \"optimal exit\" or \"as quickly as possible\" means when\nevacuation outflow and emergency-entry inflow run through the same doorways at the same\ntime, nor how the objective is to be interpreted across those competing flows. I need the\ninterpretation of the objective function — specifically, the logical boundary of what\ncounts as the primary quantity to minimize or maximize when visitor egress and\nemergency-personnel ingress compete for the same exit capacity, and which deliverable\n(a–e) is the load-bearing one that the others must be consistent with. I am not asking\nfor a rate or a constant; I am asking for the reading of the objective and its domain\nthat I cannot settle from the text.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven your boundary (visitor egress time = objective; emergency-personnel ingress = a\nconstraint on shared exit capacity; bottleneck, adaptability, and generalization must stay\nconsistent with that), I put one coherent structural hypothesis to you. Accept or reject it\nas a whole.\n\nProposed structure — a three-layer, phase-based model:\n\n1. **Network layer (topology).** Model the Louvre as a directed graph: nodes = wing\n   segments/floors/doorways, edges = corridors with free-flow speed (1.34 m/s) and a\n   speed–density fundamental diagram (flow falls to zero above ~3.8–4 persons/m², per\n   provided data). Each doorway is a bottleneck node with capacity = 1.3 · w persons/s\n   (w = effective width in m), which is the per-exit capacity term.\n\n2. **Egress layer (evacuation of visitors).** Compute per-wing evacuation time as the\n   time to move the wing's occupant count through its corridor path to its assigned exit,\n   using a queueing/bottleneck model: a wing discharges at the minimum of (upstream\n   supply rate) and (exit capacity). The building-wide evacuation time = the maximum over\n   all wings of their clearance times. This is the single scalar the objective minimizes.\n   Heterogeneous visitor classes (tourists, families, disabled, staff) enter as speed\n   distributions, not a single speed.\n\n3. **Ingress layer (emergency personnel).** Emergency entry is modeled as a *constraint*,\n   not a second objective: reserve a fixed fraction of each shared doorway's capacity for\n   ingress, and route personnel so their arrival time is bounded, without altering the\n   visitor egress objective. A doorway whose width cannot serve both egress and the\n   reserved ingress share is flagged.\n\nDeliverable mapping, made explicit:\n- (a) egress → the scalar evacuation time in layer 2 (load-bearing).\n- (b) ingress → the reserved-capacity constraint in layer 3.\n- (c) bottlenecks → any doorway whose capacity is the binding minimum in layer 2, or any\n  corridor whose density reaches the fundamental-diagram cap.\n- (d) adaptability → the topology in layer 1 is a parameter: a \"threat\" removes or alters\n  edges/doorways, and the same two layers re-solve, so the structure is reused per threat.\n- (e) generalization → only layers 1–2 are building-specific (topology + occupant counts);\n  the capacity rule (1.3·w), speed–density relation, and reserved-ingress constraint are\n  building-agnostic parameters, so the model transfers by swapping the topology and\n  occupant data.\n\nThe dominant transformation mechanism — the loss of throughput as crowd density rises — is\ncarried explicitly by the fundamental-diagram term in layer 1, not assumed away.\n\nDo you accept or reject this structural allocation?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2 timed out, so I am proceeding on the most plausible fallback structure (the one\nstanding): three layers — (1) a directed graph with corridors carrying a speed–density\nfundamental diagram that drives flow to zero above ~3.8–4 persons/m², and doorway\ncapacity = 1.3·w persons/s; (2) an egress layer where a wing discharges at the minimum of\nits upstream supply and its exit capacity, and building evacuation time = the maximum of\nthe wings' clearance times; (3) ingress as a reserved-capacity fraction on shared\ndoorways with an arrival-time bound, reported separately from egress.\n\nGiven that structure, name the single specific case, boundary condition, or failure mode\nthat would break it — i.e., the case where the model's predicted building evacuation time\nor its bottleneck identification is most wrong, or where the ingress-as-reserved-fraction\ntreatment gives a misleading answer. I want the counterexample itself (the concrete\nscenario and which layer/assumption it defeats), not a fix or general advice. This will\nanchor the bias and robustness section of the final report."
+        ],
+        "expert_answers": [
+          "The text does not settle this, and it cannot be settled from the text alone: it never states whether the objective is a single scalar (e.g., total clearance time) or a vector with egress and ingress as separate, non-commensurable criteria, nor whether ingress is a constraint on egress or a co-equal objective. The load-bearing deliverable is (a): visitor egress time is the only quantity the statement treats as the goal (\"leave the building as quickly and safely as possible\"), so (b) must be modeled as a constraint on shared capacity rather than a competing objective, and (c)–(e) must remain consistent with that reading.",
+          "accept",
+          "The counterexample is a threat that removes or blocks the *exit itself* (e.g., a device at the Pyramid entrance, or smoke making a stairwell unusable) rather than a corridor edge. Layer 2 assigns each wing a fixed exit and computes clearance as max over wings; when that exit is lost, the wing's occupants must re-route to a different exit, and the binding constraint becomes the *shared* capacity of the remaining doorways, which now serve multiple wings' demand simultaneously. The max-over-wings decomposition fails because wings are no longer independent — their queues merge at common bottlenecks, so the true evacuation time exceeds the max of independently computed clearance times. Layer 3 also misleads: a reserved ingress fraction on a doorway that has just become the sole remaining egress path for two wings understates the ingress delay, since the fraction was sized against pre-threat demand."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8187500000000001,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8333333333333333,
+        "modeling_rigorousness_evaluation": 0.825,
+        "practicality_and_scientificity_evaluation": 0.8333333333333335,
+        "result_and_bias_analysis_evaluation": 0.7833333333333333
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 focuses on the core evacuation model and bottleneck identification, Task 2 addresses the specific constraint of emergency personnel ingress, Task 3 covers adaptability to threats and security trade-offs of additional exits, and Task 4 handles validation and policy recommendations. The goals are explicit, quantitative, and directly aligned with the supervisor's request for an adaptable model that balances visitor egress and staff ingress. The definition is precise and leaves little ambiguity regarding what each task aims to achieve.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically structured and cover all key aspects of the problem requirements. There is a clear dependency flow: Task 1 establishes the baseline model, Task 2 adds the ingress constraint, Task 3 introduces robustness/adaptability, and Task 4 validates and generalizes. All sub-tasks are directly related to the final goal of creating a comprehensive emergency management plan. The coverage is complete, addressing the specific challenges mentioned in the background (bottlenecks, diverse visitors, security concerns of extra exits, and technology integration implied by the adaptable model). No key parts are missing or deviated from the actual goals.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, quantitatively rigorous, and effectively links model outputs to practical decision-making insights.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying structural, data, and behavioral biases, and appropriately mitigating their impact through sensitivity analysis and clear limitation statements.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, addressing specific constraints like ingress/egress trade-offs and blocked exits with a realistic shared-contention mechanism. It provides clear, actionable insights for decision-making and is adaptable to other structures, demonstrating a tailored approach to the problem.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using established capacity formulas and rigorous validation checks. It integrates domain-specific constraints logically and demonstrates a clear understanding of the problem's physical and operational characteristics, though it relies on standard macro-scale simplifications.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are generally reasonable and sourced from standard references, but rely on undefined external consultations and simplify complex internal connectivity, lacking deep justification for behavioral parameters.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (queueing/bottleneck) and reflects physical constraints well, with good validation steps, though it simplifies baseline inter-wing interactions and lacks explicit modeling of technological interventions.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2019_D",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building an evacuation model for the Louvre (2019 D). I have the doorway capacity\nconstant (≈1.3 persons/s per meter of effective width), the free-flow speed (1.34 m/s,\n0.85–1.85), and the building scale (72,735 m² over 5 floors, 4 main entrances). I do not\ninvent magnitudes; I need the logical boundary that the statement does not settle.\n\nThe problem requires the model to serve several distinct deliverables: (a) evacuating\nvisitors while (b) letting emergency personnel enter quickly, (c) identifying\nbottlenecks, (d) staying adaptable across threat types, and (e) generalizing to other\nlarge crowded structures.\n\nThe text never defines what \"optimal exit\" or \"as quickly as possible\" means when\nevacuation outflow and emergency-entry inflow run through the same doorways at the same\ntime, nor how the objective is to be interpreted across those competing flows. I need the\ninterpretation of the objective function — specifically, the logical boundary of what\ncounts as the primary quantity to minimize or maximize when visitor egress and\nemergency-personnel ingress compete for the same exit capacity, and which deliverable\n(a–e) is the load-bearing one that the others must be consistent with. I am not asking\nfor a rate or a constant; I am asking for the reading of the objective and its domain\nthat I cannot settle from the text.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven your boundary (visitor egress time = objective; emergency-personnel ingress = a\nconstraint on shared exit capacity; bottleneck, adaptability, and generalization must stay\nconsistent with that), I put one coherent structural hypothesis to you. Accept or reject it\nas a whole.\n\nProposed structure — a three-layer, phase-based model:\n\n1. **Network layer (topology).** Model the Louvre as a directed graph: nodes = wing\n   segments/floors/doorways, edges = corridors with free-flow speed (1.34 m/s) and a\n   speed–density fundamental diagram (flow falls to zero above ~3.8–4 persons/m², per\n   provided data). Each doorway is a bottleneck node with capacity = 1.3 · w persons/s\n   (w = effective width in m), which is the per-exit capacity term.\n\n2. **Egress layer (evacuation of visitors).** Compute per-wing evacuation time as the\n   time to move the wing's occupant count through its corridor path to its assigned exit,\n   using a queueing/bottleneck model: a wing discharges at the minimum of (upstream\n   supply rate) and (exit capacity). The building-wide evacuation time = the maximum over\n   all wings of their clearance times. This is the single scalar the objective minimizes.\n   Heterogeneous visitor classes (tourists, families, disabled, staff) enter as speed\n   distributions, not a single speed.\n\n3. **Ingress layer (emergency personnel).** Emergency entry is modeled as a *constraint*,\n   not a second objective: reserve a fixed fraction of each shared doorway's capacity for\n   ingress, and route personnel so their arrival time is bounded, without altering the\n   visitor egress objective. A doorway whose width cannot serve both egress and the\n   reserved ingress share is flagged.\n\nDeliverable mapping, made explicit:\n- (a) egress → the scalar evacuation time in layer 2 (load-bearing).\n- (b) ingress → the reserved-capacity constraint in layer 3.\n- (c) bottlenecks → any doorway whose capacity is the binding minimum in layer 2, or any\n  corridor whose density reaches the fundamental-diagram cap.\n- (d) adaptability → the topology in layer 1 is a parameter: a \"threat\" removes or alters\n  edges/doorways, and the same two layers re-solve, so the structure is reused per threat.\n- (e) generalization → only layers 1–2 are building-specific (topology + occupant counts);\n  the capacity rule (1.3·w), speed–density relation, and reserved-ingress constraint are\n  building-agnostic parameters, so the model transfers by swapping the topology and\n  occupant data.\n\nThe dominant transformation mechanism — the loss of throughput as crowd density rises — is\ncarried explicitly by the fundamental-diagram term in layer 1, not assumed away.\n\nDo you accept or reject this structural allocation?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nExchange 2 timed out, so I am proceeding on the most plausible fallback structure (the one\nstanding): three layers — (1) a directed graph with corridors carrying a speed–density\nfundamental diagram that drives flow to zero above ~3.8–4 persons/m², and doorway\ncapacity = 1.3·w persons/s; (2) an egress layer where a wing discharges at the minimum of\nits upstream supply and its exit capacity, and building evacuation time = the maximum of\nthe wings' clearance times; (3) ingress as a reserved-capacity fraction on shared\ndoorways with an arrival-time bound, reported separately from egress.\n\nGiven that structure, name the single specific case, boundary condition, or failure mode\nthat would break it — i.e., the case where the model's predicted building evacuation time\nor its bottleneck identification is most wrong, or where the ingress-as-reserved-fraction\ntreatment gives a misleading answer. I want the counterexample itself (the concrete\nscenario and which layer/assumption it defeats), not a fix or general advice. This will\nanchor the bias and robustness section of the final report."
+            ],
+            "expert_answers": [
+              "The text does not settle this, and it cannot be settled from the text alone: it never states whether the objective is a single scalar (e.g., total clearance time) or a vector with egress and ingress as separate, non-commensurable criteria, nor whether ingress is a constraint on egress or a co-equal objective. The load-bearing deliverable is (a): visitor egress time is the only quantity the statement treats as the goal (\"leave the building as quickly and safely as possible\"), so (b) must be modeled as a constraint on shared capacity rather than a competing objective, and (c)–(e) must remain consistent with that reading.",
+              "accept",
+              "The counterexample is a threat that removes or blocks the *exit itself* (e.g., a device at the Pyramid entrance, or smoke making a stairwell unusable) rather than a corridor edge. Layer 2 assigns each wing a fixed exit and computes clearance as max over wings; when that exit is lost, the wing's occupants must re-route to a different exit, and the binding constraint becomes the *shared* capacity of the remaining doorways, which now serve multiple wings' demand simultaneously. The max-over-wings decomposition fails because wings are no longer independent — their queues merge at common bottlenecks, so the true evacuation time exceeds the max of independently computed clearance times. Layer 3 also misleads: a reserved ingress fraction on a doorway that has just become the sole remaining egress path for two wings understates the ingress delay, since the fraction was sized against pre-threat demand."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8250000000000001,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.75,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p1_20260930_090912/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 focuses on the core evacuation model and bottleneck identification, Task 2 addresses the specific constraint of emergency personnel ingress, Task 3 covers adaptability to threats and security trade-offs of additional exits, and Task 4 handles validation and policy recommendations. The goals are explicit, quantitative, and directly aligned with the supervisor's request for an adaptable model that balances visitor egress and staff ingress. The definition is precise and leaves little ambiguity regarding what each task aims to achieve.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured and cover all key aspects of the problem requirements. There is a clear dependency flow: Task 1 establishes the baseline model, Task 2 adds the ingress constraint, Task 3 introduces robustness/adaptability, and Task 4 validates and generalizes. All sub-tasks are directly related to the final goal of creating a comprehensive emergency management plan. The coverage is complete, addressing the specific challenges mentioned in the background (bottlenecks, diverse visitors, security concerns of extra exits, and technology integration implied by the adaptable model). No key parts are missing or deviated from the actual goals.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, quantitatively rigorous, and effectively links model outputs to practical decision-making insights.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying structural, data, and behavioral biases, and appropriately mitigating their impact through sensitivity analysis and clear limitation statements.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, addressing specific constraints like ingress/egress trade-offs and blocked exits with a realistic shared-contention mechanism. It provides clear, actionable insights for decision-making and is adaptable to other structures, demonstrating a tailored approach to the problem.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using established capacity formulas and rigorous validation checks. It integrates domain-specific constraints logically and demonstrates a clear understanding of the problem's physical and operational characteristics, though it relies on standard macro-scale simplifications.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are generally reasonable and sourced from standard references, but rely on undefined external consultations and simplify complex internal connectivity, lacking deep justification for behavioral parameters.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (queueing/bottleneck) and reflects physical constraints well, with good validation steps, though it simplifies baseline inter-wing interactions and lacks explicit modeling of technological interventions.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2019_D",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p1_20260930_090912",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p1_20260930_090912/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a network-flow evacuation model of the Louvre. The problem\nstatement asks for three coupled deliverables that it does not connect: (a) an\nadaptable model that lets planners \"explore a range of options\" against various\nthreats, where each threat can remove route segments or exits; (b) the\nsimultaneous, fast ingress of emergency personnel while visitors egress\n(bidirectional counter-flow); and (c) policy/crowd-management recommendations\nplus generalization to other crowded structures. The data I hold (exit specific\nflow 1.3 persons/s per meter, walking-speed distribution, floor area, four main\nentrances, unknown number of staff-only exits) fixes magnitudes but leaves the\nstructural logic of the model unsettled.\n\nThree gaps, and the first is the most consequential:\n\n1. How should the \"range of options\" that leaders explore be structurally\n   represented, so that the same model serves every threat type and every\n   exit-usage policy (public entrances only vs. adding staff-only exits)? In\n   particular: is the intended reading a single underlying route/exist graph\n   whose arcs and nodes are disabled or re-weighted per threat scenario, with\n   the explored option = (threat scenario, exit set, crowd-allocation rule) —\n   or should each scenario/exit-policy be an independent sub-model? And how\n   should bidirectional counter-flow (egress vs. emergency-personnel ingress)\n   enter that same graph: as opposing flows sharing arcs, or as a\n   phase/sequence in which one direction holds right-of-way?\n\n2. Which structural elements of the core egress model are transferable to\n   deliverable (c), so the same model — rather than a re-derivation — produces\n   the policy recommendations and the adaptation to other large structures\n   (e.g., per-occupant-class speed and demand parameters, bottleneck\n   diagnostics)?\n\n3. For the \"as quickly and safely as possible\" objective: the text never\n   settles whether total evacuation time and occupant safety are to be traded\n   off in one objective (e.g., minimize time subject to a maximum\n   density/queuing constraint), or treated as a lexicographic pair — which\n   reading should I encode, so that the \"explore options\" comparison has a\n   single, comparable scalar per option?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nYou answered that the text supplies no decision criterion for comparing\noptions, so the model itself must define one. I therefore propose the\nfollowing single structural configuration and ask you to accept or reject it\nas a whole.\n\nCore structure — one re-weightable egress graph, one scalar per option:\n- A single route-exit network whose nodes are wing/floor zones and whose arcs\n  are corridors and exits. An \"option\" is one configuration (t, e, c) =\n  threat scenario t, public-exit set e (staff-only exits added only under the\n  scenarios where I recommend it), crowd-allocation rule c. Threats act only\n  by disabling or lengthening arcs; no option gets its own sub-model.\n- The comparison scalar is a weighted pair: evacuation completes when the\n  last occupant reaches an exit, and safety is charged as a penalty for time\n  spent above a maximum sustainable density (i.e., options with the same\n  clearance time rank by total occupant-exposure above the density limit,\n  and conversely). Time is the primary comparison; safety is the tie-breaker\n  and a hard constraint.\n- The dominant loss mechanism, which the structure must carry, is the\n  fundamental-diagram speed-density slowdown: arc travel time grows with arc\n  occupancy toward the jam limit, and each exit discharges at at most\n  1.3 persons per second per meter of effective width, so exit saturation —\n  not walking — sets the discharge rate of long wings.\n- Counter-flow: a fixed phase split — egress first, emergency personnel\n  ingress second — sharing the same arcs in opposite directions within each\n  phase, because right-of-way is operationally enforceable and it keeps the\n  graph's capacities intact.\n- Occupant classes (families, disabled, solo visitors) carry class-specific\n  speeds and a small assistance delay, so the same allocation rule covers\n  heterogeneous demand.\n- Transfer to the secondary deliverables: the policy recommendations are read\n  directly off the model's bottleneck diagnostics (which arcs saturate first,\n  how adding staff-only exits shifts them, where counter-flow conflicts\n  arise), and generalization to other large structures is the same graph\n  with a different demand vector, exit inventory, and class mix — the\n  mechanism is unchanged.\n\nAccept or reject this configuration.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe configuration you accepted: one re-weightable route-exit network over\nwing/floor zones; each option = (threat scenario, exit set including possibly\nstaff-only exits, crowd-allocation rule); options compared by a weighted pair\n(total clearance time, with a penalty for time spent above a maximum\nsustainable density as tie-breaker and hard safety constraint); arc travel\ntimes from a fundamental-diagram speed-density law, exits discharging at at\nmost 1.3 persons/s per meter; a fixed phase split with egress before\nemergency-personnel ingress, sharing arcs in opposite directions within each\nphase; occupant classes with class-specific speeds and small assistance\ndelays; policy recommendations read from bottleneck diagnostics and\ngeneralization by swapping demand, exit inventory, and class mix into the\nsame graph.\n\nGive me the specific case, boundary condition, or failure mode that breaks\nthis mechanism — e.g., which threat scenario, exit policy, or occupancy\ncondition makes the fixed phase split, the clearance-time-plus-density-pair\nscalar, or the transfer to policy/generalization give a wrong or unusable\nanswer. One case, stated concretely."
+            ],
+            "expert_answers": [
+              "The text does not settle the structural representation of \"range of options,\" the counter-flow mechanism, or the time/safety objective — these are modeling choices, not magnitudes the data can supply. What the problem statement lacks is any stated decision criterion for comparing options: it never says whether options are ranked by total clearance time, by safety margin, by exit-utilization policy, or by robustness across threats. Without that criterion, no single scalar per option is defined, and the choice between one re-weightable graph versus independent sub-models, and between shared-arc counter-flow versus phased right-of-way, cannot be resolved from the text. That missing comparison criterion is the gap the work must supply.",
+              "accept",
+              "A threat that removes or blocks the *only* route to a set of exits while occupants are already committed to it — e.g., a fire or device in the Passage Richelieu severing the wing it serves mid-evacuation. The fixed phase split (egress fully before ingress) then fails: emergency personnel cannot reach the incident to clear it or treat casualties until egress from the affected wing completes, and the clearance-time-plus-density scalar cannot represent this, because the binding constraint is not occupant discharge rate but responder access latency to the hazard. The model returns a feasible, low-penalty \"optimal\" option that is operationally unusable, since the hazard is never suppressed during the window that matters."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8125,
+          "dimension_scores": {
+            "analysis_evaluation": 0.7666666666666666,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8666666666666667,
+            "result_and_bias_analysis_evaluation": 0.7166666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p1_20260930_090912/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals, explicitly capturing the dual objective of rapid visitor evacuation and emergency personnel entry. It correctly identifies the need for adaptability to various threats and the identification of bottlenecks. However, the definition in Task 1 is somewhat dense, combining multiple complex requirements into a single statement, which could be broken down for clearer focus. The goals are explicit and align well with the problem requirements.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks cover the main aspects of the problem, including model development, bottleneck analysis, policy recommendations, and validation. There is a logical flow, with Task 1 providing the foundation for Task 2's specific analysis of bottlenecks and security trade-offs. Task 3 builds on the model's outputs, and Task 4 addresses validation and generalization. However, Task 2 overlaps slightly with Task 1 regarding bottleneck identification, and the reference to \"Exchange 3\" in Task 3 is context-specific and may not be universally clear without prior context. Overall, the coverage is mostly complete and interrelated.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is clear, logically sound, and effectively explains the model's inference regarding bottlenecks and policy implications, though it could benefit from more extensive quantitative sensitivity data.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model identifies key structural and behavioral biases clearly but fails to implement corrections or provide quantitative bounds on their impact, leaving the biases unmitigated in the final results.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering specific, actionable policies like dynamic exit opening and app-based crowd guidance tailored to the Louvre's unique layout and security constraints, with a clear path for implementation and adaptation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model adheres to scientific principles by using validated pedestrian flow equations (fundamental diagram, NIST capacities) and rigorous conservation laws, providing a theoretically sound and physically consistent framework for evacuation analysis.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, physically grounded in standard evacuation parameters, and logically consistent with the problem's security and structural constraints. The modeler explicitly justifies the choice of metrics and network structure, and iteratively refines assumptions based on identified flaws (e.g., phase splitting), demonstrating high rigor.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model structure is scientifically sound, using a re-weightable network to handle dynamic threats and exit policies. The metrics (clearance time, density penalty, responder access) are appropriate for the problem, and the bottleneck identification method is rigorous. The validation approach is rational given data constraints, and the model's parameterization ensures logical adaptability to other structures.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8187500000000001,
+      "interaction_cost": 0.8515830163233344,
+      "interaction_penalty": 0.04257915081616673,
+      "net_utility": 0.7761708491838334,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1729,
+          "total_expert_latency_seconds": 4.02,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8753707310953871,
+          "latency_cost_component": 0.2563677807271984,
+          "interaction_cost": 0.8501482924381549,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1838,
+          "total_expert_latency_seconds": 5.1,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8825443505212845,
+          "latency_cost_component": 0.28733009689300504,
+          "interaction_cost": 0.8530177402085138,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2018_F",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the monetary cost of privacy (Tasks 1–8 of MM-Bench 2018_F). The\nproblem leaves one structural/definitional question unsettled that my core\npricing mechanism depends on, and I need the reading, not a magnitude.\n\nThe problem simultaneously asks for (a) a price for *protecting* one's private\ninformation (a benefit of keeping data private, i.e., what individuals would pay\nto keep it protected), and (b) a price for the data *itself* as a commodity that\nmay be bought, sold, or traded (Tasks 2–3), while Task 7 asks for the liability\npaid when a data breach destroys or misuses that data. My draft mechanism prices\neach data element in each domain as three coupled but separate quantities:\n\n1. **P_protect** — the willingness-to-pay (WTP) side: what a holder pays to keep\n   the element protected (insurance/subscription-like flow);\n2. **P_market** — the commodity price at which the element can be bought/sold\n   when the holder consents (anchored to the willingness-to-accept, WTA, side);\n3. **P_loss** — the expected loss/liability if the element is exposed through\n   breach or misuse (anchored to observed per-record breach costs).\n\nThree structural ambiguities I cannot settle from the text alone:\n\n1. **Commodity vs. liability distinction.** The problem asks \"what is the\n   monetary value of keeping PI protected, or how much would it cost for others\n   to have or use PI?\" — this conflates a *value of a good* (WTP to keep, WTA\n   to release) with a *liability* (damages when breached). Should the pricing\n   structure treat P_market (commodity price) and P_loss (breach liability) as\n   the *same* underlying value, or as *distinct* quantities linked only through\n   risk (e.g., P_loss = expected damage given breach probability, while\n   P_market = WTA net of that risk)? In other words, is the \"price of data\" one\n   number or a vector of numbers with a defined relationship?\n\n2. **Public-good / externality treatment.** The problem notes data sharing may\n   be a public good (disease tracing, national security) and that one person's\n   data informs about connected others (Task 6 network effects). Should the\n   core model treat the value of an element as purely *private* (bilateral\n   buyer–seller), or must it carry an *externality* term (value to third parties\n   and to society) that is additive but not captured in the bilateral\n   transaction price? If so, which sub-tasks (Task 3 national pricing, Task 6\n   network effects, Task 8 policy) must this externality term feed into?\n\n3. **Mapping to secondary deliverables.** The problem lists eight distinct\n   deliverables (Tasks 1–8). Which structural elements of the core three-domain\n   pricing model (social media, financial, health/medical) are *directly\n   transferable* to (i) the national-level pricing system of Task 3, (ii) the\n   network-effect adjustment of Task 6, and (iii) the policy memo of Task 8 —\n   versus which require *separate* structural treatment (e.g., an aggregation\n   rule for nations, a graph-based term for networks, a right-vs-market framing\n   for policy) that cannot be inferred from the individual-level model?\n\nPlease give the logical/definitional reading, not numerical values: the valid\ninterpretation of the objective, the domain of the price quantities, and the\ntransfer/extension rule from the individual core model to the group, national,\nand policy-level deliverables.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nAccepting your reading (one: vector of three linked prices; one: additive externality; one: three named extensions), please accept or reject this specific structural hypothesis for the core pricing model. I am proposing one coherent mechanism, not a menu.\n\n**Core element price (per data element `e`, per domain `d` ∈ {social media, financial, health/medical}, for individual `i` in subgroup `s`):**\n\n- **P_protect(i, e, d)** = `WTP_base(d) · θ_s · λ_e · (1 + r_{i,d})`\n  - A multiplicative composition: a domain base rate for willingness-to-pay for\n    protection, a subgroup sensitivity factor, a per-element weight, and an\n    individual risk uplift.\n- **P_market(i, e, d)** = `WTA_base(d) · θ_s · λ_e · (1 - α · p_{breach,i,d})`\n  - The commodity transfer price is the WTA anchor reduced by a *risk\n    discount* proportional to the individual's breach probability for that\n    domain. This is the risk linkage you specified: consented-transfer price\n    and involuntary damage are coupled through risk, not identical.\n- **P_loss(i, e, d)** = `p_{breach,i,d} · C_record(d) · λ_e · (1 + β_s)`\n  - Expected breach liability = breach probability times per-record cost,\n    element-weighted, subgroup-adjusted. `C_record(d)` is anchored to observed\n    per-record breach cost (higher for health/medical).\n\n- **Externality term** `X(i, e, d)`: additive to P_market, not to P_protect or\n  P_loss. Defined as `X(i,e,d) = η_d · (N_{deg}(i) / N_{deg,ref}) · g(e,d)`,\n  where `N_{deg}(i)` is the individual's network degree in the relevant graph,\n  `N_{deg,ref}` is a reference average, and `g(e,d)` is an element-domain\n  public-good weight. This feeds Task 6 (network) directly, and is the seed\n  term for Task 3 (national) and Task 8 (policy) extensions.\n\n**Three named extensions (per your one:), each a separate structural layer, not an inference from the core:**\n\n- **Task 3 (national):** aggregation rule `P_nation = f(Σ_i [P_market(i,e,d) + X(i,e,d)] · π_d)`, where `π_d` is a domain share and `f` is a scaling function (proportional vs. superlinear). Explicitly not \"average individual price times population.\"\n- **Task 6 (network):** the externality term `X` is the graph-based term. Network effect on an individual's price = `X(i,e,d)` summed over the relevant graph, with a correlation parameter `ρ_link` capturing how much one person's data leaks information about neighbors.\n- **Task 8 (policy):** a rights-vs-market framing. If privacy is a basic right, the policy variable is a *floor* `P_floor(d)` on P_market below which no transaction is legal, plus a *cap* `P_cap(d)` on P_loss liability; the model's prices are then read as market outcomes constrained by these legal bounds, not as unregulated market prices.\n\n**Weights and subgroup stratification (per Task 2's \"stratifying weights by subgroup\"):** `θ_s` and `β_s` are per-subgroup parameters (e.g., by age cohort, professional profile, or citizenship) that multiply the domain base rate and the breach-cost adjustment respectively. `λ_e` is per-element weight (name < DOB < SSN/citizenship number < health diagnosis < biometric), with the \"name vs. name+picture\" comparison modeled as a small increment in `λ` for the picture element, not a separate mechanism.\n\n**Generational dynamics (Task 5):** `θ_s` and the WTA/WTP gap are parameterized as a function of cohort age, with a drift term. As a generation ages, `θ_s` shifts (older cohorts typically higher WTP, higher WTA) — this is a one-parameter-per-cohort shift, not a new mechanism.\n\n**Dynamic element (Task 4):** `r_{i,d}` (individual risk uplift) and the WTA/WTP gap are time-varying, driven by changes in personal beliefs about data worth; modeled as a state variable updated by a simple adjustment rule (e.g., exponential smoothing toward a cohort-specific target).\n\n**Breach cascade (Task 7):** `p_{breach,i,d}` is endogenously increased by a cascade multiplier when a large breach occurs in domain `d`; aggregate loss = `Σ_i P_loss(i,e,d)` over compromised records, with a fixed-cost floor (small breaches have higher per-record cost) and an escalation factor for medical. The \"agency responsible to pay individuals\" question maps to whether P_loss is paid to the holder (private liability) or socialized (public insurance), a Task 8 policy choice.\n\n**Please accept or reject this specific structure.** If you reject, identify which component carries the flaw (the risk linkage, the externality term, one of the three named extensions, or the subgroup/dynamic parameterization) so I can make a minimal revision.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure from Exchange 2 is accepted as stated. Given that, please name the specific case, boundary condition, or failure mode that would *break* it. I want the failure that most threatens the deliverables, not a generic limitation. I am asking against the accepted structure specifically — the risk linkage (P_market discounted by breach probability), the additive externality term X(i,e,d) feeding Task 3/6/8, the three named extensions (aggregation rule for Task 3, graph term for Task 6, rights-vs-market floor/cap for Task 8), and the subgroup/dynamic parameterization.\n\nI have four candidate failure surfaces and want you to rank or reject them, and name the one that is the real threat:\n\n1. **Market breakdown from the WTA≫WTP gap.** If the commodity price P_market is anchored to WTA and WTA ≫ buyer WTP (as survey data shows, e.g., ~$80 WTA vs. ~$5/mo WTP in the extreme case), the bid-ask spread is so wide that no transaction occurs. Does the model's \"commodity market\" then degenerate to \"no market,\" making Task 3's national pricing and Task 8's policy framing moot? If so, is the failure in my structure (which takes P_market at face value) or is it a feature the policy layer must handle (e.g., the floor/cap in Task 8 closes the spread by regulation)?\n\n2. **Externality term under- or over-counting in dense networks.** If N_deg(i) is large for a hub individual, X(i,e,d) grows linearly with degree. In a dense or hub-dominated network, does this over-count (the same third-party value counted once per edge, double-counting shared neighbors) or under-count (it misses the *correlation* channel ρ_link, where one person's data is *information about* the neighbors, not just *valuable to* them)? Which of these is the real structural flaw, and does the linear-in-degree form need a concave or saturated form to survive a power-law degree distribution?\n\n3. **Aggregation rule for nations (Task 3) and the public-good non-additivity.** I proposed P_nation = f(Σ_i [P_market + X] · π_d) with f proportional or superlinear. If data is a public good (non-rival), the value of the *whole* dataset to a buyer (e.g., CDC, a insurer, a government) is not the sum of individual prices — the marginal value of the last record is near zero once coverage is high. Does my aggregation rule then over-state national value? Is the failure the additive form, or the choice of f, or is a public-good model fundamentally inapplicable because PI is not actually non-rival (a record is unique to its holder)?\n\n4. **Rights-vs-market floor/cap (Task 8) creating a wedge.** If P_floor(d) is set above the market-clearing P_market (because privacy is a right), no voluntary sale occurs and the \"commodity\" framing of Task 3 collapses. Conversely, if P_cap(d) on liability is set below the observed P_loss (breach damages), the model's liability pricing is meaningless because it is always capped. Is the failure that a rights framing and a commodity framing are mutually exclusive (so Task 8 must pick one and Task 3's market analysis is conditional on the non-rights branch), or that the floor/cap can coexist with the market but only in a narrow parameter band that I have not specified?\n\n**Please name the single most consequential failure mode for the final deliverables (especially Task 3 national pricing, Task 6 network effects, and Task 8 policy), state the boundary condition that triggers it, and indicate whether it is a flaw in the accepted core structure or a flaw that only the secondary-extension layers must carry.** This directly informs the bias/limitation analysis and the robustness discussion in the final report."
+        ],
+        "expert_answers": [
+          "The objective is not a single scalar but a vector of distinct quantities: WTP-to-protect, WTA-to-release (the commodity price), and expected breach liability. These are linked only through risk, not identical — P_market is a consented transfer price, P_loss is an involuntary damage expectation. Treating them as one number is the error the text invites but does not require.\n\nThe value of an element must carry an additive externality term: private bilateral value plus third-party/societal value (public-good and network components). This term is not captured in any bilateral transaction price and must feed Task 3 (national aggregation), Task 6 (network effects), and Task 8 (policy).\n\nTransfer rule: the individual three-domain core transfers directly to Task 3 only via an explicit aggregation rule; to Task 6 only via a graph/network term; to Task 8 only via a rights-vs-market framing. These are separate structural extensions, not inferences from the individual model.",
+          "accept",
+          "The real threat is candidate 3: the additive aggregation rule for Task 3. Boundary condition: high population coverage, where PI behaves as a non-rival public good — the marginal value of the last record collapses toward zero, so Σ_i [P_market + X] overstates national value by construction. This is a flaw in the secondary-extension layer, not the core: the individual-level vector (P_protect, P_market, P_loss) and the externality term X remain valid per record. The aggregation rule f must be concave/saturating in coverage, not proportional or superlinear. Candidates 1 and 4 are policy-layer features the floor/cap is designed to handle; candidate 2 is a form correction (concave in degree), not a structural break."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8666666666666667,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.85,
+        "practicality_and_scientificity_evaluation": 0.8666666666666667,
+        "result_and_bias_analysis_evaluation": 0.85
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately restates the core objective of quantifying the cost of privacy and developing a pricing structure for Personal Information (PI). The goals are explicitly defined across the eight tasks, ranging from parameter identification to policy recommendation. The scope is clearly delineated, covering individual, group, and national levels, as well as specific domains like social media and health. The analysis correctly identifies the need to balance risks, benefits, and market dynamics, ensuring the problem definition is precise and aligned with the requirements for a policy analysis team.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition into eight sub-tasks is logical and comprehensive, covering all aspects of the problem requirements. There is a clear dependency chain: Task 1 defines parameters, Task 2 builds the base model, Task 3 expands to market dynamics, and subsequent tasks address constraints, demographics, network effects, and breach scenarios. This structure ensures that the final policy memo (Task 8) is supported by a robust quantitative foundation. All key components, including the comparison with PP/IP and the dynamic nature of data value, are addressed without significant deviation or omission.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing specific quantitative insights, explaining the inference logic, and clearly distinguishing between robust findings and model limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying sources of judgment and data bias, and effectively mitigating their impact by emphasizing robust structural orderings over sensitive absolute values.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, logically consistent with the problem context, and their structural impacts on the model (e.g., concave aggregation for public goods) are rigorously justified.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (vector decomposition, multiplicative weights, concave aggregation) that scientifically reflect the complex, multi-dimensional nature of privacy valuation and network effects.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, using cited real-world data for calibration, providing actionable policy insights, and effectively quantifying complex privacy trade-offs for decision-making across different subgroups and domains.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically robust, integrating behavioral economics, network theory, and risk management with justified assumptions. It employs sophisticated mathematical structures like concave functions for network effects and dynamic drift models, demonstrating deep domain understanding.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 8,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2018_F",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the monetary cost of privacy (Tasks 1–8 of MM-Bench 2018_F). The\nproblem leaves one structural/definitional question unsettled that my core\npricing mechanism depends on, and I need the reading, not a magnitude.\n\nThe problem simultaneously asks for (a) a price for *protecting* one's private\ninformation (a benefit of keeping data private, i.e., what individuals would pay\nto keep it protected), and (b) a price for the data *itself* as a commodity that\nmay be bought, sold, or traded (Tasks 2–3), while Task 7 asks for the liability\npaid when a data breach destroys or misuses that data. My draft mechanism prices\neach data element in each domain as three coupled but separate quantities:\n\n1. **P_protect** — the willingness-to-pay (WTP) side: what a holder pays to keep\n   the element protected (insurance/subscription-like flow);\n2. **P_market** — the commodity price at which the element can be bought/sold\n   when the holder consents (anchored to the willingness-to-accept, WTA, side);\n3. **P_loss** — the expected loss/liability if the element is exposed through\n   breach or misuse (anchored to observed per-record breach costs).\n\nThree structural ambiguities I cannot settle from the text alone:\n\n1. **Commodity vs. liability distinction.** The problem asks \"what is the\n   monetary value of keeping PI protected, or how much would it cost for others\n   to have or use PI?\" — this conflates a *value of a good* (WTP to keep, WTA\n   to release) with a *liability* (damages when breached). Should the pricing\n   structure treat P_market (commodity price) and P_loss (breach liability) as\n   the *same* underlying value, or as *distinct* quantities linked only through\n   risk (e.g., P_loss = expected damage given breach probability, while\n   P_market = WTA net of that risk)? In other words, is the \"price of data\" one\n   number or a vector of numbers with a defined relationship?\n\n2. **Public-good / externality treatment.** The problem notes data sharing may\n   be a public good (disease tracing, national security) and that one person's\n   data informs about connected others (Task 6 network effects). Should the\n   core model treat the value of an element as purely *private* (bilateral\n   buyer–seller), or must it carry an *externality* term (value to third parties\n   and to society) that is additive but not captured in the bilateral\n   transaction price? If so, which sub-tasks (Task 3 national pricing, Task 6\n   network effects, Task 8 policy) must this externality term feed into?\n\n3. **Mapping to secondary deliverables.** The problem lists eight distinct\n   deliverables (Tasks 1–8). Which structural elements of the core three-domain\n   pricing model (social media, financial, health/medical) are *directly\n   transferable* to (i) the national-level pricing system of Task 3, (ii) the\n   network-effect adjustment of Task 6, and (iii) the policy memo of Task 8 —\n   versus which require *separate* structural treatment (e.g., an aggregation\n   rule for nations, a graph-based term for networks, a right-vs-market framing\n   for policy) that cannot be inferred from the individual-level model?\n\nPlease give the logical/definitional reading, not numerical values: the valid\ninterpretation of the objective, the domain of the price quantities, and the\ntransfer/extension rule from the individual core model to the group, national,\nand policy-level deliverables.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nAccepting your reading (one: vector of three linked prices; one: additive externality; one: three named extensions), please accept or reject this specific structural hypothesis for the core pricing model. I am proposing one coherent mechanism, not a menu.\n\n**Core element price (per data element `e`, per domain `d` ∈ {social media, financial, health/medical}, for individual `i` in subgroup `s`):**\n\n- **P_protect(i, e, d)** = `WTP_base(d) · θ_s · λ_e · (1 + r_{i,d})`\n  - A multiplicative composition: a domain base rate for willingness-to-pay for\n    protection, a subgroup sensitivity factor, a per-element weight, and an\n    individual risk uplift.\n- **P_market(i, e, d)** = `WTA_base(d) · θ_s · λ_e · (1 - α · p_{breach,i,d})`\n  - The commodity transfer price is the WTA anchor reduced by a *risk\n    discount* proportional to the individual's breach probability for that\n    domain. This is the risk linkage you specified: consented-transfer price\n    and involuntary damage are coupled through risk, not identical.\n- **P_loss(i, e, d)** = `p_{breach,i,d} · C_record(d) · λ_e · (1 + β_s)`\n  - Expected breach liability = breach probability times per-record cost,\n    element-weighted, subgroup-adjusted. `C_record(d)` is anchored to observed\n    per-record breach cost (higher for health/medical).\n\n- **Externality term** `X(i, e, d)`: additive to P_market, not to P_protect or\n  P_loss. Defined as `X(i,e,d) = η_d · (N_{deg}(i) / N_{deg,ref}) · g(e,d)`,\n  where `N_{deg}(i)` is the individual's network degree in the relevant graph,\n  `N_{deg,ref}` is a reference average, and `g(e,d)` is an element-domain\n  public-good weight. This feeds Task 6 (network) directly, and is the seed\n  term for Task 3 (national) and Task 8 (policy) extensions.\n\n**Three named extensions (per your one:), each a separate structural layer, not an inference from the core:**\n\n- **Task 3 (national):** aggregation rule `P_nation = f(Σ_i [P_market(i,e,d) + X(i,e,d)] · π_d)`, where `π_d` is a domain share and `f` is a scaling function (proportional vs. superlinear). Explicitly not \"average individual price times population.\"\n- **Task 6 (network):** the externality term `X` is the graph-based term. Network effect on an individual's price = `X(i,e,d)` summed over the relevant graph, with a correlation parameter `ρ_link` capturing how much one person's data leaks information about neighbors.\n- **Task 8 (policy):** a rights-vs-market framing. If privacy is a basic right, the policy variable is a *floor* `P_floor(d)` on P_market below which no transaction is legal, plus a *cap* `P_cap(d)` on P_loss liability; the model's prices are then read as market outcomes constrained by these legal bounds, not as unregulated market prices.\n\n**Weights and subgroup stratification (per Task 2's \"stratifying weights by subgroup\"):** `θ_s` and `β_s` are per-subgroup parameters (e.g., by age cohort, professional profile, or citizenship) that multiply the domain base rate and the breach-cost adjustment respectively. `λ_e` is per-element weight (name < DOB < SSN/citizenship number < health diagnosis < biometric), with the \"name vs. name+picture\" comparison modeled as a small increment in `λ` for the picture element, not a separate mechanism.\n\n**Generational dynamics (Task 5):** `θ_s` and the WTA/WTP gap are parameterized as a function of cohort age, with a drift term. As a generation ages, `θ_s` shifts (older cohorts typically higher WTP, higher WTA) — this is a one-parameter-per-cohort shift, not a new mechanism.\n\n**Dynamic element (Task 4):** `r_{i,d}` (individual risk uplift) and the WTA/WTP gap are time-varying, driven by changes in personal beliefs about data worth; modeled as a state variable updated by a simple adjustment rule (e.g., exponential smoothing toward a cohort-specific target).\n\n**Breach cascade (Task 7):** `p_{breach,i,d}` is endogenously increased by a cascade multiplier when a large breach occurs in domain `d`; aggregate loss = `Σ_i P_loss(i,e,d)` over compromised records, with a fixed-cost floor (small breaches have higher per-record cost) and an escalation factor for medical. The \"agency responsible to pay individuals\" question maps to whether P_loss is paid to the holder (private liability) or socialized (public insurance), a Task 8 policy choice.\n\n**Please accept or reject this specific structure.** If you reject, identify which component carries the flaw (the risk linkage, the externality term, one of the three named extensions, or the subgroup/dynamic parameterization) so I can make a minimal revision.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure from Exchange 2 is accepted as stated. Given that, please name the specific case, boundary condition, or failure mode that would *break* it. I want the failure that most threatens the deliverables, not a generic limitation. I am asking against the accepted structure specifically — the risk linkage (P_market discounted by breach probability), the additive externality term X(i,e,d) feeding Task 3/6/8, the three named extensions (aggregation rule for Task 3, graph term for Task 6, rights-vs-market floor/cap for Task 8), and the subgroup/dynamic parameterization.\n\nI have four candidate failure surfaces and want you to rank or reject them, and name the one that is the real threat:\n\n1. **Market breakdown from the WTA≫WTP gap.** If the commodity price P_market is anchored to WTA and WTA ≫ buyer WTP (as survey data shows, e.g., ~$80 WTA vs. ~$5/mo WTP in the extreme case), the bid-ask spread is so wide that no transaction occurs. Does the model's \"commodity market\" then degenerate to \"no market,\" making Task 3's national pricing and Task 8's policy framing moot? If so, is the failure in my structure (which takes P_market at face value) or is it a feature the policy layer must handle (e.g., the floor/cap in Task 8 closes the spread by regulation)?\n\n2. **Externality term under- or over-counting in dense networks.** If N_deg(i) is large for a hub individual, X(i,e,d) grows linearly with degree. In a dense or hub-dominated network, does this over-count (the same third-party value counted once per edge, double-counting shared neighbors) or under-count (it misses the *correlation* channel ρ_link, where one person's data is *information about* the neighbors, not just *valuable to* them)? Which of these is the real structural flaw, and does the linear-in-degree form need a concave or saturated form to survive a power-law degree distribution?\n\n3. **Aggregation rule for nations (Task 3) and the public-good non-additivity.** I proposed P_nation = f(Σ_i [P_market + X] · π_d) with f proportional or superlinear. If data is a public good (non-rival), the value of the *whole* dataset to a buyer (e.g., CDC, a insurer, a government) is not the sum of individual prices — the marginal value of the last record is near zero once coverage is high. Does my aggregation rule then over-state national value? Is the failure the additive form, or the choice of f, or is a public-good model fundamentally inapplicable because PI is not actually non-rival (a record is unique to its holder)?\n\n4. **Rights-vs-market floor/cap (Task 8) creating a wedge.** If P_floor(d) is set above the market-clearing P_market (because privacy is a right), no voluntary sale occurs and the \"commodity\" framing of Task 3 collapses. Conversely, if P_cap(d) on liability is set below the observed P_loss (breach damages), the model's liability pricing is meaningless because it is always capped. Is the failure that a rights framing and a commodity framing are mutually exclusive (so Task 8 must pick one and Task 3's market analysis is conditional on the non-rights branch), or that the floor/cap can coexist with the market but only in a narrow parameter band that I have not specified?\n\n**Please name the single most consequential failure mode for the final deliverables (especially Task 3 national pricing, Task 6 network effects, and Task 8 policy), state the boundary condition that triggers it, and indicate whether it is a flaw in the accepted core structure or a flaw that only the secondary-extension layers must carry.** This directly informs the bias/limitation analysis and the robustness discussion in the final report."
+            ],
+            "expert_answers": [
+              "The objective is not a single scalar but a vector of distinct quantities: WTP-to-protect, WTA-to-release (the commodity price), and expected breach liability. These are linked only through risk, not identical — P_market is a consented transfer price, P_loss is an involuntary damage expectation. Treating them as one number is the error the text invites but does not require.\n\nThe value of an element must carry an additive externality term: private bilateral value plus third-party/societal value (public-good and network components). This term is not captured in any bilateral transaction price and must feed Task 3 (national aggregation), Task 6 (network effects), and Task 8 (policy).\n\nTransfer rule: the individual three-domain core transfers directly to Task 3 only via an explicit aggregation rule; to Task 6 only via a graph/network term; to Task 8 only via a rights-vs-market framing. These are separate structural extensions, not inferences from the individual model.",
+              "accept",
+              "The real threat is candidate 3: the additive aggregation rule for Task 3. Boundary condition: high population coverage, where PI behaves as a non-rival public good — the marginal value of the last record collapses toward zero, so Σ_i [P_market + X] overstates national value by construction. This is a flaw in the secondary-extension layer, not the core: the individual-level vector (P_protect, P_market, P_loss) and the externality term X remain valid per record. The aggregation rule f must be concave/saturating in coverage, not proportional or superlinear. Candidates 1 and 4 are policy-layer features the floor/cap is designed to handle; candidate 2 is a form correction (concave in degree), not a structural break."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r1p2_20260930_090912/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately restates the core objective of quantifying the cost of privacy and developing a pricing structure for Personal Information (PI). The goals are explicitly defined across the eight tasks, ranging from parameter identification to policy recommendation. The scope is clearly delineated, covering individual, group, and national levels, as well as specific domains like social media and health. The analysis correctly identifies the need to balance risks, benefits, and market dynamics, ensuring the problem definition is precise and aligned with the requirements for a policy analysis team.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition into eight sub-tasks is logical and comprehensive, covering all aspects of the problem requirements. There is a clear dependency chain: Task 1 defines parameters, Task 2 builds the base model, Task 3 expands to market dynamics, and subsequent tasks address constraints, demographics, network effects, and breach scenarios. This structure ensures that the final policy memo (Task 8) is supported by a robust quantitative foundation. All key components, including the comparison with PP/IP and the dynamic nature of data value, are addressed without significant deviation or omission.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative insights, explaining the inference logic, and clearly distinguishing between robust findings and model limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying sources of judgment and data bias, and effectively mitigating their impact by emphasizing robust structural orderings over sensitive absolute values.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, logically consistent with the problem context, and their structural impacts on the model (e.g., concave aggregation for public goods) are rigorously justified.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (vector decomposition, multiplicative weights, concave aggregation) that scientifically reflect the complex, multi-dimensional nature of privacy valuation and network effects.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, using cited real-world data for calibration, providing actionable policy insights, and effectively quantifying complex privacy trade-offs for decision-making across different subgroups and domains.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically robust, integrating behavioral economics, network theory, and risk management with justified assumptions. It employs sophisticated mathematical structures like concave functions for network effects and dynamic drift models, demonstrating deep domain understanding.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 8
+        },
+        {
+          "problem_id": "2018_F",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p2_20260930_090912",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p2_20260930_090912/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a pricing structure for private information (PI) covering three domains — social media, financial transactions, and health/medical records — plus the extension tasks in the problem (Task 3 market/aggregate pricing, Task 5 generations, Task 6 network effects, Task 7 breach cascade, Task 8 policy memo). The statement leaves three structural/definitional boundaries unsettled that our core mechanism must be parameterized against, and we need a reading of the problem, not magnitudes:\n\n1. **Ownership semantics — which determines whether Task 3 can exist at all.** Is PI treated as a *property right* the individual holds (and the firm holds at most a license to use), or as a *usage claim* whose value exists only while the data is being used? Specifically: does lawful acquisition by a third party transfer ownership of the PI itself, or only a limited right to use it? The pricing system in Task 3 (individuals → groups → nations) is incoherent if PI cannot be owned; we need the boundary that makes the commodity framing defensible or says where it must stop (e.g., which record types are categorically non-transferable).\n\n2. **The aggregation domain for the two-sided price.** The statement gives a \"value of keeping PI protected\" and a \"cost for others to have/use PI.\" Should the core price in Tasks 1–2 be a single scalar per data element (a symmetric exchange value), or a *pair* — an expected loss side (individual/subgroup risk of harm) and an expected value side (benefit of the use), aggregated over which entity: the individual alone, the individual plus connected third parties (network externalities, Task 6), or the individual plus society (public-good uses such as disease tracing)? In other words: at what boundary does an individual's privacy price stop being purely private, and does the \"price point for protecting one's privacy\" include the option value of the data's societal uses or exclude them?\n\n3. **Temporal domain of \"the price.\"** Is the price of a data element a *flow* (recurring per-period value while the data is fresh/being used, i.e., what a per-period subscription or per-period sharing fee would be), a *stock* (one-off lump-sum value of the record), or both with an expiry/halving structure as the data ages? This decides whether Task 4's dynamic element (beliefs about the worth of data changing over time) enters as a re-pricing of a stock or as the discounting of a decaying flow, and whether Task 7's breach loss is a one-off claim or a stream.\n\nThese three readings govern every later parameterization: the element-decomposition and subgroup weights (Task 2), the market structure (Task 3), the policy framing (Task 8). Please state the correct reading for each, and note which reading is load-bearing for the commodity market in Task 3.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 readings (PI = usage claim; price = pair {expected-loss L, expected-value V} at the individual-plus-connected-third-parties boundary; both a decaying flow and a one-off stock; health, minors' identifiers, SSN-class non-transferable), I propose the following concrete structural configuration for the core mechanism. Please accept or reject it as a whole.\n\n**Element layer.** 17 data elements, each with (i) a lump-sum record value (stock) and (ii) a per-period use value (flow) that decays exponentially as the record ages. Elements split into transferable (name, DOB, gender, picture, address, location, purchases, search, posts, network graph, card transactions, credit, bank) and non-transferable (SSN/citizenship, medical conditions, genetic, treatment). Non-transferability is enforced at element level: those elements carry no licence price, only a protection price; the rest of the domain keeps its market.\n\n**Price-pair layer.** For an individual in a domain, the private price is a pair:\n- L (expected annual loss) = breach-probability(domain × individual risk class) × per-record harm(domain scale × record value);\n- V (expected value) = present value of the decaying flow over transferable elements + a stock-resale term, both scaled by a network-externality multiplier that rises with the degree of the individual's connected network (one's data is worth more when one's network is observed).\nThe two market-facing prices are then derived from the pair: WTA (access price) from V, WTP (protection price) from L. Societal/public-good uses (e.g., disease tracing) are kept as a separate non-priced option value, excluded from the private pair, per your reading.\n\n**Market layer (Task 3).** Supply = individuals/groups/nations with a reservation price = their WTA; demand = aggregate buyer willingness-to-pay = the WTP side. The market is a licence market (not a property market). If WTA > WTP the trade does not occur and the bid-ask gap is reported as deadweight loss. The individual → group → nation price is the weighted mean of subgroup prices.\n\n**Extensions.** Task 4 dynamics = re-pricing of the stock (belief multiplier β(t) rising with data awareness) and re-discounting of the flow (decay rate λ(t) falling as data commoditizes). Task 5 generations = cohort multipliers on WTA and risk-perception that converge toward the reference as the cohort ages. Task 6 network = the degree-scaled multiplier on V (above). Task 7 breach = cascade loss = N × c(N) with c(N) decaying in N (fixed + variable cost split), plus a dark-web resale capture, plus a per-individual one-off claim and a 12-month residual stream.\n\nPlease respond with exactly one word: **accept** or **reject**.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou accepted the structure in Exchange 2. It is now the current mechanism: 17 elements (transferable vs. non-transferable at element level), a two-sided private price pair {L = breach-probability × harm, V = PV of decaying flow + stock resale, both network-degree-scaled}, a licence market where supply reservation = WTA (from V) and demand = WTP (from L) so that WTA > WTP produces a no-trade deadweight gap, and the extensions (Task 4 β(t)/λ(t) dynamics, Task 5 cohort multipliers, Task 6 network multiplier, Task 7 cascade N × c(N) + dark-web resale + per-individual claim + 12-month residual stream).\n\nName the specific case, boundary condition, or failure mode that would break this mechanism — i.e., the situation in which the price pair, the licence-market no-trade logic, or the cascade loss computation gives a result that is wrong, incoherent, or that misprices the privacy in a way that would corrupt the Task 8 policy recommendation. State the case and which part of the mechanism fails; do not propose a fix."
+            ],
+            "expert_answers": [
+              "**1. Ownership semantics.** Read PI as a *usage claim*, not a property right: lawful acquisition transfers a limited right to use, not ownership of the information itself. The commodity framing in Task 3 is defensible only as a market in *use-licenses*, and it must stop at categorically non-transferable record types (health/medical, identifiers of minors, citizenship/SSN-class elements). This reading is load-bearing for Task 3: without it, individuals→groups→nations pricing is incoherent.\n\n**2. Aggregation domain.** The core price is a *pair*, not a scalar: an expected-loss side (individual/subgroup harm) and an expected-value side (benefit of use), aggregated at the individual-plus-connected-third-parties boundary, with societal/public-good uses (disease tracing) held as a separate, non-priced option value excluded from the private price point.\n\n**3. Temporal domain.** Both: a decaying *flow* (per-period use value with expiry/halving) plus a *stock* lump-sum for the record. Task 4 enters as re-pricing of the stock and re-discounting of the flow; Task 7's breach loss is a one-off claim plus a residual stream.",
+              "accept",
+              "**Case: a single non-transferable element is bundled with transferable ones in the same record.**\n\nThe mechanism fails at the element-level non-transferability rule. If a record contains SSN/medical/genetic elements alongside name, DOB, and location, the licence market prices the bundle through V (PV of decaying flow + stock resale) on the transferable subset, while L is computed over the whole record. The buyer's WTP then reflects harm from elements it is legally barred from receiving, and the seller's WTA reflects resale value of elements it cannot license. The bid-ask gap becomes an artifact of the bundling boundary, not of privacy preference — so the no-trade deadweight loss is misattributed, and Task 8's recommendation (which record types to exclude) is driven by an accounting split rather than by the non-transferability constraint itself."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8458333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.7999999999999999,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/train_candidate/runs/round_9/r2p2_20260930_090912/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately identifies the core objective of quantifying the cost of privacy and establishing a pricing structure for Personal Information (PI). Each task is clearly defined with specific goals, such as defining parameters in Task 1, modeling domains in Task 2, and analyzing market dynamics in Task 3. The scope is well-defined, covering individual, group, and national levels, as well as various data domains. The goals are explicit and directly address the problem requirements, ensuring a clear direction for the modeling process.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced and interdependent, forming a coherent framework. Task 1 provides the foundation for Task 2, which in turn informs Task 3. The coverage is comprehensive, addressing all key aspects of the problem, including risk assessment, domain-specific modeling, market dynamics, regulatory considerations, generational differences, network effects, and breach impacts. There are no significant deviations or missing key parts, and each sub-task supports the final goal of providing a policy memo. The dependencies are clearly stated, ensuring a structured approach to solving the problem.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative outputs, clear interpretations of data value, and well-structured conclusions that directly address the policy questions with identified strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific data and model biases, analyzing their directional impact on results, and explaining how these biases influence the robustness of the policy recommendations.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a comprehensive pricing framework that accounts for domain, subgroup, and temporal dynamics. It provides actionable outputs for policy decisions, such as liability calculations and market equilibrium analysis, effectively translating abstract privacy concepts into quantifiable economic metrics.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, utilizing established economic and mathematical principles like present value, exponential decay, and network theory. It integrates interdisciplinary concepts effectively, though some parameter values lack explicit empirical justification, slightly tempering its overall scientific rigor.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, logically consistent with the problem context, and grounded in economic theory (e.g., WTA/WTP asymmetry). The distinction between usage claims and property rights is a strong foundational choice. Minor deductions are made for the lack of detailed derivation for the dynamic belief and decay parameters.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate economic methods (WTP/WTA, externality analysis) to reflect the problem's complexity. The structure logically handles the non-market nature of certain data types and the network effects of data sharing. The breach liability model is rational and quantifiable. The overall framework is scientifically sound and effectively addresses the multi-faceted nature of the prompt.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 8
+        }
+      ],
+      "refined_report_utility": 0.8666666666666667,
+      "interaction_cost": 0.8714725242886461,
+      "interaction_penalty": 0.04357362621443231,
+      "net_utility": 0.8230930404522344,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3394,
+          "total_expert_latency_seconds": 4.47,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9545243334866996,
+          "latency_cost_component": 0.27000880461683624,
+          "interaction_cost": 0.8818097333946799,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2185,
+          "total_expert_latency_seconds": 5.09,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9028382879565302,
+          "latency_cost_component": 0.2870693976793082,
+          "interaction_cost": 0.8611353151826121,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T09:26:27.923861",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_bc49a013c7df",
+  "workflow": {
+    "name": "Deliverable-Aligned Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 8) achieved high scores in modeling rigorousness and practicality but lost points in analysis_evaluation, specifically for failing to decompose problems into distinct sub-problems and for not explicitly addressing all specific requirements (like policy recommendations and generalization) in the analysis. The rollouts showed that while the core model was strong, the interaction did not explicitly ensure that the structural choices made in Exchange 2 were mapped to all the distinct deliverables listed in the problem statement. This patch introduces a 'Deliverable Alignment Rule' that requires the agent to explicitly map structural ambiguities to all enumerated sub-tasks/deliverables in Exchange 1 and to propose a mechanism in Exchange 2 that includes a defined interface for these secondary components. This directly addresses the judge's feedback on analysis decomposition and coverage without changing the core operator sequence or rejection handling, which were already effective.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_bc49a013c7df",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 9,
+    "parent_workflow_ids": [
+      "interaction_workflow_ed9d84c49711"
+    ],
+    "training_batch": [
+      "2019_D",
+      "2018_F"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2019_D",
+    "2018_F"
+  ],
+  "absolute_utility": 0.8427083333333334,
+  "interaction_cost": 0.8615277703059903,
+  "interaction_penalty": 0.04307638851529952,
+  "net_utility": 0.7996319448180339,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

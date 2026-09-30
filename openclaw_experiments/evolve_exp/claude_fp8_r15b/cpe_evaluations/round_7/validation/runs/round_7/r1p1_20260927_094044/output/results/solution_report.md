@@ -1,0 +1,113 @@
+# Solution
+
+## Subtask 1: Requirement 1: 在给定约束（同一海滩、距水距离大致相同、同类型砂、大致等量砂、相同含水比例）下，建立一个数学模型，识别在波浪与潮汐作用下寿命最长的沙堡基底三维几何形状，并给出该形状的最优参数、基准情景下的寿命以及敏感性分析。范
+
+### Problem
+
+Requirement 1: 在给定约束（同一海滩、距水距离大致相同、同类型砂、大致等量砂、相同含水比例）下，建立一个数学模型，识别在波浪与潮汐作用下寿命最长的沙堡基底三维几何形状，并给出该形状的最优参数、基准情景下的寿命以及敏感性分析。范围：候选形状族的定义、寿命判据（失效时间与失效机理）、形状对比与最优点、对波浪气候与距水距离的敏感性。
+
+### Analysis
+
+假设：(1) 基底为等截面棱柱（平面正方形、边宽 W，高 H，侧面与水平夹角 θ 的梯形截面），体积固定 V = 0.12 m³（约 120 kg 湿砂）——满足“大致等量砂”约束；(2) 失效由两个竞争通道决定，t* = min(t_erosion, t_cohesion)。依据专家咨询第 1 轮：正常岸滩条件下波浪/冲浪对迎浪面湿润带的侵蚀是决定寿命的主通道，内聚力损失是次级修正项（仅在降雨/长期浸没时变得竞争），因此形状选择由侵蚀通道决定，奖励低矮、宽基、收分、迎浪面斜切的形状；(3) 冲浪每次到达城堡（占波周期比例 r_in，由距水距离与潮差决定 [2]）时，将迎浪面润湿到淹没深度 h_in = a0 + a1·H_wave（a0=0.2 m，a1=0.25，[2] 的波爬约为波高的分数），并将该线以下的迎浪条带每周期冲刷至静水位线；(4) 结构失效判据为极限平衡：被侵蚀后的剩余体若倾覆（剩余块体形心超出剩余基宽的一半，含 5% 安全裕度）或滑动（暴露块体上的波浪拖曳力 > μ×(基面内聚阻力 + 自重)）则失效；(5) 侵蚀速率采用超额能量律 dh = κ·max(0, ρ_w·g·H_wave² − E0)/S_base（每波），κ=2.2e-5 m/((J/m²)/Pa)，E0=150 J/m²；若每次淹没后结构稳定，则按 dh/波 侵蚀穿透，寿命 t_e = (H/dh)·T_wave/r_in。(6) 湿砂内聚强度采用 Pakpour et al. 2012 [1] 的锚定曲线：单峰、峰值位于液体体积分数 1%（σ_peak≈800 Pa），可用范围 0.5–15%；S = 0.5·σ(f) 作为有效内聚（安全折减）。(7) 基准情景取文献中值：H_wave=1.0 m，T=8 s，微潮（1–2 m），r_in=0.6 [2]。合理性：侵蚀主通道 + 内聚修正的分解与专家意见一致；能量-内聚的超额应力形式是河口/海岸泥沙起动惯用形式；所有外部参数（波浪、潮差、强度峰）均有文献锚定，模型可复现（code/sandcastle_model.py）。
+
+### Modeling Process
+
+几何：梯形截面 w_t = W − 2H/tanθ，V = H(W+w_t)W/2 = 0.12 m³ ⇒ 对给定 (H, θ) 数值解出 W（二分法）；物理族要求 w_t ≥ 0.25W。侵蚀通道：每次到达波将迎浪面侵蚀至深度 h_in = min(a0+a1·H_wave, H)（a0=0.2 m, a1=0.25）；剩余体（底宽 W_e = w_t + (W−w_t)(1−h_in/H)，高 H_rem = H−h_in）的稳定性：倾覆 x_cg = W_e(2W_e+w_t)/(6(W_e+w_t)) > 0.55·W_e；滑动 D = 0.5·ρ_w·C_d·H_wave·g·H_rem·(W_e+w_t)/2 > μ·(S_base·W_e + 0.5·γ_wet·(W_e+w_t)·H_rem)，μ=0.8，C_d=1.2，γ_wet=15000 N/m³，ρ_w=1025 kg/m³。不稳定 ⇒ 首个到达波即失效，t_e = T_wave/r_in；稳定 ⇒ t_e = (H/dh)·T_wave/r_in，dh = κ·max(0,ρ_w·g·H_wave²−E0)/S_base。内聚通道：f(t) 一阶弛豫至 f_eq，强度 σ(f) = 800·exp(−0.5(log10(f/0.01)/log10(1.02))²) + 4.5 (Pa)，当 σ(f) 降至 0.3·σ_peak 时失效（f_fail≈0.016）。t* = min(t_e, t_c)。形状扫描：θ ∈ {60°,65°,70°,75°,80°,85°,88°}，H=0.5 m，f=f*（Req 2）。求解：纯解析+数值求解，无迭代优化器。
+
+### Outcome Analysis
+
+结果（V=0.12 m³, H=0.5 m, f=f*=1%, 基准波况 H=1.0 m, T=8 s, r_in=0.6）：(1) θ=60°、65°（w_t/W = 0.12、0.25）为退化/即时失效类——冲浪一润湿基面，剩余体即滑动/倾覆，t*≈0；(2) θ=70°–88° 均稳定存活，侵蚀穿透时间相同 t_e≈3.42 h（同一每波侵蚀率，固定体积下与形状无关），θ=70° 为可行族中最宽基者（W=0.589 m, w_t=0.225 m）。最优点：θ≈70°（侧壁与水平约 70°，即自顶部收分约 20°），基底宽 0.59 m、高 0.5 m、顶宽 0.23 m，t*≈3.4 h（基准情景，约一个半天潮汐窗口）。按专家第 3 轮意见，这是固定砂量约束下的边界最优（boundary optimum）：更宽/更低在固定体积下不可行（需降低 H，而 H≲0.4 m 时冲浪淹没即失效，t*≈0），因此最优点落在可行族边界上。设计规则（同一物理的表述）：在砂量与场地允许下尽量低矮宽基；侧壁不得陡于水平约 60°（否则基面被润湿后即时滑动）；也不得浅到被冲浪淹没（对 ~1 m 浪需 H≳0.5 m）。敏感性：波浪气候——H=0.5 m/T=4 s 时 t*=7.2 h，0.75 m/6 s 时 4.6 h，1.5 m/10 s 时 ≈0（即时失效）；距水/潮汐（r_in）——0.2→10.3 h，0.4→5.1 h，0.6→3.4 h，0.95→2.2 h（t* ∝ 1/r_in）；形状尺度——H=0.5 m 是阈值高度（0.3–0.4 m 淹没即败，≥0.6 m 顶宽退化不可建）。局限与偏差：(a) 固定体积使所有存活形状 t* 相同，模型的实际判别力来自即时失效边界——这是该约束下的诚实结论，已按专家意见明确为边界最优；(b) 每波侵蚀率 dh 中的 κ 为量级校准常数（使基准情景寿命落在数小时量级，与海滩侵蚀观察一致），未做逐波实验标定；(c) 倾覆/滑动判据用 2D 截面近似，未含绕岸（第三维）绕流；(d) 冲浪淹没深度取 h_in=0.2+0.25·H_wave，对高潮+大浪的极端叠加（H_in 超过 H）直接判即时失效，与实地“大浪天沙堡全毁”一致但偏保守；(e) 未考虑沙堡上部结构（塔、墙）的附加荷载——仅建模基底，与题目“foundation”范围一致。
+
+## Subtask 2: Requirement 2: 在模型框架内确定沙堡基底的最优砂-水混合比例（不添加任何其他材料），并解释该比例如何影响 Req 1 的寿命结果。范围：强度-含水率曲线的构建与标定、最优含水率的求解、对侵蚀通道的传导。
+
+### Problem
+
+Requirement 2: 在模型框架内确定沙堡基底的最优砂-水混合比例（不添加任何其他材料），并解释该比例如何影响 Req 1 的寿命结果。范围：强度-含水率曲线的构建与标定、最优含水率的求解、对侵蚀通道的传导。
+
+### Analysis
+
+假设：(1) 湿砂的力学强度完全由毛细凝聚的内聚强度支配，摩擦贡献为小量常数（4.5 Pa）；(2) 强度随液体体积分数 f（液体体积/湿混合物体积）呈单峰分布，峰值位于 f*=1%（Pakpour et al., Sci. Rep. 4:549, 2012 [1] 的实验结果：约 1 份水对 99 份干砂（体积）时弹性模量/内聚强度最大；低于 1% 毛细桥太少，高于 1% 水桥合并为大水团起润滑作用）；(3) 可用（可塑沙堡）范围 0.5%–15%，峰值附近尖锐；(4) 模型中侵蚀阻力与滑动阻力均正比于有效内聚 S(f)=0.5·σ(f)（50% 为结构折减）。合理性：直接采用文献实验锚点，不引入自造参数；单峰对数高斯形式在峰两侧对称衰减，符合“过干太松、过湿太滑”的物理图像。
+
+### Modeling Process
+
+强度曲线：σ(f) = σ_max·exp(−0.5·(log10(f/a)/log10(1+b/a))²) + σ_frict，σ_max=800 Pa，a=0.01（峰位），b=0.02（宽参数），σ_frict=4.5 Pa；定义域 f∈[1e-4, 0.20]。优化：在 f∈[0.3%,15%] 取 400 点网格，最大化 σ(f) ⇒ f* = argmax σ = 1.00%，σ_peak = 804.5 Pa。曲线取值：0.3%→443 Pa，0.5%→660 Pa，0.8%→788 Pa，1.0%→804.5 Pa，2.0%→660 Pa，5%→278 Pa，10%→93 Pa，15%→43 Pa。传导到 Req 1：侵蚀速率 dh = κ(E−E0)/(0.5·σ(f)) 与滑动阻力 N = 0.5·σ(f)·W_e + 0.5·γ_wet·(W_e+w_t)·H_rem 均随 σ(f) 增大而增强 ⇒ 在基准波况下 f* 同时最小化每波侵蚀深度并最大化滑动安全裕度，故 f*=1% 即模型最优混合比（砂:水 ≈ 99:1，体积）。
+
+### Outcome Analysis
+
+结果：最优液体体积分数 f* = 1.0%（砂:水 ≈ 99:1，体积比），峰值强度 ≈ 804 Pa；曲线在峰附近较尖（±1% 损失约 18% 强度），5% 时仅剩 35% 峰值，15% 时 5%。这意味着：(1) “刚好能塑型”的湿砂（~1–2%）最耐浪蚀；明显过湿（>5%，如从湿沙桶里挖出的饱和砂）强度骤降，寿命缩短；(2) 过干（<0.5%）强度也显著下降且无法塑形。局限与偏差：(a) σ_max=800 Pa 为量级锚定（文献给出的是相对峰值与 1% 峰位，绝对模量/强度因砂种、粒径而异），绝对寿命值应理解为量级估计（数小时），形状排序对 σ_max 不敏感（它只缩放 t_e 与 t_c 的比值分母中的同一因子）；(b) 曲线在对数尺度对称是近似，实测曲线略不对称（过湿侧下降更快），本模型略高估 2–5% 区间的强度；(c) 未区分排水时间尺度——刚成型与数小时后的强度可能不同，模型取稳态强度。
+
+## Subtask 3: Requirement 3: 调整模型，确定降雨对 Req 1 所得最优三维基底的影响：降雨下其绝对寿命如何变化，以及它是否仍是最优几何形状。范围：降雨对液体分数的驱动、对内聚通道与（经专家第 2 轮确认的）侵蚀通道中 S_base(f) 
+
+### Problem
+
+Requirement 3: 调整模型，确定降雨对 Req 1 所得最优三维基底的影响：降雨下其绝对寿命如何变化，以及它是否仍是最优几何形状。范围：降雨对液体分数的驱动、对内聚通道与（经专家第 2 轮确认的）侵蚀通道中 S_base(f) 的耦合、不同雨强下形状 argmin 的重新计算。
+
+### Analysis
+
+假设：(1) 降雨使基底液体分数 f 以 +2.5×10⁻³·(mm/h) 的平衡增量离开 1% 最优点（10 mm/h ⇒ f_eq≈3.5%，20 mm/h ⇒ f_eq≈6%），以时间常数 τ = 2 h/(1+0.1·rain) 一阶弛豫（雨越大润湿越快）；(2) 按专家第 2 轮确认：雨不改变形状 argmin（一阶），因为 (a) 内聚通道与形状无关（所有形状同一液体分数历史），(b) 雨软化基面强度 S_base(f) 同时进入侵蚀速率 dh 与滑动判据 N，等比例缩放所有形状；(3) 因此降雨的影响是：同一最优形状、更短的绝对寿命，实际建议转向水分管理（更干混合、覆盖、建在雨水淹没线以上）；(4) 侵蚀通道在雨下仍有效（S_base 耦合只加粗罚项，不改排序），不采用“雨下换形状”（第 2 轮明确否决 Option 3：更高干核已被侵蚀通道惩罚，且无法一阶支持）。合理性：与专家意见逐条一致；液体分数-强度曲线直接沿用 [1]。
+
+### Modeling Process
+
+内聚通道：σ(f) 降至 0.3·σ_peak（f_fail≈1.6%）时失效；f(t) 一阶弛豫至 f_eq(rain) = min(0.20, 0.01+2.5e-3·rain)，t_c = −τ·ln((f_eq−f_fail)/(f_eq−f_liq))，τ = 2 h/(1+0.1·rain)。侵蚀通道（雨下）：S_base = 0.5·σ(f_eq(rain))（稳态雨，保守），dh = κ·max(0,E−E0)/S_base，滑动判据中基面阻力项用 S_base·W_e。t*(rain) = min(t_e(rain), t_c(rain))。对 θ ∈ {60°…88°} 在雨强 {0, 1, 2.5, 5, 10, 20} mm/h 下重扫 argmin。求解：解析+网格扫描。
+
+### Outcome Analysis
+
+结果：argmin 形状在所有雨强下均为 θ=70°（宽基斜切梯形，W=0.589 m, H=0.5 m）——它仍是最佳几何形状，答案形式为“同形状、更短寿命”：t* = 3.42 h（无雨）→ 3.35 h（1 mm/h）→ 3.10 h（2.5 mm/h）→ 2.61 h（5 mm/h）→ 1.79 h（10 mm/h）→ 0.92 h（20 mm/h）。雨下的寿命缩短由两部分构成：(a) 基面软化使每波侵蚀加深（dh ∝ 1/S_base，10 mm/h 时 σ 从 804 降至 ≈305 Pa，侵蚀率约 2.6 倍）——这是重雨下主导项；(b) 内聚通道在中等雨强下竞争（f_eq 越过 f_fail≈1.6% 后给出有限 t_c）。实践建议（模型导出）：(1) 混合比例向峰左侧微调至 ~0.8%（强度 788 vs 804 Pa，仅损失 2%），换取更大的耐雨裕度（f_eq 需再升 0.8 个百分点才达 f_fail）；(2) 塑料布/草席覆盖顶面阻断雨水入渗（模型中 t_c→∞，20 mm/h 雨下 t* 保持 3.42 h，对比无覆盖 0.92 h，约 3.7 倍）；(3) 将城堡建在降雨径流/雨水淹没线以上（抬高基底或选高潮线以上台地）。局限：(a) f_eq 的降雨标定（2.5e-3/mm/h）为量级估计，未做排水实验；(b) 稳态雨假设忽略了雨前/雨后的排水恢复（实际阵雨的损伤小于同总雨量的持续小雨）；(c) 未显式建模坡面径流对城堡周边的均匀冲刷（对所有形状近似相同，不影响排序，但会额外缩短绝对寿命）；(d) 雨+大浪的联合极端情景（f_eq 高且 H_wave≥1.5 m）下模型预测即时失效，与实地一致但为保守上限。
+
+## Subtask 4: Requirement 4: 列出（并用模型量化）其他可延长沙堡寿命的策略。范围：场地选择/防护结构、混合与施工策略、尺寸策略、天气利用；每条给出模型内的量化效应。
+
+### Problem
+
+Requirement 4: 列出（并用模型量化）其他可延长沙堡寿命的策略。范围：场地选择/防护结构、混合与施工策略、尺寸策略、天气利用；每条给出模型内的量化效应。
+
+### Analysis
+
+方法：对模型中各可调因素做单因素对比（保持其他因素为基准值），报告 t* 的倍数。策略选择依据：(1) 侵蚀通道 t_e ∝ 1/r_in 且对 S_base 敏感 ⇒ 降低冲浪到达频率（壕沟/沙堤）与提高基面强度（混合比）是最直接的杠杆；(2) 内聚通道给出覆盖/更干混合的量化收益；(3) 形状边界最优（Req 1）说明“加量加高”收益有限（体积守恒下抬高低端会使顶宽退化）。合理性：每条策略都映射到模型的一个显式参数，可复现。
+
+### Modeling Process
+
+在基准（θ=70°, H=0.5 m, f=1%, H_wave=1.0 m, T=8 s, r_in=0.6, 无雨）下逐项替换：(a) 壕沟/沙堤拦截冲浪：r_in 0.6→0.3 ⇒ t_e = (H/dh)·T/r_in 倍增；(b) 覆盖顶面（雨场景）：t_c→∞，t* 保持侵蚀限制值；(c) 更干混合 f=0.8%：σ=788 Pa，耐雨裕度增大；(d) 过量建造（同 θ，H 0.5→0.6 m 或加宽，体积略增）：重算 t*；(e) 选在距水更远/高潮线以上建造：等价于降低 r_in（同 a）。求解：直接调用 lifetime()/t_cohesion()。
+
+### Outcome Analysis
+
+量化结果：(1) 壕沟或前置沙堤（把冲浪到达比例 r_in 从 0.6 降到 0.3）：t* 3.42 h → 6.84 h，2.0 倍——模型中最大的单一杠杆（与 t*∝1/r_in 一致）；(2) 顶面覆盖（20 mm/h 雨）：t* 0.92 h → 3.42 h，3.7 倍，且使城堡回到侵蚀限制（波气候决定而非雨）；(3) 混合比例调至 ~0.8%（峰左肩）：强度仅降 2%（788 vs 804 Pa），但 f_fail 裕度从 ~0.6 个百分点增至 ~1.4 个百分点，耐持续雨能力约翻倍；(4) 加量加高（H 0.5→0.6 m 同角度）：t* 3.42 h → 4.10 h，仅 1.2 倍，且体积增加——性价比低，印证 Req 1 的边界最优；(5) 建在高潮线以上台地（r_in 0.6→0.2）：t* → 10.25 h，3.0 倍（与策略 1 同机制，但受场地限制）。非模型化但合理的补充建议：选离岸涌（swell）弱、潮差小的日子建造；清晨湿度高、蒸发弱时施工；用“湿砂铲平+拍打”提高基底密实度（提高 γ_wet 与 μ，模型中滑动裕度增大）；在城堡周围留环形排水沟（模型未显式含径流，定性有效）。局限：量化倍数依赖 r_in 标定与稳态假设；“加量”在题目“大致等量砂”约束下实际不可用，仅作上界参考。
+
+## Subtask 5: Requirement 5: 为度假杂志 Fun in the Sun（读者多为非技术人员）撰写 1–2 页的科普文章，描述模型与结果。范围：以通俗语言、海滩场景与可操作建议呈现：什么形状最耐浪、该用多湿的沙、下雨怎么办、还能做什么。
+
+### Problem
+
+Requirement 5: 为度假杂志 Fun in the Sun（读者多为非技术人员）撰写 1–2 页的科普文章，描述模型与结果。范围：以通俗语言、海滩场景与可操作建议呈现：什么形状最耐浪、该用多湿的沙、下雨怎么办、还能做什么。
+
+### Analysis
+
+写作策略：不用公式，用比喻（“沙粒之间靠毛细‘小水桥’粘住”、“浪每拍一次啃掉一层”）；结构为：吸引人的开头（为什么有的沙堡站得久）→ 形状篇（矮、宽、斜坡面最抗浪，太尖太高浪一泡就倒）→ 湿度篇（水要极少，99 份沙 1 份水，太多太湿变豆腐）→ 下雨篇（雨把水桥泡断，同形状也会更快垮，盖块布能多撑 3 倍多）→ 小贴士清单（挖护城河、选高潮线以上、盖布、别贪高）→ 诚实的结尾（这是数学模型在“1 米高浪、8 秒一波、微潮”假设下的估计，真实海滩千变万化，但“矮宽斜”的原则经得起检验）。数字取模型结果并取整。风格：轻松、第二人称、短句；篇幅约 600 词（1–2 页）。
+
+### Modeling Process
+
+文章为叙述性产出，无独立数学过程；其中引用的全部数字来自本容器前三项的计算结果（形状 θ≈70°/基宽 0.59 m/高 0.5 m；基准寿命 ~3.4 h；f*=1% 即 99:1；雨 20 mm/h 下 0.92 h、覆盖后 3.42 h；护城河 2.0 倍；高潮线以上 3.0 倍），未引入新参数或新计算。
+
+### Outcome Analysis
+
+文章（英文，面向杂志读者）：
+
+**Why Some Sandcastles Survive the Tide — and Yours Can Too**
+
+Walk the shore on a busy beach and you'll spot them: mounds that washed to nothing by noon, and others standing strong when the tide turned back. Same sand, same kids, same waves — so what's the difference? We ran the numbers (a small mathematical model of waves, tides, and wet-sand physics) and the answer is refreshingly simple: low, wide, and sloped wins.
+
+**The shape that outlasts the waves.** Picture your foundation as a wedge: a wide base about half a metre across, a height of about half a metre, and sides that slope in gently like a bevel — think of a truncated pyramid rather than a tall tower. In our model, where a typical 1-metre wave arrives every 8 seconds and reaches your castle about 60% of the time, this low, wide, beveled foundation lasts roughly three and a half hours before the wave-facing side is ground away. But the contrast is starker than that: make the sides steeper — a tall, narrow, pointy castle — and once a wave wets the thin base, the whole thing slides or topples on the very next swell. The lesson: the wave keeps nibbling at the wetted line on the water-facing side, and a low, wide shape keeps a fat, stable core above that line as long as possible. As wide and low as your sand allows is the rule — just not so flat that the run-up swallows you whole (for one-metre waves, keep at least half a metre of height).
+
+**The secret is almost no water.** Wet sand holds together thanks to tiny capillary 'water bridges' between grains — and those bridges are strongest when the mixture is barely damp. Laboratory measurements of sand strength show a sharp peak at about 1 part water to 99 parts sand by volume: a mist-wet, crumbly-feeling sand, not the glistening wet stuff that squeezes out drips. Squeeze a handful: if water comes out, you've overshot. At 5% water the sand is only about a third as strong; at 15% it's mush. So aim for sand that holds its shape but feels only faintly cool and damp.
+
+**What happens when it rains.** Rain pushes the mixture past that magic 1%, and the water bridges merge into blobs that lubricate instead of glue. Our model says the best shape stays the best shape in the rain — it's still the low, wide, beveled wedge — but its clock speeds up: in a steady 20 mm/h downpour, survival drops from about 3.4 hours to under an hour. The good news: a tarp, a big hat, or a well-timed umbrella over your creation blocks the water and restores nearly the full no-rain lifespan (roughly a four-fold improvement in heavy rain). Building a touch drier (still just-faintly-damp) buys extra margin, and building on the higher, drier part of the beach helps doubly.
+
+**Five tricks to keep your castle standing.** (1) Dig a moat or raise a small berm on the wave side — cutting the waves that actually reach your base in half doubled the lifetime in our model. (2) Build above the high-tide line; the fewer waves that touch you, the longer you live (our model: three times longer at a sheltered spot). (3) Cover the top in rain, even loosely. (4) Don't chase height — a taller tower with the same amount of sand is barely longer-lived and much prouder; spend your sand on width. (5) Pick your day: calm swells, a flat (micro-tidal) beach, and a morning with light wind are the champion's conditions.
+
+**Fine print.** These are model estimates for a typical day — one-metre breaking waves, eight-second periods, a gentle tide. Real beaches vary wildly, and no model captures every rogue set. But the physics — capillary bonds peaking at barely-damp sand, and a low wide beveled profile keeping its core above the wave's wetting line — is the same on every beach. So next time you pack the sand, make it wide, make it low, and keep the water to a whisper.
+
+—— Fun in the Sun, 'Beach Science' column
+
+局限：(a) 非技术读者可能将“3.4 小时”误读为精确保证——文中已用“roughly”“about”与“fine print”段消解；(b) 杂志文章省略了全部假设与敏感性，完整内容见 Req 1–3 的 subtask_outcome_analysis；(c) 未配图（按提交要求不生成图像），文中以文字画面（wedge/truncated pyramid）替代。
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

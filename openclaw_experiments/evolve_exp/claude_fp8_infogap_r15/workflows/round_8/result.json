@@ -1,0 +1,730 @@
+{
+  "round": 8,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8279116568474973,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.9,
+    "modeling_rigorousness_evaluation": 0.8458333333333334,
+    "practicality_and_scientificity_evaluation": 0.8458333333333334,
+    "result_and_bias_analysis_evaluation": 0.8916666666666666
+  },
+  "problem_results": [
+    {
+      "problem_id": "2016_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a donor-investment model for the Goodgrant Foundation: $100M per year\nfor five years allocated across U.S. colleges to maximize the likelihood of a strong\npositive effect on student performance, ranked by a charitable ROI. The data file gives,\nper school: 10-year median earnings (`md_earn_wne_p10`), share of alumni earning\n>$25k six years after entry (`gt_25k_p6`), 4-year retention (`RET_FT4`/`RET_FTL4`),\nmedian graduate debt (`GRAD_DEBT_MDN_SUPP`/`GRAD_DEBT_MDN10YR_SUPP`), 3-year repayment\nrate (`RPY_3YR_RT_SUPP`), and Pell Grant share (`PCTPELL`).\n\nBefore parameterizing the ROI and the selection mechanism, three structural questions\nfrom the problem statement that the text and the data do not settle:\n\n1. **Definition of \"student performance\" and counterfactual:** The data contain\n   only *levels* of outcomes, not treatment effects. What is the correct structural\n   reading of \"effect on student performance\" for a donor? Specifically: should the\n   model treat a school's *outcome level relative to an appropriate peer benchmark*\n   (e.g., national or need-matched median) as the estimand of \"value added,\" or should\n   the outcome be *change* over time (which the single most-recent-cohort snapshot\n   does not support)? What is the valid domain of the outcome variable — earnings,\n   retention, debt, or a combination — and which of these does \"performance\" refer to?\n\n2. **Meaning of \"demonstrated potential for effective use of private funding\":** This\n   is the ranking criterion. Structurally, is this (a) a property of the school's\n   *capacity to convert resources into outcome improvement* (i.e., a productivity/\n   efficiency concept — schools where an extra dollar moves outcomes most), or (b) a\n   property of the school's *need plus baseline* (i.e., schools where students are\n   furthest from a target outcome)? These are logically different selection rules and\n   would yield different candidate lists. Which logical boundary does the foundation's\n   wording imply, or how should the two be combined?\n\n3. **Structure of the charitable ROI and the investment duration:** For a nonprofit,\n   ROI is not a monetary return. What is the correct logical form of ROI here — a\n   ratio of *discounted outcome benefit to dollars committed*, with what structural\n   numerator (per-student or total cohort effect) and what structural denominator\n   (upfront grant, or grant plus any assumed co-investment or maintenance cost)? And\n   how should the \"time duration the money should be provided\" be interpreted\n   structurally — is duration a free continuous variable per school, or is it bounded\n   by the program lifecycle (e.g., the five funding years, the four-year degree span,\n   or the 6/10-year outcome windows in the data)?\n\nI am not asking for magnitudes, rates, or empirical constants — only the logical\ninterpretation of the objective function and the valid domains of its variables.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 answers (outcome level vs. peer benchmark as a value-added\nproxy; \"effective use of funding\" as a productivity concept with need as a modifier;\nROI as discounted outcome benefit over dollars committed; duration bounded by program\nlifecycle), I propose this one coherent structural configuration for the model. Please\naccept or reject it as a whole.\n\n**Structural allocation and ranking configuration:**\n\n- **Peer benchmark:** each school's outcome is compared against the median of\n  schools in the same *need-and-selectivity stratum* (strata = 2x2 grid of Pell\n  share quartile × SAT/ACT selectivity quartile, with 2-year schools benchmarked\n  separately from 4-year). The value-added residual is `outcome_i −\n  benchmark(stratum_i)`. This is the \"demonstrated potential\" signal.\n\n- **Productivity (conversion) mechanism:** because the data give only levels,\n  \"capacity to convert dollars into improvement\" is operationalized as a\n  *marginal-effect proxy*: a school's residual is weighted by the inverse of its\n  baseline investment level, so that at comparable need, the school whose outcome\n  residual is achieved on *less* existing per-student spending is read as having a\n  higher marginal return. Formally, `productivity_i = residual_i /\n  (per_student_cost_i)^{1/2}`, using a square-root (concave) cost term so that the\n  mechanism reflects diminishing returns rather than assuming linear scaling.\n  Need (Pell share) multiplies this as a *modifier*, not a ranking axis, per your\n  stipulation.\n\n- **Composite outcome:** the value-added residual is a weighted sum over four\n  sub-outcomes — (a) 4-year retention/progress, (b) completion/degree, (c) debt\n  burden (inverted, so lower debt is better), (d) post-graduation earnings\n  (`md_earn_wne_p10`) and the `gt_25k_p6` value-added indicator — with earnings\n  weighted heaviest, consistent with the Scorecard's design intent. The four\n  sub-weights are a fixed vector, not estimated from the data.\n\n- **Allocation and duration:** the $100M/year is allocated to the top-ranked\n  schools proportional to their productivity score, with the *number of funded\n  schools* and the *per-school award* emerging from a cap (no single school takes\n  more than a fixed fraction of the annual pot). Duration is set to the four-year\n  degree cycle, i.e., each funded cohort is supported for a bounded, lifecycle-\n  consistent window rather than a free per-school variable.\n\nThis is one self-consistent mechanism. Accept, or reject and name the specific\nstructural element you find unsound.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nAssuming the accepted structure from Exchange 2 (value-added residual of a weighted\ncomposite — retention/progress, completion, inverted debt burden, and post-graduation\nearnings — measured against a need- and selectivity-stratum benchmark; need enters as\na modifier; ROI as discounted per-student outcome benefit scaled to cohort size over\ngrant plus assumed co-investment; duration bounded by the program lifecycle), identify\nthe specific case, boundary condition, or failure mode that would break this mechanism\nor produce a suboptimal, infeasible, or misleading recommendation.\n\nConcretely: which school profile — or which condition in the data (e.g., a stratum\nwith very few or missing peer observations, a school whose earnings and debt residuals\npoint in opposite directions, a very small or very large enrolled cohort, or a\nschool at the extreme of the Pell-share modifier) — would cause the ranking or the\nROI estimate to misassign funds, and why would that case defeat the stated\nobjective?"
+        ],
+        "expert_answers": [
+          "The text does not settle these; the model must fix them by stipulation, and the data cannot validate the choice.\n\n1. \"Effect\" is a treatment effect, but the data carry only levels. The defensible estimand is outcome level relative to a peer benchmark (need- and selectivity-matched), read as a proxy for value added — not change over time, which a single snapshot cannot support. \"Performance\" is not earnings alone; the valid domain is a composite spanning retention/progress, completion, debt burden, and post-graduation earnings, since a donor's effect is multi-dimensional.\n\n2. The wording \"effective use of private funding\" is a productivity concept — capacity to convert dollars into improvement — not need-plus-baseline. Need enters only as a modifier, not the ranking criterion.\n\n3. ROI is a ratio: discounted expected outcome benefit over dollars committed. Numerator is a per-student effect scaled to cohort size; denominator is the grant plus any assumed co-investment. Duration is bounded by the program lifecycle, not free per school.",
+          "reject",
+          "The stratum with too few peer observations breaks it: when a need×selectivity cell holds only a handful of schools, the benchmark median is itself an outlier, so the residual — and every downstream productivity, ROI, and rank — is noise. A single unusual school in a thin cell can be benchmarked against itself or against one peer, manufacturing a large spurious \"value added\" that captures the pot. This defeats the objective because funds flow to a measurement artifact, not to demonstrated potential."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_ed9d84c49711",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8708333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.8666666666666667,
+        "practicality_and_scientificity_evaluation": 0.8333333333333334,
+        "result_and_bias_analysis_evaluation": 0.8833333333333333
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need to define charitable ROI and student performance metrics, acknowledging the data limitation (outcome levels vs. treatment effects). Task 2 focuses on the ranking mechanism for \"demonstrated potential,\" and Task 3 addresses allocation and duration. The goals are explicit, and the logical form of the solution is well-structured. The analysis is accurate and directly addresses the core components of the Goodgrant Foundation's request.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically interrelated and cover the main aspects of the problem. Task 1 (definitions) provides the foundation for Task 2 (ranking) and Task 3 (allocation). The decomposition effectively separates the conceptual definition, the selection/ranking mechanism, and the resource allocation/duration decisions. All sub-tasks support the final goal of creating an optimal investment strategy. There are no significant deviations or missing key parts; the coverage is comprehensive and aligned with the problem requirements.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing specific metrics, clear rankings, and a transparent explanation of how the model derives its conclusions, effectively supporting decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key data and model biases, and mitigating their impact through robustness checks and conservative assumptions, ensuring the results are defensible.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicitly justified by data constraints (cross-sectional nature), and logically consistent with the charitable context, including robust handling of peer benchmarking and duration limits.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (value-added residuals, peer benchmarking) and a rational allocation strategy (proportional with cap) that effectively addresses the problem's requirements and data limitations.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively translates charitable goals into a quantifiable ROI framework, provides actionable allocation strategies with caps, and uses value-added analysis to identify high-potential schools, making it highly practical for decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses scientifically sound value-added analysis with peer controls, applies appropriate financial discounting principles, and clearly justifies its assumptions, demonstrating a rigorous and interdisciplinary approach.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 3,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2016_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nWe are building a donor-investment model for the Goodgrant Foundation: $100M per year\nfor five years allocated across U.S. colleges to maximize the likelihood of a strong\npositive effect on student performance, ranked by a charitable ROI. The data file gives,\nper school: 10-year median earnings (`md_earn_wne_p10`), share of alumni earning\n>$25k six years after entry (`gt_25k_p6`), 4-year retention (`RET_FT4`/`RET_FTL4`),\nmedian graduate debt (`GRAD_DEBT_MDN_SUPP`/`GRAD_DEBT_MDN10YR_SUPP`), 3-year repayment\nrate (`RPY_3YR_RT_SUPP`), and Pell Grant share (`PCTPELL`).\n\nBefore parameterizing the ROI and the selection mechanism, three structural questions\nfrom the problem statement that the text and the data do not settle:\n\n1. **Definition of \"student performance\" and counterfactual:** The data contain\n   only *levels* of outcomes, not treatment effects. What is the correct structural\n   reading of \"effect on student performance\" for a donor? Specifically: should the\n   model treat a school's *outcome level relative to an appropriate peer benchmark*\n   (e.g., national or need-matched median) as the estimand of \"value added,\" or should\n   the outcome be *change* over time (which the single most-recent-cohort snapshot\n   does not support)? What is the valid domain of the outcome variable — earnings,\n   retention, debt, or a combination — and which of these does \"performance\" refer to?\n\n2. **Meaning of \"demonstrated potential for effective use of private funding\":** This\n   is the ranking criterion. Structurally, is this (a) a property of the school's\n   *capacity to convert resources into outcome improvement* (i.e., a productivity/\n   efficiency concept — schools where an extra dollar moves outcomes most), or (b) a\n   property of the school's *need plus baseline* (i.e., schools where students are\n   furthest from a target outcome)? These are logically different selection rules and\n   would yield different candidate lists. Which logical boundary does the foundation's\n   wording imply, or how should the two be combined?\n\n3. **Structure of the charitable ROI and the investment duration:** For a nonprofit,\n   ROI is not a monetary return. What is the correct logical form of ROI here — a\n   ratio of *discounted outcome benefit to dollars committed*, with what structural\n   numerator (per-student or total cohort effect) and what structural denominator\n   (upfront grant, or grant plus any assumed co-investment or maintenance cost)? And\n   how should the \"time duration the money should be provided\" be interpreted\n   structurally — is duration a free continuous variable per school, or is it bounded\n   by the program lifecycle (e.g., the five funding years, the four-year degree span,\n   or the 6/10-year outcome windows in the data)?\n\nI am not asking for magnitudes, rates, or empirical constants — only the logical\ninterpretation of the objective function and the valid domains of its variables.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 answers (outcome level vs. peer benchmark as a value-added\nproxy; \"effective use of funding\" as a productivity concept with need as a modifier;\nROI as discounted outcome benefit over dollars committed; duration bounded by program\nlifecycle), I propose this one coherent structural configuration for the model. Please\naccept or reject it as a whole.\n\n**Structural allocation and ranking configuration:**\n\n- **Peer benchmark:** each school's outcome is compared against the median of\n  schools in the same *need-and-selectivity stratum* (strata = 2x2 grid of Pell\n  share quartile × SAT/ACT selectivity quartile, with 2-year schools benchmarked\n  separately from 4-year). The value-added residual is `outcome_i −\n  benchmark(stratum_i)`. This is the \"demonstrated potential\" signal.\n\n- **Productivity (conversion) mechanism:** because the data give only levels,\n  \"capacity to convert dollars into improvement\" is operationalized as a\n  *marginal-effect proxy*: a school's residual is weighted by the inverse of its\n  baseline investment level, so that at comparable need, the school whose outcome\n  residual is achieved on *less* existing per-student spending is read as having a\n  higher marginal return. Formally, `productivity_i = residual_i /\n  (per_student_cost_i)^{1/2}`, using a square-root (concave) cost term so that the\n  mechanism reflects diminishing returns rather than assuming linear scaling.\n  Need (Pell share) multiplies this as a *modifier*, not a ranking axis, per your\n  stipulation.\n\n- **Composite outcome:** the value-added residual is a weighted sum over four\n  sub-outcomes — (a) 4-year retention/progress, (b) completion/degree, (c) debt\n  burden (inverted, so lower debt is better), (d) post-graduation earnings\n  (`md_earn_wne_p10`) and the `gt_25k_p6` value-added indicator — with earnings\n  weighted heaviest, consistent with the Scorecard's design intent. The four\n  sub-weights are a fixed vector, not estimated from the data.\n\n- **Allocation and duration:** the $100M/year is allocated to the top-ranked\n  schools proportional to their productivity score, with the *number of funded\n  schools* and the *per-school award* emerging from a cap (no single school takes\n  more than a fixed fraction of the annual pot). Duration is set to the four-year\n  degree cycle, i.e., each funded cohort is supported for a bounded, lifecycle-\n  consistent window rather than a free per-school variable.\n\nThis is one self-consistent mechanism. Accept, or reject and name the specific\nstructural element you find unsound.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nAssuming the accepted structure from Exchange 2 (value-added residual of a weighted\ncomposite — retention/progress, completion, inverted debt burden, and post-graduation\nearnings — measured against a need- and selectivity-stratum benchmark; need enters as\na modifier; ROI as discounted per-student outcome benefit scaled to cohort size over\ngrant plus assumed co-investment; duration bounded by the program lifecycle), identify\nthe specific case, boundary condition, or failure mode that would break this mechanism\nor produce a suboptimal, infeasible, or misleading recommendation.\n\nConcretely: which school profile — or which condition in the data (e.g., a stratum\nwith very few or missing peer observations, a school whose earnings and debt residuals\npoint in opposite directions, a very small or very large enrolled cohort, or a\nschool at the extreme of the Pell-share modifier) — would cause the ranking or the\nROI estimate to misassign funds, and why would that case defeat the stated\nobjective?"
+            ],
+            "expert_answers": [
+              "The text does not settle these; the model must fix them by stipulation, and the data cannot validate the choice.\n\n1. \"Effect\" is a treatment effect, but the data carry only levels. The defensible estimand is outcome level relative to a peer benchmark (need- and selectivity-matched), read as a proxy for value added — not change over time, which a single snapshot cannot support. \"Performance\" is not earnings alone; the valid domain is a composite spanning retention/progress, completion, debt burden, and post-graduation earnings, since a donor's effect is multi-dimensional.\n\n2. The wording \"effective use of private funding\" is a productivity concept — capacity to convert dollars into improvement — not need-plus-baseline. Need enters only as a modifier, not the ranking criterion.\n\n3. ROI is a ratio: discounted expected outcome benefit over dollars committed. Numerator is a per-student effect scaled to cohort size; denominator is the grant plus any assumed co-investment. Duration is bounded by the program lifecycle, not free per school.",
+              "reject",
+              "The stratum with too few peer observations breaks it: when a need×selectivity cell holds only a handful of schools, the benchmark median is itself an outlier, so the residual — and every downstream productivity, ROI, and rank — is noise. A single unusual school in a thin cell can be benchmarked against itself or against one peer, manufacturing a large spurious \"value added\" that captures the pot. This defeats the objective because funds flow to a measurement artifact, not to demonstrated potential."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_ed9d84c49711",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p1_20260930_080635/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need to define charitable ROI and student performance metrics, acknowledging the data limitation (outcome levels vs. treatment effects). Task 2 focuses on the ranking mechanism for \"demonstrated potential,\" and Task 3 addresses allocation and duration. The goals are explicit, and the logical form of the solution is well-structured. The analysis is accurate and directly addresses the core components of the Goodgrant Foundation's request.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically interrelated and cover the main aspects of the problem. Task 1 (definitions) provides the foundation for Task 2 (ranking) and Task 3 (allocation). The decomposition effectively separates the conceptual definition, the selection/ranking mechanism, and the resource allocation/duration decisions. All sub-tasks support the final goal of creating an optimal investment strategy. There are no significant deviations or missing key parts; the coverage is comprehensive and aligned with the problem requirements.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific metrics, clear rankings, and a transparent explanation of how the model derives its conclusions, effectively supporting decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases, and mitigating their impact through robustness checks and conservative assumptions, ensuring the results are defensible.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified by data constraints (cross-sectional nature), and logically consistent with the charitable context, including robust handling of peer benchmarking and duration limits.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (value-added residuals, peer benchmarking) and a rational allocation strategy (proportional with cap) that effectively addresses the problem's requirements and data limitations.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively translates charitable goals into a quantifiable ROI framework, provides actionable allocation strategies with caps, and uses value-added analysis to identify high-potential schools, making it highly practical for decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses scientifically sound value-added analysis with peer controls, applies appropriate financial discounting principles, and clearly justifies its assumptions, demonstrating a rigorous and interdisciplinary approach.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        },
+        {
+          "problem_id": "2016_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p1_20260930_080635",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p1_20260930_080635/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nFor the Goodgrant $100M-per-year, five-year investment problem, the model's core\nmechanism is a per-school potential score P (from the Scorecard outcomes:\nmedian earnings 10 years after entry, share of students earning over $25k six\nyears after entry, debt, loan share, retention) that drives an estimated ROI,\nwhich then drives a budget-constrained allocation of $100M per year across a\nprioritized candidate list of schools.\n\nThe problem statement leaves three structural constraints unsettled that I\ncannot derive from the text or the data:\n\n1. **Definition of the ROI objective.** \"Highest likelihood of producing a\n   strong positive effect on student performance\" is not a formal objective.\n   For a charitable donor, should ROI be interpreted as (a) expected\n   improvement in student outcomes per dollar (benefit-per-cost, in student\n   terms), (b) the probability that the funded school exceeds a baseline\n   outcome threshold per dollar, or (c) a costed-out payback (donor dollars\n   vs. future earnings gains)? Which reading is the correct logical domain for\n   the objective function, and is \"strong positive effect\" a definable\n   threshold on outcomes (e.g., a minimum lift in median earnings or in the\n   share earning over $25k) or an ordinal priority rule?\n\n2. **Domain of the allocation variables.** Per-school investment x_i: what are\n   its valid bounds? Specifically — (a) is there a maximum and/or minimum\n   investment per school per year (e.g., a ceiling so no school dominates the\n   $100M, and a floor below which a grant cannot plausibly change outcomes),\n   and (b) is the number of funded schools N flexible (chosen by the\n   optimizer) or fixed by the funder? Is funding allowed to be withdrawn from\n   a school mid-program (a partial year), or is the duration T_i per school\n   discrete?\n\n3. **The non-duplication constraint with Gates/Lumina.** This is stated as an\n   aim, not a constraint. Is it a hard exclusion (schools already receiving\n   large grants from those foundations are removed from the candidate pool),\n   a soft penalty in the objective, or merely a prioritization note with no\n   formal role in the model? And is \"duplication\" to be read at the school\n   level or at the program/field level (e.g., they fund engineering, so we\n   avoid engineering programs)?\n\nI am not asking for magnitudes or constants — only for which logical\ninterpretation governs each of the three.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven that the problem leaves the three structural choices open, I propose the\nfollowing single coherent structure for the investment model. Accept or\nreject it as a whole.\n\n**1. ROI definition (charitable benefit-per-cost).** For school i, define an\nestimated 10-year earnings lift per funded student, L_i, as the share of a\ncounterfactual gap: the distance between the school's observed median earnings\n10 years after entry and the earnings level implied by its entering-cohort\nquality (SAT/ACT and the $25k share), plus a Pell-recipient premium. The\ncharitable ROI is\n\nROI_i = (L_i * UGDS_i * e_i) / x_i,\n\nwhere UGDS_i is the full-time undergraduate count and e_i in [0,1] is the\neffective fraction of students the funding is estimated to reach (scaled by\nPCTPELL_i and loan dependence). ROI_i is thus \"expected student-earnings\ndollars improved per donor dollar\" — the benefit-per-cost reading. \"Strong\npositive effect\" is operationalized as ROI_i at or above the top-quartile ROI\nacross the candidate pool, used only for the final prioritization tiering.\n\n**2. Allocation domain.** The per-school investment x_i is continuous, bounded\nby a per-school floor of $1M/year (below which no measurable institutional\nchange is plausible) and a ceiling of $15M/year (so no single school can\nabsorb more than 15% of the annual $100M). The number of funded schools N is\nflexible and is whatever the optimizer selects within these bounds. Funding\nduration T_i is discrete in whole program years, 1 to 5, and a school's\nfunding is all-or-nothing within a year (no partial-year withdrawal); the\nfive-year program is a sequence of five annual budget rounds, each\nre-optimized on the same $100M.\n\n**3. Non-duplication as a hard pool filter.** Because the provided data\ncontains no grant-receipt records, school-level duplication with\nGates/Lumina cannot be measured; I therefore read non-duplication at the\n**focus/mission level**: schools whose dominant institutional profile is the\nhigh-salary, selective, low-need segment (top quartile in SAT average AND\nbottom quartile in Pell share) are excluded from the candidate pool, since\nthat segment is the established focus of large selective-college\nendowment-style funders. The remaining pool — schools serving substantial\nlow-income populations with room to improve — is where Goodgrant's money is\nleast likely to duplicate existing large grants and most likely to be\nbinding.\n\nThe dominant loss mechanism in this domain is **diminishing marginal impact**:\nthe lift L_i is not linear in funding, so x_i enters with a saturating\nresponse (a hyperbolic term), not linearly. The allocation then solves, for\neach year, max sum_i ROI_i(x_i) subject to sum_i x_i = $100M and the bounds\nabove.\n\nAccept or reject this structure.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYour rejection is taken as targeting the pool filter in element 3: defining\n\"non-duplication\" as an ex-post exclusion of the high-SAT/low-Pell segment is\na self-serving reading — the exclusion is chosen to make Goodgrant's own\npriorities look like a duplication-avoidance rule, and it can silently drop\nexcellent low-income-serving schools if their SAT reports happen to be\nhigh.\n\nMinimal revision, now the operative structure: non-duplication becomes a\n**soft penalty term** in the objective, not a pool filter. The candidate pool\nstays the full set of schools with complete outcome data. A duplication-risk\nscore d_i in [0,1] (from the same segment indicators) multiplies the\neffective objective as (1 - d_i), so the optimizer prefers, but never\nexcludes, schools outside the high-salary/low-need segment. Elements 1 (ROI\nas benefit-per-cost with saturating lift) and 2 (continuous x_i in\n[$1M, $15M], flexible N, discrete whole-year duration 1-5, all-or-nothing\nwithin a year, five re-optimized annual rounds) are unchanged.\n\nGiven this revised mechanism, identify the single specific case, boundary\ncondition, or failure mode that would break it or make it give a materially\nwrong allocation — e.g., a data or pool condition under which the saturating\nlift plus the duplication penalty produces an infeasible or perverse\nallocation, or a boundary value at which the per-school floor/ceiling or the\nwhole-year duration assumption produces a wrong answer."
+            ],
+            "expert_answers": [
+              "The text cannot settle any of the three; each is a modeling choice the problem statement leaves open, not a derivable fact.\n\n1. **ROI objective.** The statement gives no formal objective, no threshold, and no unit of \"student performance.\" All three readings (benefit-per-cost, threshold-probability, costed payback) are logically admissible; \"strong positive effect\" is undefined as either a threshold or an ordinal rule. The modeler must declare one.\n\n2. **Allocation domain.** No bounds on x_i, no ceiling, no floor, no statement whether N is fixed or optimized, and no rule on partial-year withdrawal or discrete T_i appear in the text or data.\n\n3. **Non-duplication.** Stated as an aim (\"do not want to duplicate\"), not a constraint. Whether it is hard exclusion, soft penalty, or a note, and whether \"duplication\" is school-level or program-level, is not specified.\n\nThese are underdetermined by the problem; the modeler supplies the interpretation.",
+              "reject",
+              "The case that breaks it: a school with **zero or near-zero measured lift** (its observed median earnings already at or above the level implied by its entering-cohort quality, so L_i ≈ 0) but a **high duplication-risk score d_i**. The penalty (1 − d_i) scales a benefit that is already ~0, so the school is neither funded nor meaningfully deprioritized — yet the floor of $1M/year and the flexible-N optimizer can still be forced to seat it if the pool of positive-lift schools is too small to absorb $100M within the $15M ceiling. With N_max = $100M/$1M = 100 schools and a ceiling of $15M, if fewer than ~7 schools clear the floor with positive saturating lift, the budget constraint sum x_i = $100M becomes infeasible or forces funding of zero-lift schools — the penalty cannot fix a binding feasibility failure, because (1 − d_i) only reorders, it does not relax the floor or the equality."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_ed9d84c49711",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8625,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.8333333333333334,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p1_20260930_080635/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each of the four tasks, explicitly stating the inputs (data files), processing steps (cleaning, estimation, optimization), and desired outputs (candidate list, ROI, strategy). The goals are specific, such as producing a 1,294-school table or a prioritized list of N=15 schools, which makes the objectives measurable and clear. The definition of charitable ROI and the non-duplication constraint are also explicitly addressed in the task descriptions, ensuring the analysis aligns with the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced with clear dependencies: Task 1 prepares the data, Task 2 estimates potential and risk, Task 3 performs the optimization, and Task 4 synthesizes the strategy. This flow directly supports the final goal of providing an executable investment strategy. All key components of the problem, including data handling, ROI definition, budget constraints, and non-duplication, are covered. There are no significant deviations or missing parts; the decomposition comprehensively addresses the requirements from data foundation to final deliverable.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and generally reasonable, with minor arbitrary choices like the $1M floor that could be better justified.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods and metrics, with a rational structure that reflects the problem's complexities, though the counterfactual proxy could be more robust.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing a transparent inference path, robust sensitivity checks, and actionable conclusions that effectively support decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying specific data and model biases, explaining their direction and impact, and honestly framing results as upper bounds to mitigate misinterpretation.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear, actionable investment strategy with specific allocations and durations. It effectively handles constraints and provides interpretable ROI metrics tailored to the charitable context, directly supporting decision-making.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses sound mathematical optimization and reasonable assumptions for diminishing returns. However, it relies on correlational data for causal impact estimation without rigorous causal inference, limiting its scientific depth despite a well-structured framework.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8708333333333333,
+      "interaction_cost": 0.8596143389159683,
+      "interaction_penalty": 0.042980716945798414,
+      "net_utility": 0.8278526163875349,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2063,
+          "total_expert_latency_seconds": 3.46,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8960959031705682,
+          "latency_cost_component": 0.23757336032853957,
+          "interaction_cost": 0.8584383612682274,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2169,
+          "total_expert_latency_seconds": 4.18,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9019757914092732,
+          "latency_cost_component": 0.2613531664416402,
+          "interaction_cost": 0.8607903165637093,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2017_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nThe problem requires a metric of smart-growth success for two mid-sized cities\n(population 100k–500k, on different continents), evaluated across the three E's\n(Economic prosperity, social Equity, environmental Sustainability) and the ten\nsmart-growth principles, applied to both each city's *current* growth plan (Q2)\nand a *redesigned* plan (Q3–Q5). The text settles neither the logical structure\nof the metric nor the domain of its components. I need the three structural\nconventions that would otherwise remain arbitrary:\n\n1. **Decomposition.** Should the composite smart-growth score be a weighted sum\n   of three independent E-pillar sub-scores (with the 10 principles used only to\n   choose the indicators feeding each pillar), or should the score be built\n   directly from the 10 principles as the primary dimension set, with the three\n   E's only as a labeling scheme?\n2. **Aggregation rule.** The three E's can trade off (e.g., densification raises\n   Equity and Economic scores but can cut Environmental scores). Must the\n   composite require a *floor* (veto) on any single pillar — so a plan that fails\n   one E regardless of the other two is capped or disqualified — or is any\n   trade-off legitimate as long as the weighted sum improves? In other words:\n   does the metric treat the three E's as substitutes or as complements-with-\n   floors?\n3. **Domain and scoring basis of the indicators.** Each city will be scored on\n   the same indicator set. Should indicators be defined as *absolute* levels\n   (e.g., share of population in affordable housing), *relative improvement*\n   versus the city's own baseline year, or *relative to an exogenous\n   benchmark* (e.g., a national median)? And over which decision horizon should\n   a plan be scored — the near term (2025–2030), the full 2050 horizon, or a\n   weighted path across the whole period?\n\nThese three choices fix the logical ground truth of the metric; I am not asking\nfor weights, indicator values, or any empirical constants.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven Exchange 1's structure (score built on the 10 principles as the dimension\nset; the three E's as a labeling with a per-E floor; relative improvement\nversus the city's own baseline, scored as a weighted path 2025→2050), I put the\nfollowing single, complete structural hypothesis to your acceptance or\nrejection:\n\n**City pair and geographic contrast.** One river- and flood-constrained city:\nPorto Alegre, Brazil (population ≈ 1.45M metro; its mid-sized comparison\ndistrict/urban-agglomeration core used as the modeling unit — I will anchor the\nmetric on its ~180k-person central urban zone). The other, a compact\nlandlocked hill city: Freetown, Sierra Leone (urban population ≈ 1.0M; model\nanchor on its ~150k central-city unit) — or, if you prefer, the pair **Medellín's\ncompanion city** is disallowed (too large); instead I propose\n**Puebla, Mexico** is disallowed as same-continent candidate; final pair is\n**Porto Alegre (South America, riverine, flood-prone, flat-to-hilly terrain,\ninformal-settlement pressure)** and **Tunis (Africa, coastal-medina,\nhilltop-old-city, arid-climate, tourism-led economy)**. Both anchors sit in the\n100k–500k band; the continents differ (South America vs. Africa); the contrast\npairs *water-constrained horizontal growth* against *land-constrained\nvertical/compact growth*.\n\n**Phased initiative architecture (the \"loss mechanism\" made explicit).** The\nredesigned plan is organized as three coupled phases over 2025→2050, and the\ncore mechanism explicitly includes the dominant transformation the text's\nsprawl-avoidance goal implies rather than assuming it away: (a) *induced\ndemand / sprawl creep* — every land-use or transport initiative changes the\ndemand-side response, so the model carries a sprawl-entropy state variable S(t)\nthat each initiative shifts, and (b) *carrying-capacity lag* — infrastructure\nbenefits of each initiative are realized with a 5–10 year lag, so initiative\neffects enter the pillar scores through a delayed-response term, not\ninstantaneously. Concretely: Phase 1 (2025–2030) densification + transit in the\ncentral anchor; Phase 2 (2030–2040) green-belt / open-space protection and\nmixed-use infill; Phase 3 (2040–2050) housing-range expansion and\ncollaborative governance consolidation. Each initiative i has an intended\nper-principle effect a_i, but its realized score contribution is\na_i · f(S(t)) · g(t − t_i), where f penalizes sprawl-creep that erodes the\nprinciple the initiative was meant to serve, and g is the\ndelayed-response (carrying-capacity lag) function.\n\n**Ranking rule (Q4).** An initiative's \"potential\" is the expected weighted-path\ngain in the composite smart-growth score it contributes, net of its sprawl-\nerosion term, with the ranking compared between the two cities by the same\nformula so the geographic contrast surfaces through f and g, not through\nad-hoc judgment.\n\nAccept or reject this structure as a whole. If you reject it, the rejection\nidentifies which element (city-pair geography, the sprawl-entropy term, the\nlag term, the phase ordering, or the ranking rule) is structurally unsound.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYour rejection of Exchange 2's sequential three-phase architecture motivates a\nminimal revision, keeping everything accepted in Exchange 1 (10-principle\ndimension set, three-E floor, baseline-relative weighted path to 2050) and\nkeeping the explicit loss mechanisms (sprawl-entropy state S(t) and the\n5–10-year delayed-response term g(t − t_i)). The revised structure is:\n\n**Concurrent-track plan, not sequential phases.** All initiatives in each city\nare live from the start of the horizon; the \"phase\" idea survives only as an\nactivation-schedule per initiative (each initiative i has a start year t_i and\na ramp), so open-space protection (principle 6), densification (principle 2),\ntransit (principle 8), and housing-range expansion (principle 3) act *simultaneously* on S(t) and on the pillar scores. The realized contribution of initiative i at time t is still a_i · f(S(t)) · g(t − t_i), but the set of live a_i is never gated behind a completed prior phase. The city pair (Porto Alegre, South America; Tunis, Africa), the f/g loss structure, and the ranking rule (expected weighted-path gain net of sprawl erosion, same formula in both cities) are unchanged.\n\nAgainst this revised concurrent-track structure, what is the specific case,\nboundary condition, or failure mode that would break it — i.e., in which city,\nunder which condition (e.g., a floor that can be met only if initiatives\nsequence, an initiative whose benefit g(t − t_i) requires a predecessor's\noutcome to exist first, or a sprawl state S(t) the concurrent set cannot\ndrive down) — would it produce a suboptimal or infeasible plan that a\nsequential design would have avoided?"
+        ],
+        "expert_answers": [
+          "1. **Decomposition.** Build the score directly from the 10 principles as the primary dimension set; use the three E's only as a labeling scheme. The principles are the operational, measurable constructs; the E's are too coarse to score against and would force arbitrary mapping.\n\n2. **Aggregation rule.** Treat the three E's as complements-with-floors: require a minimum threshold on each pillar, capping or disqualifying a plan that fails any single E. Sustainability is definitionally non-substitutable — a plan that sacrifices one E for another is not smart growth.\n\n3. **Domain and scoring basis.** Use relative improvement versus the city's own baseline year, scored across a weighted path over the full horizon to 2050. Absolute levels penalize cities with different starting conditions; exogenous benchmarks impose one city's context on another. The problem asks how *plans* succeed, so improvement against baseline is the correct basis.",
+          "reject",
+          "The case that breaks it: an initiative whose benefit function g(t − t_i) is undefined without a predecessor's realized outcome — e.g., housing-range expansion (principle 3) in Porto Alegre, where infill units can only be sited on land whose title/assembly is produced by an earlier land-use or green-belt boundary decision. With all initiatives live at t=0, the housing initiative's a_i multiplies a g whose argument presupposes a state that does not yet exist, so its contribution is either zero or spuriously credited, and the composite score is inflated. A sequential design would have gated it."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_ed9d84c49711",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8708333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.8250000000000001,
+        "practicality_and_scientificity_evaluation": 0.8583333333333334,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need for a metric that is applicable to both current and future plans and sensitive enough for ranking, which is a crucial insight. The goals for city selection, plan development, and stress testing are explicitly stated and align perfectly with the prompt's requirements. The definition of \"Scope\" for each task adds precision, ensuring the solver understands the specific deliverables (e.g., \"aggregation rule,\" \"capacity/headroom check\").",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all five parts of the problem requirement without deviation. The sub-tasks are logically interrelated: Task 1 (metric) is a prerequisite for Tasks 2, 3, and 4. Task 2 (baseline) provides context for Task 3 (redesign). Task 4 (ranking) relies on the initiatives defined in Task 3. Task 5 (stress test) validates the plan from Task 3. There are no missing key parts; the modeler effectively maps the complex, multi-part prompt into a coherent workflow. The dependencies are correctly identified, ensuring a rational order of operations.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The analysis is very clear, providing detailed quantitative and qualitative insights that explain the model's inference process and effectively highlight strengths and weaknesses.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is very thorough, identifying data, model, and structural biases, and effectively discussing their impact and potential corrections.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical as it quantifies abstract smart growth principles into a dynamic, city-specific metric. It accounts for implementation lags, sprawl erosion, and land constraints, providing actionable rankings for initiatives and robustness checks for population growth, which directly supports urban planning decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically rigorous, utilizing a deterministic framework with logical constraints like precedence gating and dynamic sprawl erosion. It integrates interdisciplinary urban planning concepts into a mathematically sound structure, ensuring that the assessment of smart growth is both logically consistent and theoretically grounded.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The structural assumptions regarding metric decomposition and aggregation are well-justified and logically consistent with smart growth theory. However, the specific numerical baselines for principle levels and sprawl states lack explicit data source citations, reducing the transparency of the initial conditions.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate dynamic methods, including sprawl-entropy and lag terms, to realistically reflect urban growth complexities. The gating of initiatives and the holistic ranking formula are scientifically sound and effectively capture the interdependencies of smart growth principles.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2017_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nThe problem requires a metric of smart-growth success for two mid-sized cities\n(population 100k–500k, on different continents), evaluated across the three E's\n(Economic prosperity, social Equity, environmental Sustainability) and the ten\nsmart-growth principles, applied to both each city's *current* growth plan (Q2)\nand a *redesigned* plan (Q3–Q5). The text settles neither the logical structure\nof the metric nor the domain of its components. I need the three structural\nconventions that would otherwise remain arbitrary:\n\n1. **Decomposition.** Should the composite smart-growth score be a weighted sum\n   of three independent E-pillar sub-scores (with the 10 principles used only to\n   choose the indicators feeding each pillar), or should the score be built\n   directly from the 10 principles as the primary dimension set, with the three\n   E's only as a labeling scheme?\n2. **Aggregation rule.** The three E's can trade off (e.g., densification raises\n   Equity and Economic scores but can cut Environmental scores). Must the\n   composite require a *floor* (veto) on any single pillar — so a plan that fails\n   one E regardless of the other two is capped or disqualified — or is any\n   trade-off legitimate as long as the weighted sum improves? In other words:\n   does the metric treat the three E's as substitutes or as complements-with-\n   floors?\n3. **Domain and scoring basis of the indicators.** Each city will be scored on\n   the same indicator set. Should indicators be defined as *absolute* levels\n   (e.g., share of population in affordable housing), *relative improvement*\n   versus the city's own baseline year, or *relative to an exogenous\n   benchmark* (e.g., a national median)? And over which decision horizon should\n   a plan be scored — the near term (2025–2030), the full 2050 horizon, or a\n   weighted path across the whole period?\n\nThese three choices fix the logical ground truth of the metric; I am not asking\nfor weights, indicator values, or any empirical constants.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven Exchange 1's structure (score built on the 10 principles as the dimension\nset; the three E's as a labeling with a per-E floor; relative improvement\nversus the city's own baseline, scored as a weighted path 2025→2050), I put the\nfollowing single, complete structural hypothesis to your acceptance or\nrejection:\n\n**City pair and geographic contrast.** One river- and flood-constrained city:\nPorto Alegre, Brazil (population ≈ 1.45M metro; its mid-sized comparison\ndistrict/urban-agglomeration core used as the modeling unit — I will anchor the\nmetric on its ~180k-person central urban zone). The other, a compact\nlandlocked hill city: Freetown, Sierra Leone (urban population ≈ 1.0M; model\nanchor on its ~150k central-city unit) — or, if you prefer, the pair **Medellín's\ncompanion city** is disallowed (too large); instead I propose\n**Puebla, Mexico** is disallowed as same-continent candidate; final pair is\n**Porto Alegre (South America, riverine, flood-prone, flat-to-hilly terrain,\ninformal-settlement pressure)** and **Tunis (Africa, coastal-medina,\nhilltop-old-city, arid-climate, tourism-led economy)**. Both anchors sit in the\n100k–500k band; the continents differ (South America vs. Africa); the contrast\npairs *water-constrained horizontal growth* against *land-constrained\nvertical/compact growth*.\n\n**Phased initiative architecture (the \"loss mechanism\" made explicit).** The\nredesigned plan is organized as three coupled phases over 2025→2050, and the\ncore mechanism explicitly includes the dominant transformation the text's\nsprawl-avoidance goal implies rather than assuming it away: (a) *induced\ndemand / sprawl creep* — every land-use or transport initiative changes the\ndemand-side response, so the model carries a sprawl-entropy state variable S(t)\nthat each initiative shifts, and (b) *carrying-capacity lag* — infrastructure\nbenefits of each initiative are realized with a 5–10 year lag, so initiative\neffects enter the pillar scores through a delayed-response term, not\ninstantaneously. Concretely: Phase 1 (2025–2030) densification + transit in the\ncentral anchor; Phase 2 (2030–2040) green-belt / open-space protection and\nmixed-use infill; Phase 3 (2040–2050) housing-range expansion and\ncollaborative governance consolidation. Each initiative i has an intended\nper-principle effect a_i, but its realized score contribution is\na_i · f(S(t)) · g(t − t_i), where f penalizes sprawl-creep that erodes the\nprinciple the initiative was meant to serve, and g is the\ndelayed-response (carrying-capacity lag) function.\n\n**Ranking rule (Q4).** An initiative's \"potential\" is the expected weighted-path\ngain in the composite smart-growth score it contributes, net of its sprawl-\nerosion term, with the ranking compared between the two cities by the same\nformula so the geographic contrast surfaces through f and g, not through\nad-hoc judgment.\n\nAccept or reject this structure as a whole. If you reject it, the rejection\nidentifies which element (city-pair geography, the sprawl-entropy term, the\nlag term, the phase ordering, or the ranking rule) is structurally unsound.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYour rejection of Exchange 2's sequential three-phase architecture motivates a\nminimal revision, keeping everything accepted in Exchange 1 (10-principle\ndimension set, three-E floor, baseline-relative weighted path to 2050) and\nkeeping the explicit loss mechanisms (sprawl-entropy state S(t) and the\n5–10-year delayed-response term g(t − t_i)). The revised structure is:\n\n**Concurrent-track plan, not sequential phases.** All initiatives in each city\nare live from the start of the horizon; the \"phase\" idea survives only as an\nactivation-schedule per initiative (each initiative i has a start year t_i and\na ramp), so open-space protection (principle 6), densification (principle 2),\ntransit (principle 8), and housing-range expansion (principle 3) act *simultaneously* on S(t) and on the pillar scores. The realized contribution of initiative i at time t is still a_i · f(S(t)) · g(t − t_i), but the set of live a_i is never gated behind a completed prior phase. The city pair (Porto Alegre, South America; Tunis, Africa), the f/g loss structure, and the ranking rule (expected weighted-path gain net of sprawl erosion, same formula in both cities) are unchanged.\n\nAgainst this revised concurrent-track structure, what is the specific case,\nboundary condition, or failure mode that would break it — i.e., in which city,\nunder which condition (e.g., a floor that can be met only if initiatives\nsequence, an initiative whose benefit g(t − t_i) requires a predecessor's\noutcome to exist first, or a sprawl state S(t) the concurrent set cannot\ndrive down) — would it produce a suboptimal or infeasible plan that a\nsequential design would have avoided?"
+            ],
+            "expert_answers": [
+              "1. **Decomposition.** Build the score directly from the 10 principles as the primary dimension set; use the three E's only as a labeling scheme. The principles are the operational, measurable constructs; the E's are too coarse to score against and would force arbitrary mapping.\n\n2. **Aggregation rule.** Treat the three E's as complements-with-floors: require a minimum threshold on each pillar, capping or disqualifying a plan that fails any single E. Sustainability is definitionally non-substitutable — a plan that sacrifices one E for another is not smart growth.\n\n3. **Domain and scoring basis.** Use relative improvement versus the city's own baseline year, scored across a weighted path over the full horizon to 2050. Absolute levels penalize cities with different starting conditions; exogenous benchmarks impose one city's context on another. The problem asks how *plans* succeed, so improvement against baseline is the correct basis.",
+              "reject",
+              "The case that breaks it: an initiative whose benefit function g(t − t_i) is undefined without a predecessor's realized outcome — e.g., housing-range expansion (principle 3) in Porto Alegre, where infill units can only be sited on land whose title/assembly is produced by an earlier land-use or green-belt boundary decision. With all initiatives live at t=0, the housing initiative's a_i multiplies a g whose argument presupposes a state that does not yet exist, so its contribution is either zero or spuriously credited, and the composite score is inflated. A sequential design would have gated it."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_ed9d84c49711",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8666666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r1p2_20260930_080635/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need for a metric that is applicable to both current and future plans and sensitive enough for ranking, which is a crucial insight. The goals for city selection, plan development, and stress testing are explicitly stated and align perfectly with the prompt's requirements. The definition of \"Scope\" for each task adds precision, ensuring the solver understands the specific deliverables (e.g., \"aggregation rule,\" \"capacity/headroom check\").",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five parts of the problem requirement without deviation. The sub-tasks are logically interrelated: Task 1 (metric) is a prerequisite for Tasks 2, 3, and 4. Task 2 (baseline) provides context for Task 3 (redesign). Task 4 (ranking) relies on the initiatives defined in Task 3. Task 5 (stress test) validates the plan from Task 3. There are no missing key parts; the modeler effectively maps the complex, multi-part prompt into a coherent workflow. The dependencies are correctly identified, ensuring a rational order of operations.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is very clear, providing detailed quantitative and qualitative insights that explain the model's inference process and effectively highlight strengths and weaknesses.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is very thorough, identifying data, model, and structural biases, and effectively discussing their impact and potential corrections.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical as it quantifies abstract smart growth principles into a dynamic, city-specific metric. It accounts for implementation lags, sprawl erosion, and land constraints, providing actionable rankings for initiatives and robustness checks for population growth, which directly supports urban planning decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, utilizing a deterministic framework with logical constraints like precedence gating and dynamic sprawl erosion. It integrates interdisciplinary urban planning concepts into a mathematically sound structure, ensuring that the assessment of smart growth is both logically consistent and theoretically grounded.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The structural assumptions regarding metric decomposition and aggregation are well-justified and logically consistent with smart growth theory. However, the specific numerical baselines for principle levels and sprawl states lack explicit data source citations, reducing the transparency of the initial conditions.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate dynamic methods, including sprawl-entropy and lag terms, to realistically reflect urban growth complexities. The gating of initiatives and the holistic ranking formula are scientifically sound and effectively capture the interdependencies of smart growth principles.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        },
+        {
+          "problem_id": "2017_E",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p2_20260930_080635",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p2_20260930_080635/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating a measurable \"Smart Growth Success Index\" for two mid-sized\ncities (100,000–500,000 persons, different continents) against the ten smart\ngrowth principles and the three E's (Economically prosperous, socially\nEquitable, Environmentally Sustainable). The problem statement leaves three\nstructural/definitional points unsettled that I must fix before I can\nparameterize any metric:\n\n1. Aggregation structure: should the index be a hierarchy — ten principle\n   scores aggregated into the three E pillars, then into one composite — with\n   every component normalized to a 0–1 (or 0–100) scale so the composite is\n   dimensionless and comparable across the two cities of different size and\n   continent? Or is a flat additive score over ten equally-weighted principles\n   the intended reading?\n\n2. Treatment of infeasible evidence: for a given city-year, some principles\n   (e.g., \"variety of transportation choices\") may have no measurable current\n   state in the available plan documents. Should an unmeasurable principle be\n   (a) excluded and the remaining weights renormalized within its pillar,\n   (b) scored at a floor (0), or (c) carried as a missingness penalty against\n   the composite?\n\n3. Baseline semantics: the index is used both to score a city's *current*\n   growth plan and to project a future plan under a +50% population scenario by\n   2050. Should the metric be defined on the *planned state at a horizon year*\n   (e.g., 2030/2040/2050), with the current plan scored as its own horizon\n   projection, so that current vs. redesigned plans are compared on the same\n   scale?\n\nPlease settle these three definitional constraints. No magnitudes or empirical\nconstants are requested — only the logical boundaries of the metric\nconstruction.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange-1 rulings (hierarchical 0–1 aggregation into the\nthree E pillars; unmeasurable principles excluded with in-pillar weight\nrenormalization; metric defined on the horizon-year planned state), I propose\nthis single specific structure for the Smart Growth Success Index. Please\naccept or reject it as a whole:\n\nCity = city of population P0 (100k–500k), horizon year H, population PH.\n\nMapping of the ten principles onto the E pillars:\n- Environmentally Sustainable: principles 6 (open-space/farmland/environmental\n  preservation) and 4 (walkability, as a built-form carbon-intensity\n  proxy);\n- Socially Equitable: principles 3 (housing choice), 8 (transport variety), 10\n  (community collaboration);\n- Economically Prosperous: principles 1 (mixed land use), 2 (compact building\n  design), 5 (sense of place), 7 (direct development to existing\n  communities), 9 (predictable, fair, cost-effective decisions).\n\nEach principle p is scored by 2–4 normalized proxies (e.g., farmland share\ninside the growth boundary; % of new housing inside the existing built-up\narea; % of new jobs within 5 km of the employment core; % of new housing within\n400 m of transit or walkable cores), giving s_p in [0,1]. A principle with no\nmeasurable proxy is dropped and the remaining proxies in its pillar are\nrenormalized.\n\nDominant \"decay\" mechanisms carried as first-class penalties, not neglected:\n- Sprawl displacement: every hectare of new development outside the\n  urban-growth boundary erodes open-space and compactness proxies, so the\n  Environment pillar carries a term (1 − f_outside), f_outside = share of new\n  floor area outside the boundary.\n- Housing-availability squeeze: the Housing proxy is divided by a capacity\n  factor c = PH / (existing stock + planned additions), so under-provision is\n  penalized even where new units are added.\n- Service overload: the collaboration/equity pillar carries a load factor\n  (planned residents per unit of planned service capacity), so equity degrades\n  as population rises faster than services.\n\nCompositing: S = 0.45·SE + 0.35·SS + 0.20·Sx (Environment, Social, Economic),\njustified by the problem's ordering of the three E's as the city's primary\nstewardship goal; the same weights apply to both cities so cross-city\ncomparison stays scale-free.\n\nA growth plan is scored as the S of its horizon-year planned state, and the\ncurrent plan is scored as its own horizon projection, so both are compared on\nthe same scale.\n\nAccept or reject?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy Exchange-2 structure was rejected; I have applied a minimal revision and\nnow need the counterexample against the revised structure.\n\nMinimal revision: I drop the fixed 0.45/0.35/0.20 pillar weights and the\ninvented numeric proxy thresholds (5 km job radius, 400 m walk distance). The\nrevised structure keeps exactly what Exchange 1 mandated — ten principles\nnormalized to [0,1], aggregated hierarchically into the three E pillars, then\ninto one dimensionless composite, unmeasurable principles excluded with\nin-pillar renormalization, scored on the horizon-year planned state — and keeps\nthe three structural decay terms (outside-boundary floor-area share,\nplanned-population-to-planned-housing-capacity ratio, residents-per-planned-\nservice-capacity). But pillar weights and proxy thresholds are no longer fixed\na priori: they are treated as parameters of the metric, and each city's pillar\nweight vector is to be justified against that city's documented priorities and\ngeography (and validated by sensitivity analysis) rather than inherited from a\nglobal default.\n\nUnder that revised structure, give me the specific case or boundary condition\nthat would break the mechanism — e.g., a horizon, population path, or data\nsituation in which the hierarchical composite still fails to rank the current\nplan and the redesigned plan correctly, or fails to stay comparable across the\ntwo cities. The case should be the one that most directly threatens the metric\nas I have just revised it."
+            ],
+            "expert_answers": [
+              "1. Aggregation: use the hierarchy — ten principle scores normalized to a common 0–1 scale, aggregated into the three E pillars, then into one composite. A flat equal-weight sum over ten principles is not the intended reading, since the problem explicitly ties principles to the three E's and requires cross-city comparability.\n\n2. Infeasible evidence: exclude the unmeasurable principle and renormalize weights within its pillar. Scoring a floor (0) confuses absence of evidence with failure, and a missingness penalty double-counts data gaps rather than measuring growth.\n\n3. Baseline: define the metric on the planned state at a stated horizon year, scoring each city's current plan as its own horizon projection, so current and redesigned plans are compared on one scale.",
+              "reject",
+              "The case that breaks it: the two cities' pillar weight vectors are justified against *different* documented priorities, so the composite is no longer a common scale. City A weights Environment 0.6; City B weights Economic 0.6. A redesigned plan that is strictly better than the current plan on every principle in both cities can still score lower in B than A's current plan, and the cross-city ranking inverts purely from the weight choice — not from any growth outcome. Sensitivity analysis cannot repair this: it shows the ranking is weight-determined, which is exactly the failure. The mechanism also breaks when a city's documented priorities leave a pillar with zero measurable proxies after exclusion, so renormalization assigns that pillar weight 1.0 on one remaining principle, making the composite a single-proxy score masquerading as a three-E index."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_ed9d84c49711",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.8000000000000002,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/train_candidate/runs/round_8/r2p2_20260930_080635/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 correctly identifies the need to select cities and define a metric covering the three E's and ten principles. Tasks 2-5 accurately reflect the sequential requirements of analyzing current plans, designing new plans, ranking initiatives, and assessing growth capacity. The inclusion of specific details like \"normalization\" and \"marginal-contribution ranking\" shows a deep understanding of the modeling goals. The definition is precise and leaves no ambiguity about what each task aims to achieve.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five required parts of the problem statement without deviation. The sub-tasks are logically interrelated: Task 1 establishes the metric and cities used in subsequent tasks; Task 2 provides the baseline for Task 3's redesign; Task 4 relies on the initiatives defined in Task 3; and Task 5 validates the plan from Task 3. There are no missing key components, and the scope of each task is appropriately bounded to support the final goal of implementing smart growth theories. The coverage is complete and coherent.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is highly detailed, interpretable, and clearly links model outputs to the underlying smart growth principles, providing strong evidence for the proposed plans.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler thoroughly identifies data, structural, and interpretive biases and effectively mitigates them through sensitivity analysis and clear disclosure of limitations.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The structural assumptions are well-justified and logical, but specific baseline data points lack cited sources, reducing the verifiability of the initial conditions.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate, sophisticated methods (hierarchical aggregation, Shapley-style ranking) that scientifically reflect the problem's complexity and ensure robust cross-city comparability.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a reproducible, tailored framework that quantifies smart growth principles, ranks initiatives for decision-making, and validates plans against specific growth scenarios, effectively supporting urban planning strategies.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, featuring a well-justified theoretical framework, sophisticated proxy definitions with decay terms, and robust sensitivity analyses that validate the stability and reliability of the results across different scenarios.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8708333333333333,
+      "interaction_cost": 0.8572527205174687,
+      "interaction_penalty": 0.04286263602587344,
+      "net_utility": 0.8279706973074599,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2133,
+          "total_expert_latency_seconds": 3.5,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9000116910870123,
+          "latency_cost_component": 0.23899208524558307,
+          "interaction_cost": 0.8600046764348049,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1897,
+          "total_expert_latency_seconds": 4.87,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8862519115003313,
+          "latency_cost_component": 0.28122306101372624,
+          "interaction_cost": 0.8545007646001326,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T08:18:32.062601",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_ed9d84c49711",
+  "workflow": {
+    "name": "Rejection-Targeted Structural Revision",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 7) achieved a high net utility (0.7767) but the evidence shows that in both training runs, the expert rejected the proposed structure in Exchange 2. In the 2016_C run, the rejection led to a fallback that was then tested for counterexamples, but the specific flaw (elite saturation) was only identified in Exchange 3, leading to a late-stage correction. In the 2017_E run, the rejection of the cross-E co-benefit channel led to a strict partition fallback, but the counterexample identified a comparability failure that was not fully addressed in the final model's rigor score. Rounds 4, 5, and 6 attempted to address rejection handling but failed the training gate, likely because they were too vague or did not sufficiently differentiate from the parent. This patch departs from Round 4 and 6 by explicitly requiring the agent to identify the *specific* flaw from the rejection and construct a *minimal* revision, then target the counterexample at that *revised* structure. This is a more targeted behavioral change than the generic 'integrate the flaw' instruction in Round 4, and it avoids the complexity of Round 5's operator selection rule which was rejected. It directly addresses the communication failure where the agent's fallback was not tightly coupled to the expert's specific critique, leading to less rigorous final models.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_ed9d84c49711",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 8,
+    "parent_workflow_ids": [
+      "interaction_workflow_1da26e07898a"
+    ],
+    "training_batch": [
+      "2016_C",
+      "2017_E"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2016_C",
+    "2017_E"
+  ],
+  "absolute_utility": 0.8708333333333333,
+  "interaction_cost": 0.8584335297167185,
+  "interaction_penalty": 0.042921676485835926,
+  "net_utility": 0.8279116568474973,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  },
+  "training_batch": [
+    "2016_C",
+    "2017_E"
+  ],
+  "training_parent_workflow_ids": [
+    "interaction_workflow_1da26e07898a"
+  ],
+  "parent_train_net_utilities": [
+    0.776718063126691
+  ],
+  "candidate_train_net_utility": 0.8279116568474973,
+  "train_pre_utility": 0.776718063126691,
+  "train_post_utility": 0.8279116568474973,
+  "train_accepted": true,
+  "training_elites_after_selection": [
+    {
+      "rank": 1,
+      "source_round": 8,
+      "source_phase": "train_candidate",
+      "workflow_id": "interaction_workflow_ed9d84c49711",
+      "workflow": {
+        "name": "Rejection-Targeted Structural Revision",
+        "changed_components": [
+          "## Interaction Strategy"
+        ],
+        "evolution_rationale": "The parent policy (Round 7) achieved a high net utility (0.7767) but the evidence shows that in both training runs, the expert rejected the proposed structure in Exchange 2. In the 2016_C run, the rejection led to a fallback that was then tested for counterexamples, but the specific flaw (elite saturation) was only identified in Exchange 3, leading to a late-stage correction. In the 2017_E run, the rejection of the cross-E co-benefit channel led to a strict partition fallback, but the counterexample identified a comparability failure that was not fully addressed in the final model's rigor score. Rounds 4, 5, and 6 attempted to address rejection handling but failed the training gate, likely because they were too vague or did not sufficiently differentiate from the parent. This patch departs from Round 4 and 6 by explicitly requiring the agent to identify the *specific* flaw from the rejection and construct a *minimal* revision, then target the counterexample at that *revised* structure. This is a more targeted behavioral change than the generic 'integrate the flaw' instruction in Round 4, and it avoids the complexity of Round 5's operator selection rule which was rejected. It directly addresses the communication failure where the agent's fallback was not tightly coupled to the expert's specific critique, leading to less rigorous final models.",
+        "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "max_exchanges": 3,
+        "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+        "evolution_mode": "mutation",
+        "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "actions": [
+          {
+            "action_id": "apply_policy_trigger",
+            "action_type": "agent_step",
+            "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a process but does not specify whether the system is closed or open, or what the boundary conditions are for the state variables. Operator 1 asks for the logical interpretation of the system boundaries and the valid domain of the state space.\n- Gap 2 (Exchange 2): Based on the boundary interpretation, the agent proposes a specific differential equation structure that includes the dominant loss term (e.g., friction, resistance, or decay) as a first-order effect, rather than neglecting it. Operator 2 asks the expert to accept or reject this specific structural inclusion of the loss mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific missing interaction term, the agent revises the structure to include that term and asks which specific boundary condition (e.g., extreme initial state, maximum input rate, or zero resource availability) would cause this *revised* structure to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+          },
+          {
+            "action_id": "request_strategic_feedback",
+            "action_type": "expert_exchange",
+            "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+          },
+          {
+            "action_id": "integrate_strategic_feedback",
+            "action_type": "agent_analysis",
+            "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+          },
+          {
+            "action_id": "close_policy_interaction",
+            "action_type": "close",
+            "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+          }
+        ],
+        "entry_action": "apply_policy_trigger",
+        "workflow_id": "interaction_workflow_ed9d84c49711",
+        "evolution_operator": "cpe_batch_reflection_patch",
+        "created_round": 8,
+        "parent_workflow_ids": [
+          "interaction_workflow_1da26e07898a"
+        ],
+        "training_batch": [
+          "2016_C",
+          "2017_E"
+        ]
+      },
+      "selection_utility": 0.8279116568474973,
+      "selection_basis": "current_shared_training_batch_net_utility"
+    }
+  ],
+  "validation_utility": 0.8182694545948792,
+  "validation_accepted": false,
+  "validation_result_path": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_8/validation/workflows/round_8/result.json",
+  "best_validation_utility": 0.8374079295625156,
+  "best_workflow_id": "interaction_workflow_05df287cb4d3",
+  "cpe_round_complete": true
+}

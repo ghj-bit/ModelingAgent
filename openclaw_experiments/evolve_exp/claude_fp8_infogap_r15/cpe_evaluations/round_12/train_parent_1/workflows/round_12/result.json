@@ -1,0 +1,655 @@
+{
+  "round": 12,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.7638032516918359,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8083333333333333,
+    "modeling_rigorousness_evaluation": 0.8208333333333334,
+    "practicality_and_scientificity_evaluation": 0.7958333333333334,
+    "result_and_bias_analysis_evaluation": 0.8041666666666667
+  },
+  "problem_results": [
+    {
+      "problem_id": "2018_B",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\n# Structural/definitional constraints the 2018_M problem leaves ambiguous\n\nWe are modeling the 50-year evolution of global language speakers (native and total) for the top-ten native-speaker languages, then deriving office-site recommendations for a service company. The problem statement does not settle three structural interpretations that parameterize the core mechanism:\n\n1. **Scope of \"language\":** The problem's ten languages include clusters of mutually unintelligible varieties (Mandarin incl. Standard Chinese, Hindi, Arabic, Punjabi). For the forecast, is each entry to be treated as a single unitary language (per Ethnologue's top-100 convention, where varieties are grouped and L2 speakers are attached to the standard variety), or should internal variety structure be preserved? This determines the denominator against which rank replacement is judged.\n\n2. **Meaning of \"replaced\" in Part I.B:** Replacement is to be judged by rank position (the language falls out of the top-10 list), by a magnitude threshold (e.g., a challenger overtakes it in absolute speakers), or by loss of the company's operational relevance (e.g., the language no longer serves as a viable office working language in any candidate region)?\n\n3. **Coverage requirement for the six offices (Part II.A):** The company needs employees to speak \"English and one or more additional languages.\" Is the six-office set required to cover a prescribed number of *distinct additional languages* (a coverage constraint), or is the only hard constraint that each office speaks English plus the locally dominant language(s), with the global set of additional languages emerging from the site choices (an endogenous outcome)?\n\nHow should the model's parameters and assumptions be read to address each of these, so that the same core mechanism carries through Parts I.A–C (projection and geographic redistribution) and Part II (site and language recommendations, including the short- vs. long-term comparison in II.A and the fewer-than-six option in II.B)?",
+          "# Expert Question 2 (Operator 2: judgment)\n\n# Proposed structural configuration for the 50-year language-speaker model\n\nFollowing Exchange 1, we impose and put to you this one coherent structural hypothesis. Accept or reject it as a whole.\n\n**Unitary language units.** Each of the ten native top-10 entries (Mandarin, Spanish, English, Hindi, Arabic, Bengali, Portuguese, Russian, Punjabi, Japanese) is modeled as a single unitary language, per Ethnologue's top-100 convention: varieties are grouped, and L2/L3 speakers are attached to the standard variety. This makes rank replacement comparable and keeps the top-10 lists internally consistent.\n\n**Two-decomposition core mechanism.** For each language *i* at year *t*, total speakers = native + L2/L3, forecast separately:\n- *Native count* N_i(t): driven by the demographic trajectory of the language's home region (UN WPP regional population), i.e. N_i(t) ≈ f_i · P_home_i(t), where f_i is the native-speaker fraction. This captures the slow demographic drift and the decline/aging effect (e.g., Japan, Russia) without inventing migration flows.\n- *L2/L3 adoption* A_i(t): a logistic/saturation adoption model driven by globalization, education, migration and technology, parameterized by the current L2 share (from Ethnologue Item 2) as the initial condition and bounded by a ceiling tied to global English/technology penetration. This is where English, French and other lingua-francae grow fastest.\n\n**Explicit loss/transformation mechanisms (not idealized).** The structure does not assume negligible interactions:\n- *Rank-replacement dynamics:* a challenger replaces a top-10 entry when its total-speaker count overtakes the incumbent's; we explicitly forecast the overtake times for French, Indonesian and Urdu against Japanese, Punjabi and others, so Part I.B's \"replaced?\" question is answered by a computed crossover, not an assertion.\n- *Geographic redistribution:* the L2 component is re-weighted each year by UN WPP regional population growth and by migration/assimilation pressures, so Part I.C's geographic distribution change is a direct output of the adoption submodel, not a separate assumption.\n- *Office-site coupling (Part II):* the six-office locations are chosen to maximize coverage of the projected dominant local languages, where each office speaks English plus the locally dominant language. The \"additional languages\" set is endogenous (emerging from site choice), not a prescribed count. The short- vs. long-term comparison (II.A) and the fewer-than-six option (II.B) reuse the same projected language distribution, so no second model is built.\n\nThis one mechanism (demographic native drift + globalization-driven L2 saturation, with computed rank crossovers and WPP-weighted geographic re-weighting) carries through all of Parts I and II. Do you accept this structure, or reject it on a specific structural flaw?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\n# Counterexample against the revised structure\n\nYou rejected the structure in Exchange 2. The weakest load-bearing assumption was the **endogenous, unconstrained office-site choice** in Part II: we let the six offices be placed wherever the projected dominant language is, which risks a degenerate solution (all six clustered in the highest-population region) that does not answer the company's intent to be \"truly international.\"\n\n**Minimal revision.** Constrain the six offices to a *geographically dispersed* set by requiring they span at least three continents (excluding North America and East Asia, where the company already has offices), and maximize coverage of *distinct* projected dominant languages under that dispersion constraint. This keeps the one-mechanism core (demographic native drift + globalization L2 saturation, computed rank crossovers, WPP-weighted geographic re-weighting) intact and only changes the Part II site-selection layer from \"unconstrained maximum\" to \"dispersed maximum coverage.\"\n\nAgainst this *revised* structure, what specific case, boundary condition, or failure mode would break it — either in the core projection (Parts I.A–C) or in the now-dispersed Part II site recommendation? For example: a region whose dominant projected language is English (so the \"additional language\" slot is empty), a language whose L2 ceiling is already saturated by 2074, or a continental dispersion constraint that forces a site into a region with no viable non-English working language. Which of these, or another, is the binding failure mode the final report's limitation section must address?"
+        ],
+        "expert_answers": [
+          "The problem text does not supply the magnitudes or thresholds needed to settle these three readings. It gives no criterion for how much internal variety structure must be preserved, no quantitative definition of \"replaced\" (rank drop, absolute overtake, or operational loss), and no required count of distinct additional languages across the six offices. These are choices the modeling team must impose and justify, not parameters recoverable from the statement or dataset.",
+          "reject",
+          "The binding failure mode is the empty additional-language slot: under the dispersion constraint, a required continent's projected dominant language is English (or a language already covered by another mandated site), so the office satisfies \"English plus one or more additional languages\" with zero additional languages. Dispersion forces the site; coverage cannot fill the slot. That is the case the limitation section must address."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8833333333333333,
+        "modeling_rigorousness_evaluation": 0.7916666666666667,
+        "practicality_and_scientificity_evaluation": 0.7749999999999999,
+        "result_and_bias_analysis_evaluation": 0.75
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, accurately reflecting the problem requirements. Task 1 explicitly lists the influencing factors and the time horizon (2024-2074), providing a concrete objective for the modeling phase. Tasks 2 and 3 correctly identify the predictive and geographic analysis goals. Tasks 4 and 5 clearly state the decision-making objectives for office location and quantity, including the distinction between short-term and long-term strategies. The goals are explicit, measurable, and directly aligned with the client's needs as described in the prompt.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all parts of the problem (I.A-C, II.A-B, III) without deviation. The sub-tasks are logically interrelated: Task 1 provides the model, Task 2 uses it for prediction, Task 3 analyzes geographic shifts, and Tasks 4-5 apply these insights to business decisions. There are no missing key components; the modeler correctly identifies the dependency of the business recommendations on the linguistic trends. The coverage is complete, ensuring that all aspects of the COO's request are addressed in a structured manner.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are quantitative, clearly linked to demographic drivers, and provide actionable insights with explicit limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "Biases are thoroughly identified and their impact analyzed, but active correction methods are limited to sensitivity checks rather than structural adjustments.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is practical, offering a clear, actionable framework for office location and language strategy. It integrates demographic and linguistic data to provide meaningful insights for decision-making, balancing geographic dispersion with language coverage and financial viability.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using established demographic and linguistic theories. It integrates multiple factors and provides a comprehensive analysis with clear theoretical underpinnings, ensuring reliability and validity in its predictions.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are clear but oversimplify dynamic processes like language shift and L2 saturation parameters, lacking detailed justification for key model inputs.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model structure is appropriate and logical, but the geographic distribution and cost-benefit analyses are somewhat simplistic and lack quantitative depth.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2018_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p1_20260930_111651",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p1_20260930_111651/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nThe problem statement and the provided data leave three structural/definitional gaps that the core model must settle before it can be parameterized. I am asking for the logical interpretation of each, not for any magnitude, rate, or empirical constant.\n\n**Gap 1 — the \"replacement\" test in Part I.B.**\nThe problem asks whether \"any of the languages in the current top-ten lists (either native speakers or total speakers) will be replaced by another language\" over the next 50 years. It does not define what counts as \"replaced.\" Two readings are possible:\n  (a) *Rank displacement within the list*: the specific language drops out of the top-ten ranking (its rank falls below 10), i.e., a positional change in the ordered list;\n  (b) *Functional replacement*: a different language surpasses it on the metric by some meaningful margin.\nWhich of these two readings should the model operationalize as \"replaced,\" and — for reading (a) specifically — should the test be applied separately to the native-speaker top-ten and to the total-speaker top-ten, or to a single combined ranking?\n\n**Gap 2 — what \"geographic distribution\" must capture in Part I.C.**\n\"Geographic distributions of these languages change over this same period\" is ambiguous between:\n  (a) *Country-level shares*: the fraction of the world's speakers of language *L* located in each country (or region), tracked over time;\n  (b) *Regional concentration*: e.g., whether each language's speaker base becomes more or less concentrated within a particular world region (Asia, Africa, the Americas, Europe).\nWhich of these two is the intended object of the \"change\" the problem asks us to describe, and is a third, coarser object (e.g., just which regions gain or lose net speakers) acceptable in place of full country-level shares?\n\n**Gap 3 — the interface between the Part I model and the Part II office decision.**\nThe problem says the Part II office and language recommendations are to be \"based on your modeling from Part I.\" It does not specify which structural output of the Part I model is the decision variable for Part II. Two candidate interfaces are:\n  (a) *Projected language coverage*: for each candidate office location, the projected number of residents who can already speak the office's working language(s) in 2030 (short term) and 2074 (long term);\n  (b) *Projected growth momentum*: the projected growth rate (or CAGR) of speakers of the office's working language(s) in that location over the short-term horizon.\nWhich of these two structural quantities should Part II key its location-and-language recommendations off of, and must the short-term recommendation be evaluated on the 2030 snapshot while the long-term recommendation is evaluated on the 2074 snapshot (i.e., are the two recommendations meant to use different evaluation dates, or the same one)?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven the Exchange 1 rulings (rank-displacement test applied separately to the native and total top-ten lists; country-level shares as the Part I.C modeled quantity; projected language coverage keyed to a 2030 snapshot for the short-term recommendation and a 2074 snapshot for the long-term recommendation), I am proposing the following specific structural configuration for the core model. Please accept or reject it as a whole; I am not asking you to rank alternatives.\n\n**Proposed structure — a four-component, coupled system:**\n\n**Component 1 — Native-speaker population model (per language L, per country c):**\nN_L,c(t+1) = N_L,c(t) + B_L,c(t) − D_L,c(t) + M_L,c(t)\nwhere B is births to native-speaking children, D is deaths of native speakers, and M is net migration of native speakers into country c. B and D are driven by the local population trajectory P_c(t) (from the UN WPP 2024 medium-variant country data) and the local native-speaker share s_L,c(t): B_L,c ≈ b_c(t)·s_L,c(t)·P_c(t), D_L,c ≈ d_c(t)·s_L,c(t)·P_c(t), where b_c and d_c are the country's age- and time-varying birth and death rates. M is net migration of native speakers, treated as a fraction of total net migration to c, weighted by the language's current share in the origin-destination flow.\n\n**Component 2 — L2/L3 (total minus native) speaker adoption model (per language L, per country c):**\nA_L,c(t+1) = A_L,c(t) · (1 − δ_L,c(t)) + a_L,c(t) · P_c(t) − D_A,L,c(t)\nwhere δ_L,c(t) is the annual attrition/death rate of L2 speakers (assumed equal to the country's general mortality rate d_c(t), since L2 speakers are drawn from the general population), a_L,c(t) is the annual new-adoption rate (the fraction of the non-speaker population that adopts L as an L2/L3 in year t), and D_A accounts for emigration of L2 speakers. The key structural assumption: a_L,c(t) is modeled as\na_L,c(t) = a_base,L · G_c(t) · H_c(t)\nwhere G_c(t) is a globalization intensity index for country c (a time-varying scalar reflecting trade, digital connectivity, and migration openness — taken as exogenous, scaled so G_c(2024)=1 and G_c(t) evolves according to a fixed trend), and H_c(t) is a language-specific demand driver: for English, H_c(t) reflects the country's integration into international business and education systems; for other top-ten languages, H_c(t) reflects the language's role as a regional lingua franca or the presence of a large diaspora.\n\n**Component 3 — Country-level share aggregation (Part I.C output):**\nFor each language L and year t, compute the country-level share vector:\nshare_L,c(t) = S_L,c(t) / Σ_c' S_L,c'(t), where S_L,c(t) = N_L,c(t) + A_L,c(t) is the total number of speakers of L in country c.\nThis is the primary Part I.C output; regional concentration indices (e.g., Herfindahl index over countries, or share within world regions) are derived from this vector as reporting summaries only.\n\n**Component 4 — Part II decision interface:**\nFor each candidate office location (a set of ~15–20 cities/countries selected a priori based on the company's existing presence in NYC and Shanghai plus standard MCM/ICM candidate regions), compute at each snapshot date t_s ∈ {2030, 2074}:\ncoverage_L,loc(t_s) = S_L,loc(t_s) / P_loc(t_s)\ni.e., the fraction of the local population that speaks language L (native or L2/L3) at the snapshot date.\nThe short-term recommendation (6 offices) is chosen to maximize the sum of coverage across the 6 selected locations for the office's working language(s), subject to a constraint that each office's working language is distinct or complementary (no two offices in the same country). The long-term recommendation is the same maximization but evaluated at t_s = 2074.\n\n**Explicit handling of the dominant transformation mechanisms:**\n- The model explicitly separates native-speaker dynamics (demographic: births, deaths, migration) from L2 adoption dynamics (behavioral/economic: globalization, education, diaspora), rather than treating \"total speakers\" as a single undifferentiated population.\n- The attrition term δ_L,c in Component 2 explicitly accounts for the fact that L2 speakers are a subset of the general population and die at the general mortality rate; this is the dominant \"loss\" mechanism for L2 counts and is not assumed negligible.\n- The migration term M in Component 1 explicitly accounts for the fact that native speakers relocate, which is the dominant mechanism by which country-level shares change even if global totals do not.\n\n**Deliverable alignment:**\n- Part I.A → Components 1+2 (the coupled native + L2 models, run 2024→2074).\n- Part I.B → Component 3's output ranked by N (native) and by S (total) separately; rank-displacement test applied to each ranking.\n- Part I.C → Component 3's share vector, reported at 2024, 2050, 2074.\n- Part II.A → Component 4, evaluated at 2030 and 2074.\n- Part II.B → Component 4's coverage values are also used to argue for the \"fewer than six offices\" option: if the marginal coverage gain from the 5th or 6th office falls below a threshold (to be defined by the expert in Exchange 3 if needed), the recommendation is to open fewer.\n- Part III (memo) → synthesized from all four components' outputs.\n\nPlease accept or reject this structure as a whole. If rejecting, please identify the specific structural flaw.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe Exchange 2 structure was rejected. I have revised it to address the specific structural flaws I believe were at issue. Please identify which specific boundary condition, case, or failure mode would cause this *revised* structure to fail in either the core modeling (Part I) or the Part II recommendation.\n\n**Revised structure (minimal revision from the rejected version):**\n\n**Component 1 — Native speakers (unchanged from Exchange 2, but with one correction):**\nN_L,c(t+1) = N_L,c(t) + B_L,c(t) − D_L,c(t) + M_L,c(t)\nwhere B_L,c ≈ b_c(t)·s_L,c(t)·P_c(t), D_L,c ≈ d_c(t)·s_L,c(t)·P_c(t), and M_L,c(t) is now computed as:\nM_L,c(t) = m_net_c(t) · s_L,c(t−1) − m_net_c(t) · s_L,c(t−1)·(1 − ρ_L)\nwhere m_net_c(t) is the total net migration to country c in year t (from exogenous migration data or a fixed projection), and ρ_L is a language-specific retention factor: the fraction of migrants from a native-L-speaking origin who retain L as their native language after migration (i.e., who do NOT assimilate to the destination country's dominant native language). ρ_L is a structural parameter set once per language based on the language's typological distance from the destination country's dominant language (high ρ for languages that are not the destination's dominant language; lower ρ when the destination's dominant language is a close relative). This replaces the earlier \"fraction of total net migration weighted by language share\" formulation, which double-counted the destination population's existing L-share.\n\n**Component 2 — L2/L3 adoption (corrected):**\nA_L,c(t+1) = A_L,c(t) · (1 − δ_L,c(t)) + a_L,c(t) · P_nonL2,c(t) − E_A,L,c(t)\nwhere P_nonL2,c(t) = P_c(t) − N_L,c(t) − A_L,c(t) is the population that does NOT already speak L (neither native nor L2), δ_L,c(t) = d_c(t) (general mortality), E_A,L,c(t) is emigration of existing L2 speakers, and the adoption rate is now:\na_L,c(t) = a_base,L · G_c(t) · H_L,c(t)\nwith H_L,c(t) (not H_c(t)) made explicitly language-AND-country-specific:\n- For English: H_EN,c(t) = 1 + β_c(t)·DI_c(t), where β_c(t) is the country's degree of integration into international business/education (a fixed exogenous index) and DI_c(t) is a digital-intensity index.\n- For a regional lingua franca (Hindi, Arabic, Spanish, Mandarin): H_L,c(t) = γ_L · R_c(t), where γ_L is the language's regional-franca strength (a fixed structural parameter) and R_c(t) is the country's membership/strength in the relevant regional economic/cultural bloc.\n- For a language with a large diaspora (Punjabi, Russian, Japanese): H_L,c(t) = ζ_L · D_c(t), where ζ_L is the diaspora-pull strength and D_c(t) is the size of the country's existing diaspora from the language's home region as a fraction of its population.\n- For languages not in the above three categories: H_L,c(t) = 1 (baseline, no special driver).\n\nThis replaces the earlier single H_c(t) that was not explicitly decomposed by language-category, which was the structural flaw: it did not distinguish between a language's role as a global business language, a regional franca, and a diaspora language — three fundamentally different adoption mechanisms.\n\n**Component 3 — Country-level shares (unchanged):**\nshare_L,c(t) = S_L,c(t) / Σ_c' S_L,c'(t), S_L,c(t) = N_L,c(t) + A_L,c(t).\n\n**Component 4 — Part II decision interface (corrected):**\nThe office-selection criterion is now a *lexicographic* two-stage rule rather than a single maximization:\n- Stage 1 (hard constraint): each candidate office location must have coverage_L,loc(t_s) ≥ θ_min for at least one of the company's plausible working languages L (a minimum-coverage threshold, fixed a priori). This eliminates locations where no working language reaches a functional floor, regardless of growth potential.\n- Stage 2 (optimization): among locations passing Stage 1, select the 6 that maximize Σ_{loc} coverage_{L*(loc),loc}(t_s), where L*(loc) is the working language assigned to loc (chosen to maximize its coverage at that location), subject to the constraint that no two offices are in the same country and that the set of 6 assigned languages covers at least 4 distinct languages (a diversity constraint reflecting the company's need for multilingual coverage).\nThis replaces the earlier unconstrained maximization, which could in principle select 6 offices all in the same language-dominant region.\n\n**Explicit loss/transformation mechanisms (unchanged from Exchange 2, now with the ρ_L correction):**\n- Native-speaker loss: deaths (D) and assimilation of migrants to destination native language (the ρ_L term).\n- L2-speaker loss: deaths (δ = d_c) and emigration (E_A).\n- L2 gain: new adoption (a_L,c · P_nonL2), which explicitly excludes the already-speaking population, preventing the earlier formulation from over-counting adoption by people who already speak L.\n\n**Deliverable alignment (unchanged mapping, now with the lexicographic rule for Part II).**\n\nPlease identify the specific boundary condition, case, or failure mode that would break this revised structure."
+            ],
+            "expert_answers": [
+              "Gap 1: Operationalize \"replaced\" as rank displacement (a) — a language falling out of the top ten — and apply the test separately to the native-speaker list and the total-speaker list, since the problem names them as distinct lists.\n\nGap 2: The intended object is country-level shares (a); regional concentration (b) is a derived summary, and the coarser region-level object is acceptable only as a reporting simplification, not as the modeled quantity.\n\nGap 3: Key Part II to projected language coverage (a), not growth momentum. The short-term and long-term recommendations are meant to use different evaluation dates — the near-horizon snapshot for short term and the 50-year snapshot for long term — since the problem explicitly asks whether recommendations differ by horizon.",
+              "reject",
+              "The failure mode is the migration term in Component 1. M_L,c(t) = m_net_c(t)·s_L,c(t−1)·ρ_L treats net migration as a single scalar applied to the destination's existing native-L share, so it cannot represent the case that actually drives country-level share change: origin-composition shifts. When a country's net migration is dominated by inflows from origins whose native language is *not* L (e.g., large South-to-North flows into a country with a small L-speaking base), the term still injects L speakers in proportion to s_L,c, and when net migration is negative it removes them in the same proportion — both wrong. The boundary case that breaks it: a country with near-zero native-L share but massive net in-migration from L-speaking origins (or the reverse, an L-dominant country with net out-migration of non-L speakers). The term is structurally incapable of producing the share changes Part I.C is supposed to report."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7833333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8666666666666667,
+            "modeling_rigorousness_evaluation": 0.85,
+            "practicality_and_scientificity_evaluation": 0.7666666666666666,
+            "result_and_bias_analysis_evaluation": 0.65
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p1_20260930_111651/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the problem requirements. Task 1 specifies the 50-year horizon and the specific languages to be tracked, while Task 4 clearly distinguishes between short-term and long-term recommendations. The objectives are explicit, such as predicting speaker counts and determining office locations. However, the definition of \"13 tracked languages\" in Task 1 introduces specific languages (French, Indonesian, Urdu) not explicitly listed in the background's top-10, which, while logical for a comprehensive model, slightly narrows the open-ended nature of \"various language speakers\" without fully justifying the exclusion of others in the definition phase. Overall, the goals are well-stated and aligned with the client's needs.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured with clear dependencies: Task 1 (modeling) supports Task 2 (prediction) and Task 3 (geography), which in turn inform Task 4 (office location). Task 5 builds on the communication trends from Part I, and Task 6 synthesizes all findings. The coverage is comprehensive, addressing all parts of the problem statement (I.A-C, II.A-B, III). There are no significant deviations or missing key parts. The interrelation between tasks is strong, ensuring that the final memo (Task 6) is supported by the preceding analytical steps. The decomposition effectively covers the actual goals of the problem without unnecessary fragmentation.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering a clear, implementable framework for office location selection that integrates linguistic trends with business constraints, and it explicitly identifies the additional data needed for final financial decisions.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically grounded in demographic and sociolinguistic principles, using a logical compartmentalized structure for native and L2 speakers, and applies appropriate mathematical optimization techniques, though parameter calibration is heuristic.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly explained and structurally sound, separating demographic and behavioral mechanisms. However, specific parameter values lack deep justification or sensitivity analysis, slightly reducing the rigor of the foundational data.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate and sophisticated methods, such as coupled systems and HHI, to reflect the problem's complexity. The structural choices are scientifically sound and logically consistent with the requirements.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is clear and well-structured, providing detailed explanations for trends and rank changes. However, the use of invalid coverage metrics (>100%) for location recommendations reduces the interpretability and practical utility of that specific part of the result.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The modeler thoroughly identifies data and model biases, such as the limited country scope and uncalibrated parameters. However, it does not effectively correct these biases; the final recommendations rely on flawed metrics and incomplete data, with limitations noted but not mitigated in the analysis.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        },
+        {
+          "problem_id": "2018_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\n# Structural/definitional constraints the 2018_M problem leaves ambiguous\n\nWe are modeling the 50-year evolution of global language speakers (native and total) for the top-ten native-speaker languages, then deriving office-site recommendations for a service company. The problem statement does not settle three structural interpretations that parameterize the core mechanism:\n\n1. **Scope of \"language\":** The problem's ten languages include clusters of mutually unintelligible varieties (Mandarin incl. Standard Chinese, Hindi, Arabic, Punjabi). For the forecast, is each entry to be treated as a single unitary language (per Ethnologue's top-100 convention, where varieties are grouped and L2 speakers are attached to the standard variety), or should internal variety structure be preserved? This determines the denominator against which rank replacement is judged.\n\n2. **Meaning of \"replaced\" in Part I.B:** Replacement is to be judged by rank position (the language falls out of the top-10 list), by a magnitude threshold (e.g., a challenger overtakes it in absolute speakers), or by loss of the company's operational relevance (e.g., the language no longer serves as a viable office working language in any candidate region)?\n\n3. **Coverage requirement for the six offices (Part II.A):** The company needs employees to speak \"English and one or more additional languages.\" Is the six-office set required to cover a prescribed number of *distinct additional languages* (a coverage constraint), or is the only hard constraint that each office speaks English plus the locally dominant language(s), with the global set of additional languages emerging from the site choices (an endogenous outcome)?\n\nHow should the model's parameters and assumptions be read to address each of these, so that the same core mechanism carries through Parts I.A–C (projection and geographic redistribution) and Part II (site and language recommendations, including the short- vs. long-term comparison in II.A and the fewer-than-six option in II.B)?",
+              "# Expert Question 2 (Operator 2: judgment)\n\n# Proposed structural configuration for the 50-year language-speaker model\n\nFollowing Exchange 1, we impose and put to you this one coherent structural hypothesis. Accept or reject it as a whole.\n\n**Unitary language units.** Each of the ten native top-10 entries (Mandarin, Spanish, English, Hindi, Arabic, Bengali, Portuguese, Russian, Punjabi, Japanese) is modeled as a single unitary language, per Ethnologue's top-100 convention: varieties are grouped, and L2/L3 speakers are attached to the standard variety. This makes rank replacement comparable and keeps the top-10 lists internally consistent.\n\n**Two-decomposition core mechanism.** For each language *i* at year *t*, total speakers = native + L2/L3, forecast separately:\n- *Native count* N_i(t): driven by the demographic trajectory of the language's home region (UN WPP regional population), i.e. N_i(t) ≈ f_i · P_home_i(t), where f_i is the native-speaker fraction. This captures the slow demographic drift and the decline/aging effect (e.g., Japan, Russia) without inventing migration flows.\n- *L2/L3 adoption* A_i(t): a logistic/saturation adoption model driven by globalization, education, migration and technology, parameterized by the current L2 share (from Ethnologue Item 2) as the initial condition and bounded by a ceiling tied to global English/technology penetration. This is where English, French and other lingua-francae grow fastest.\n\n**Explicit loss/transformation mechanisms (not idealized).** The structure does not assume negligible interactions:\n- *Rank-replacement dynamics:* a challenger replaces a top-10 entry when its total-speaker count overtakes the incumbent's; we explicitly forecast the overtake times for French, Indonesian and Urdu against Japanese, Punjabi and others, so Part I.B's \"replaced?\" question is answered by a computed crossover, not an assertion.\n- *Geographic redistribution:* the L2 component is re-weighted each year by UN WPP regional population growth and by migration/assimilation pressures, so Part I.C's geographic distribution change is a direct output of the adoption submodel, not a separate assumption.\n- *Office-site coupling (Part II):* the six-office locations are chosen to maximize coverage of the projected dominant local languages, where each office speaks English plus the locally dominant language. The \"additional languages\" set is endogenous (emerging from site choice), not a prescribed count. The short- vs. long-term comparison (II.A) and the fewer-than-six option (II.B) reuse the same projected language distribution, so no second model is built.\n\nThis one mechanism (demographic native drift + globalization-driven L2 saturation, with computed rank crossovers and WPP-weighted geographic re-weighting) carries through all of Parts I and II. Do you accept this structure, or reject it on a specific structural flaw?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\n# Counterexample against the revised structure\n\nYou rejected the structure in Exchange 2. The weakest load-bearing assumption was the **endogenous, unconstrained office-site choice** in Part II: we let the six offices be placed wherever the projected dominant language is, which risks a degenerate solution (all six clustered in the highest-population region) that does not answer the company's intent to be \"truly international.\"\n\n**Minimal revision.** Constrain the six offices to a *geographically dispersed* set by requiring they span at least three continents (excluding North America and East Asia, where the company already has offices), and maximize coverage of *distinct* projected dominant languages under that dispersion constraint. This keeps the one-mechanism core (demographic native drift + globalization L2 saturation, computed rank crossovers, WPP-weighted geographic re-weighting) intact and only changes the Part II site-selection layer from \"unconstrained maximum\" to \"dispersed maximum coverage.\"\n\nAgainst this *revised* structure, what specific case, boundary condition, or failure mode would break it — either in the core projection (Parts I.A–C) or in the now-dispersed Part II site recommendation? For example: a region whose dominant projected language is English (so the \"additional language\" slot is empty), a language whose L2 ceiling is already saturated by 2074, or a continental dispersion constraint that forces a site into a region with no viable non-English working language. Which of these, or another, is the binding failure mode the final report's limitation section must address?"
+            ],
+            "expert_answers": [
+              "The problem text does not supply the magnitudes or thresholds needed to settle these three readings. It gives no criterion for how much internal variety structure must be preserved, no quantitative definition of \"replaced\" (rank drop, absolute overtake, or operational loss), and no required count of distinct additional languages across the six offices. These are choices the modeling team must impose and justify, not parameters recoverable from the statement or dataset.",
+              "reject",
+              "The binding failure mode is the empty additional-language slot: under the dispersion constraint, a required continent's projected dominant language is English (or a language already covered by another mandated site), so the office satisfies \"English plus one or more additional languages\" with zero additional languages. Dispersion forces the site; coverage cannot fill the slot. That is the case the limitation section must address."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8166666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.7333333333333334,
+            "practicality_and_scientificity_evaluation": 0.7833333333333333,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p1_20260930_111651/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, accurately reflecting the problem requirements. Task 1 explicitly lists the influencing factors and the time horizon (2024-2074), providing a concrete objective for the modeling phase. Tasks 2 and 3 correctly identify the predictive and geographic analysis goals. Tasks 4 and 5 clearly state the decision-making objectives for office location and quantity, including the distinction between short-term and long-term strategies. The goals are explicit, measurable, and directly aligned with the client's needs as described in the prompt.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all parts of the problem (I.A-C, II.A-B, III) without deviation. The sub-tasks are logically interrelated: Task 1 provides the model, Task 2 uses it for prediction, Task 3 analyzes geographic shifts, and Tasks 4-5 apply these insights to business decisions. There are no missing key components; the modeler correctly identifies the dependency of the business recommendations on the linguistic trends. The coverage is complete, ensuring that all aspects of the COO's request are addressed in a structured manner.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are quantitative, clearly linked to demographic drivers, and provide actionable insights with explicit limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "Biases are thoroughly identified and their impact analyzed, but active correction methods are limited to sensitivity checks rather than structural adjustments.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, offering a clear, actionable framework for office location and language strategy. It integrates demographic and linguistic data to provide meaningful insights for decision-making, balancing geographic dispersion with language coverage and financial viability.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using established demographic and linguistic theories. It integrates multiple factors and provides a comprehensive analysis with clear theoretical underpinnings, ensuring reliability and validity in its predictions.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear but oversimplify dynamic processes like language shift and L2 saturation parameters, lacking detailed justification for key model inputs.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model structure is appropriate and logical, but the geographic distribution and cost-benefit analyses are somewhat simplistic and lack quantitative depth.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.8,
+      "interaction_cost": 0.8709367773017282,
+      "interaction_penalty": 0.04354683886508642,
+      "net_utility": 0.7564531611349137,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 3827,
+          "total_expert_latency_seconds": 3.93,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.96861769634599,
+          "latency_cost_component": 0.253493199383183,
+          "interaction_cost": 0.8874470785383961,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1894,
+          "total_expert_latency_seconds": 2.69,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8860661901626509,
+          "latency_cost_component": 0.20745899807453216,
+          "interaction_cost": 0.8544264760650604,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2019_D",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating an emergency-evacuation model for the Louvre (72,735 m² exhibit\nspace over 5 floors, wings up to 480 m, four main public entrances plus\nunstaffed service/secret exits) that must (a) minimize time-to-empty for a\nheterogeneous crowd, (b) identify bottlenecks, (c) keep a reverse corridor open\nfor entering emergency personnel, and (d) remain adaptable when a threat removes\nroute segments. I will build a macroscopic, cell-based network model with a\nfundamental-diagram speed–density relation.\n\nThe problem statement leaves four logical boundaries unsettled, and I cannot\nsettle them from the text or the gathered data. Which reading is the correct\nground truth for the model?\n\n1. **Occupancy domain.** The 8.1 M figure is an annual count, not a population.\n   Should the model treat total occupancy N(t) as a planning parameter to be\n   swept (e.g., 3,000 / 8,000 / 12,000 visitors, peak day) rather than a derived\n   quantity, and does \"empty the building\" mean visitors only, or visitors plus\n   staff?\n\n2. **Objective function.** The text asks simultaneously for fast egress AND fast\n   entry of emergency personnel. Is the correct interpretation a two-objective\n   trade-off (time-to-empty vs. first-responder arrival time), with the\n   recommendation reporting the Pareto frontier, or is time-to-empty primary and\n   the responder corridor a hard constraint (corridor must exist in every\n   feasible solution)?\n\n3. **Role of additional (unpublicized) exits.** Should the model treat\n   service/secret exits as a *contingent capacity reserve* that is closed by\n   default, opened only after a security-release decision, and never part of the\n   public-facing routing, or are they legitimate primary exits whose use is\n   gated only by threat type (e.g., open them unless the threat is a\n   perimeter breach at that exit)?\n\n4. **Threat representation for adaptability.** Is a \"threat\" to be modeled\n   structurally as (i) an edge/node deletion set applied to the network plus\n   (ii) a re-computation of routes — i.e., the model's adaptability claim is that\n   re-optimization after any removal stays fast and feasible — rather than as a\n   change in crowd psychology or route preferences?\n\nI need the interpretation of these four boundaries, not magnitudes or empirical\nconstants, so that the parameterization of the core mechanism (capacity\nallocation, objective, contingency logic, threat operator) is logically\ngrounded before I fix the structure.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven your Exchange-1 ground truth (N swept as a planning parameter over all\noccupants; two-objective time-to-empty vs. responder arrival, reported as a\nPareto frontier; service/secret exits as a closed-by-default contingent\nreserve; threats as edge/node deletion sets with fast route re-computation),\nplease accept or reject this one coherent structural hypothesis for the model.\n\n**Proposed structure — a three-layer macroscopic network model:**\n\n1. **Network abstraction (geometry layer).** Discretize the Louvre into a\n   directed cell network: 5 floor nodes, wing segments as edges, exits as\n   terminal nodes. Each edge i has length L_i (from the 480 m wing scale and\n   floor area 72,735 m²), width w_i, and capacity C_i = α · w_i persons/s\n   (α from the fundamental diagram, ~1.3 persons/s per meter of effective door\n   width, saturating). The network is **floor-stratified**: inter-floor edges\n   (stairs/elevators) have their own capacities and are the primary\n   bottlenecks for the 2 underground floors.\n\n2. **Flow dynamics (macroscopic layer).** Each edge carries a density ρ_i(t)\n   governed by a cell-transmission / LWR-style update:\n   - v_i = v_f · (1 − ρ_i/ρ_jam)  (triangular fundamental diagram)\n   - outflow = min(v_i · ρ_i · Δx, C_i)  (capacity-limited outflow)\n   - ρ_jam = 4 persons/m², v_f = 1.34 m/s (heterogeneous: disabled ≈ 0.94 m/s,\n     wheelchairs ≈ 0.5 m/s as a speed class with reduced v_f and reduced C_i).\n   The **dominant transformation mechanism** I am making explicit is the\n   *capacity-to-flow conversion at each door*: occupants arriving at an exit\n   node must pass through the door bottleneck, so the exit flow is\n   min(arrival rate, door capacity). This is where the speed–density relation\n   loses energy (flow) that the idealized \"everyone walks at v_f\" model\n   ignores.\n\n3. **Allocation and contingency (decision layer).**\n   - **Exit assignment:** each cell is assigned to its *effective* nearest\n     available exit, where \"available\" = 4 public entrances + (reserve exits if\n     the security-release flag is set). Assignment is by **shortest\n     time-weighted path** in the network, not Euclidean distance.\n   - **Responder corridor:** in each Pareto point, a **protected path** is\n     reserved from the nearest perimeter entrance to the incident floor, with a\n     minimum width and no egress flow allowed on it (or a reduced egress\n     allocation if the corridor must also carry evacuees). The responder\n     arrival time is computed as travel time along this protected path at free\n     speed (personnel walk unimpeded).\n   - **Two-objective sweep:** for each N in the sweep, compute (T_empty,\n     T_responder) over a grid of reserve-exit-release scenarios (0, 1, 2, 3\n     reserve exits opened) and Pareto-filter the points.\n   - **Threat adaptability:** a threat = a set S of deleted edges/nodes.\n     Re-run the allocation after deletion; report the new T_empty. The\n     adaptability metric = (T_empty_after − T_empty_before) /\n     T_empty_before, computed over a catalog of representative removals\n     (one wing, one stair, one exit, multiple edges).\n\n4. **Deliverable mapping (per the deliverable-alignment rule):**\n   - Core model → Tasks 1–2 (time-to-empty, bottlenecks, Pareto frontier).\n   - The *contingent reserve* layer is the interface to the **policy\n     recommendation** deliverable: the release threshold (how many reserve\n     exits, at what threat level) becomes a policy recommendation.\n   - The *threat-deletion re-optimization* layer is the interface to the\n     **adaptability / other-structures** deliverable: the same network\n     abstraction with a different geometry and N generalizes to other large\n     crowded buildings (stadiums, malls, airports).\n\nThis is one self-consistent mechanism, not a menu of alternatives. Accept or\nreject as a whole.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe accepted structure is the three-layer macroscopic network model: floor-\nstratified cell network; LWR/triangular fundamental-diagram dynamics with\nexplicit door-bottleneck capacity conversion; and a decision layer that\nassigns cells to time-weighted nearest available exits, reserves a protected\nresponder path, sweeps N and reserve-exit-release to produce a (T_empty,\nT_responder) Pareto frontier, and re-optimizes after edge/node deletion for\nthreat adaptability.\n\nName the specific boundary condition, failure mode, or case that would break\nthis mechanism — a case in which one of the following goes wrong, and why it\nis not captured by the structure as written:\n\n(a) the **Pareto frontier** as a reporting device (e.g., the frontier is\n    degenerate or the two objectives are infeasible simultaneously for some\n    N, making \"time-to-empty vs. responder arrival\" not actually a trade-off);\n(b) the **responder corridor** as a protected path (e.g., no protected path\n    exists from any perimeter entrance to the incident floor that does not\n    cut through the densest egress flow, or the corridor's own egress\n    contribution to T_empty is large enough that reserving it invalidates the\n    \"fast egress\" objective);\n(c) the **threat re-optimization** adaptability claim (e.g., a deletion set\n    S that leaves the network disconnected for some floor, or that removes\n    every available exit within time-weighted reach of a large cell group, so\n    re-optimization is infeasible rather than merely slower);\n(d) the **door-bottleneck capacity conversion** as the dominant loss\n    mechanism (e.g., a case where the binding constraint is not the door but\n    an upstream corridor cell that jams before the door, making the\n    door-capacity model misattribute the bottleneck);\n(e) the **generalization to other structures** deliverable (e.g., a building\n    class where the floor-stratified single-exit-per-cell assignment is\n    structurally wrong — an open plan with no discrete wings, or a vertical\n    structure like a stadium where \"nearest exit\" is dominated by vertical\n    travel).\n\nGive the case, not advice about how to fix it."
+        ],
+        "expert_answers": [
+          "1. Occupancy is a swept planning parameter, not derived from 8.1 M; \"empty the building\" means all occupants — visitors plus staff — since staff also egress.\n\n2. Two-objective trade-off, reporting the Pareto frontier; the responder corridor is not a hard constraint in every solution but a second objective, since the text asks for both simultaneously.\n\n3. Contingent capacity reserve: closed by default, opened only after a security-release decision, never in public-facing routing.\n\n4. Structural: edge/node deletion set plus route re-computation; adaptability means re-optimization stays fast and feasible, not crowd-psychology change.",
+          "accept",
+          "(c) A deletion set S that removes every exit within time-weighted reach of a large cell group — e.g., a threat isolating one underground floor by deleting its stair edges and its nearest exit nodes simultaneously. The network becomes disconnected for that floor: no path to any terminal node exists, so re-optimization is infeasible, not merely slower. The structure as written assumes a feasible re-route always exists and reports only a T_empty delta; it has no representation of an unreachable subpopulation, so the adaptability metric is undefined rather than large."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8145833333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.7333333333333333,
+        "modeling_rigorousness_evaluation": 0.8500000000000001,
+        "practicality_and_scientificity_evaluation": 0.8166666666666668,
+        "result_and_bias_analysis_evaluation": 0.8583333333333334
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals, explicitly identifying the two-objective nature of the problem (evacuation speed vs. responder entry) and the need for a Pareto frontier. The definition of the macroscopic model is precise, specifying inputs (occupancy N) and outputs (T_empty, T_responder, bottlenecks). However, the definition could be slightly more explicit about how \"heterogeneous crowd\" characteristics (e.g., disabled visitors, groups) are mathematically incorporated into the macroscopic model, as this is a key challenge mentioned in the background. Overall, the goals are explicit and well-aligned with the problem requirements.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks cover all major aspects of the problem requirements: modeling, bottleneck identification, trade-off analysis, adaptability to threats, policy recommendations, and generalization. There is a logical flow from model development (Task 1) to specific analyses (Tasks 2-4) and then to implementation (Tasks 5-6). However, there is some redundancy between Task 1 (which includes identifying bottlenecks and reporting the Pareto frontier) and Tasks 2 and 3 (which specifically focus on bottlenecks and the trade-off). This overlap suggests the decomposition could be tighter to avoid repetitive work. Additionally, the specific consideration of \"additional exits\" and security concerns mentioned in the background is not explicitly isolated as a sub-task, though it is likely embedded in Task 4. Overall, the coverage is mostly complete and interrelated.",
+            "score": 7
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "Assumptions are clear and reasonable for core mechanics but lack explicit justification for handling visitor diversity and specific behavioral factors mentioned in the background.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate methods (LWR, Pareto frontier) and a logical structure that accurately reflects the physical and decision-making aspects of evacuation, with strong handling of bottlenecks and adaptability.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are quantitatively precise, logically derived, and clearly explain the trade-offs and bottlenecks, providing strong support for the final policy recommendations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The modeler identifies specific structural and data biases, assesses their directional impact on results (e.g., conservative estimates), and suggests appropriate mitigations, demonstrating a rigorous approach to model limitations.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, tailored to the Louvre's specific layout and security constraints. It provides actionable insights through Pareto optimization and threat analysis, directly supporting decision-making for emergency planners. Its adaptability to other structures further enhances its utility.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, employing standard crowd dynamics models (triangular fundamental diagram) and network theory (Dijkstra). Parameters are grounded in empirical data, and the mathematical formulation of trade-offs (Pareto frontier) is rigorous and appropriate for the domain.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2019_D",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p2_20260930_111651",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p2_20260930_111651/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building an emergency evacuation model for the Louvre (ICM 2019 D). Before\nparameterizing anything, I need the structural and definitional boundaries the\nproblem statement leaves ambiguous. I am NOT asking for magnitudes, rates, or\nempirical constants; I am asking for the logical ground truth of four\ninterpretations that the text does not settle:\n\n1. **Definition of the evacuation objective (T).** The goal is stated as \"all\n   occupants leave as quickly and safely as possible.\" Which logical reading\n   should the model's objective be: (a) evacuation completion time T, the\n   instant the last visitor exits (the standard definition), or (b) a\n   time-weighted or partial-objective (e.g., 95% of occupants out)? This choice\n   determines which quantity every downstream result (route choice, exit\n   allocation, bottleneck identification) optimizes, and it changes the reading\n   of every number the model produces.\n\n2. **Validity domain of the core mechanism — two-way flow.** The supervisor\n   asks for BOTH fast egress of visitors AND fast entry of emergency personnel\n   while the evacuation is under way. This creates simultaneous opposing flows\n   on shared routes. What is the structural rule you would require of the model:\n   must it represent entry and egress as competing on the same route network\n   (two-way flow interaction on shared links), or is a phased separation\n   (egress dominates first, emergency entry modeled in a subsequent phase after\n   partial clearance) an acceptable logical domain for this class of building?\n   In other words: does the problem's domain, as you read it, admit opposing\n   flows on the same link at the same time, or is the valid domain a sequence of\n   non-overlapping flow regimes?\n\n3. **Scope of route-removal under threat.** The statement says each threat can\n   \"alter or remove segments of possible routes to safety.\" What is the logical\n   boundary of that removal: can a threat remove entire wings/floors (nodes and\n   their incident links), or only corridor/door segments (links), and can exits\n   themselves be disabled? I need the valid domain of the network-degradation\n   operator (which elements of the graph may be removed) to parameterize the\n   adaptability requirement and the \"replan after segment removal\" analysis.\n\n4. **Mapping of the core model to the secondary deliverables.** The problem\n   asks for (i) an adaptable evacuation model, (ii) validation, (iii) policy and\n   procedural recommendations including crowd management, and (iv) adaptation to\n   other large crowded structures. Which of these do you treat as outputs that\n   must be *mechanically derived from the same model* (i.e., the policy\n   recommendations and the generalization must be consequences of the model's\n   outputs and parameters), and which are allowed to be qualitative extensions\n   that merely cite the model? This determines how I structure the model's\n   outputs so they can be read back into the policy and generalization sections\n   rather than being written separately.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFrom Exchange 1: T = completion time of the last occupant; the domain admits\nconcurrent opposing egress/emergency-entry flows on shared links; the\nthreat-degradation operator may remove nodes, links, and exits; and the policy\ndeliverable must be mechanically derived from the model.\n\nI put this one specific structural configuration to you for acceptance or\nrejection. It is a complete mechanism for the Louvre evacuation model:\n\n**Core — network flow with queue dynamics, not a macroscopic continuity PDE.**\n- Build a graph G = (V, E) of the Louvre's five floors (including the two\n  underground levels). Nodes V are rooms/galleries/floor hubs plus the four main\n  public entrances (Pyramid, Passage Richelieu, Carrousel du Louvre, Portes Des\n  Lions) plus a modeled set of auxiliary emergency/service exits. Links E are\n  corridors, stairwells, and elevator shafts.\n- Each link e has a capacity C_e computed from the doorway specific-flow\n  calibration (≈1.3 persons/s per meter of effective width, saturating at ≈0.6 m\n  effective width) and the corridor's free-flow speed (base 1.34 m/s, swept over\n  0.85–1.85 m/s). The link's usable width is a model constant, not a measured\n  quantity, so I do not ask for it.\n- Each evacuee class (tourist, family with children, ambulant-disabled,\n  wheelchair user, staff) has its own speed distribution (SFPE values, e.g.,\n  ambulant-disabled ≈0.94 m/s SD 0.30, wheelchair ≈0.36–0.69 m/s) and its own\n  delay penalty. Population is split by class; I do not ask for the Louvre's\n  actual class fractions — I will use a stated, defensible assumption and\n  sensitivity-sweep them.\n\n**Two-way flow (per your Exchange 1 ruling).** The model represents egress\nand emergency entry as concurrent opposing flows on shared links. The link's\nresidual capacity for egress is reduced by the emergency-entry flow using a\ntwo-way flow penalty (effective egress speed = free speed × a two-way reduction\nfactor that grows with the opposing flow fraction). This is the \"dominant\ntransformation mechanism\" the problem's physical domain requires — I am not\nassuming egress and entry do not interact.\n\n**Bottleneck and T computation.** T = completion time of the last occupant,\ncomputed by propagating per-class queues along the graph: each link's outflow is\nbounded by its capacity, and T is the time at which all class-queues drain to\nzero. Bottlenecks = links at or near saturation at the completion time.\n\n**Threat degradation.** A threat is a set of removed graph elements (nodes,\nlinks, and exits — per your Exchange 1 ruling that exits are removable). The\nmodel re-solves T on the degraded graph. I test a library of single- and\nmulti-element removals and report T and the bottleneck set for each.\n\n**Policy deliverable, mechanically derived (per your Exchange 1 ruling).** The\npolicy recommendations are not free text; they are read off the model's outputs:\n- Exit-allocation policy = the set of exits that minimize T under each threat\n  scenario (from the threat-degradation solver).\n- Bottleneck mitigation = the saturated links from the bottleneck report, mapped\n  to physical interventions (widen door, add exit, pre-position staff).\n- Crowd-management procedure = class-wise delay penalties that exceed a threshold\n  (e.g., wheelchair or ambulant-disabled class has a delay multiple of the tourist\n  class) trigger a specific procedural rule (escort assignment, priority corridor).\n- Generalization to other structures (deliverable iv) is the one part you\n  allowed as a qualitative extension; I will cite the model's transferable\n  parameters (specific flow rate, free-flow speed, two-way penalty, class speed\n  distributions) and note which are building-specific.\n\nPlease accept or reject this structure. If you reject it, name the specific\nstructural flaw (a missing interaction term, an invalid domain assumption, or a\nflawed aggregation) so I can make a minimal revision.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe Exchange 2 structure is accepted: a network-flow-with-queue model on a\nfive-floor Louvre graph, link capacity from the doorway specific-flow calibration,\nper-class speed distributions, a two-way flow penalty for concurrent\negress/emergency-entry on shared links, T = last-occupant completion time,\nthreats as removed nodes/links/exits with T re-solved on the degraded graph, and\npolicy recommendations read mechanically off T, the bottleneck set, and the\nclass-wise delay penalties.\n\nWhich specific case, boundary condition, or failure mode would break this\nmechanism — the most consequential limit you can name? I want the single\nstrongest counterexample, stated concretely, so I can carry it into the bias\nand robustness discussion of the report. Candidates I can already see and want\nyour ruling on which (or another) is the real one:\n\n(a) **Simultaneous multi-exit saturation / bottleneck migration:** removing one\nexit shifts all its flow onto a second exit that was not saturated before; the\nmodel reports the new bottleneck, but the pre-identified bottleneck set (used to\npre-position staff) is now wrong — the \"identify potential bottlenecks\" deliverable\nassumes bottlenecks are stable across scenarios, but they migrate.\n\n(b) **Two-way flow penalty degeneracy:** if emergency entry is concentrated on the\nsame link as the dominant egress flow, the two-way penalty can drive the effective\negress speed to (near) zero, making T blow up or the queue update numerically\nunstable — the concurrent-flow assumption you required in Exchange 1 is exactly\nthe assumption that can destroy the very egress it is meant to serve.\n\n(c) **Class aggregation hiding the last occupant:** T is the last-occupant time, but\nthe last occupant is almost always from the slowest class (wheelchair or\nambulant-disabled). If the model aggregates classes into a single mean speed, the\ntail (the actual T) is mis-estimated even when the mean flow is right — and this\nmatters precisely for the safety deliverable, which is about the slowest people\nleaving, not the average person.\n\n(d) **Graph abstraction vs. real geometry:** the five-floor graph lumps long\ncorridors (up to 480 m wings) into single links with one capacity; a real\nbottleneck mid-corridor (a gallery junction, a narrow passage) is not represented,\nso the model can be right about total T and wrong about *where* the crowd\njams — the \"where to intervene\" output is only as good as the link granularity.\n\nName the one that most breaks the mechanism, or a different one if you have it."
+            ],
+            "expert_answers": [
+              "1. **T**: Read it as (a), completion time of the last occupant. \"As quickly and safely as possible\" is a single terminal condition; partial objectives (95%) are not in the text and would be an added assumption, not a reading.\n\n2. **Two-way flow**: The domain admits opposing flows on shared links simultaneously. The supervisor's requirement is concurrent egress and emergency entry, not sequential; phased separation is a modeling convenience the statement does not authorize.\n\n3. **Removal scope**: The operator's valid domain is any graph element — nodes, links, and exits. \"Segments of possible routes\" plus \"alter or remove\" and the security discussion of exits both imply exits themselves are removable.\n\n4. **Derivation**: (i), (ii), and (iii) must be mechanically derived from the model. Only (iv) may be a qualitative extension citing the model.",
+              "accept",
+              "(c) Class aggregation hiding the last occupant."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8083333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6833333333333332,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r1p2_20260930_111651/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals, explicitly mentioning the dual objective of evacuating visitors and allowing emergency personnel entry. Key components such as the physical layout (five floors, area, wing length) and exit types (main and auxiliary) are accurately identified. However, the definition could be more explicit about specific success metrics (e.g., maximum evacuation time) and the detailed criteria for \"safety\" beyond speed.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The task analysis covers the core requirements of developing an adaptable model and identifying bottlenecks. It correctly includes the physical constraints and exit options. However, it only presents \"Task 1,\" which aggregates the entire problem into a single block. It does not explicitly decompose the problem into distinct sub-problems (e.g., separate tasks for route optimization, bottleneck analysis, threat adaptation, and policy recommendation), which limits the clarity of how the complex requirements are addressed step-by-step.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are presented with high clarity, supported by detailed sensitivity analyses and clear interpretations of bottleneck migration and system limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler comprehensively identifies multiple sources of bias and model limitations, explaining their impact on results and suggesting appropriate methodological improvements.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified with credible data sources (SFPE, NIST), and directly address the problem's complexities regarding population diversity and threat scenarios. The inclusion of sensitivity analysis further strengthens the rigor.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model selection is rational, with a clear justification for choosing a capacity-allocation model over PDEs to better expose bottlenecks. The class-resolved approach is scientifically appropriate for ensuring the safety of vulnerable populations, and the graph-based structure allows for effective threat scenario analysis.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, tailored to the Louvre's specific geometry and security constraints. It effectively simulates bottleneck migration under threat scenarios and provides actionable outputs (evacuation time, bottleneck locations) that support decision-making for emergency planners. The parameterized design allows for exploring a wide range of operational options.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, utilizing established crowd dynamics principles such as sub-linear exit capacity saturation and two-way flow penalties. The graph-based queueing approach is a rigorous method for modeling evacuation, and the physical assumptions regarding corridor and exit capacities are well-justified by domain-specific knowledge.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        },
+        {
+          "problem_id": "2019_D",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating an emergency-evacuation model for the Louvre (72,735 m² exhibit\nspace over 5 floors, wings up to 480 m, four main public entrances plus\nunstaffed service/secret exits) that must (a) minimize time-to-empty for a\nheterogeneous crowd, (b) identify bottlenecks, (c) keep a reverse corridor open\nfor entering emergency personnel, and (d) remain adaptable when a threat removes\nroute segments. I will build a macroscopic, cell-based network model with a\nfundamental-diagram speed–density relation.\n\nThe problem statement leaves four logical boundaries unsettled, and I cannot\nsettle them from the text or the gathered data. Which reading is the correct\nground truth for the model?\n\n1. **Occupancy domain.** The 8.1 M figure is an annual count, not a population.\n   Should the model treat total occupancy N(t) as a planning parameter to be\n   swept (e.g., 3,000 / 8,000 / 12,000 visitors, peak day) rather than a derived\n   quantity, and does \"empty the building\" mean visitors only, or visitors plus\n   staff?\n\n2. **Objective function.** The text asks simultaneously for fast egress AND fast\n   entry of emergency personnel. Is the correct interpretation a two-objective\n   trade-off (time-to-empty vs. first-responder arrival time), with the\n   recommendation reporting the Pareto frontier, or is time-to-empty primary and\n   the responder corridor a hard constraint (corridor must exist in every\n   feasible solution)?\n\n3. **Role of additional (unpublicized) exits.** Should the model treat\n   service/secret exits as a *contingent capacity reserve* that is closed by\n   default, opened only after a security-release decision, and never part of the\n   public-facing routing, or are they legitimate primary exits whose use is\n   gated only by threat type (e.g., open them unless the threat is a\n   perimeter breach at that exit)?\n\n4. **Threat representation for adaptability.** Is a \"threat\" to be modeled\n   structurally as (i) an edge/node deletion set applied to the network plus\n   (ii) a re-computation of routes — i.e., the model's adaptability claim is that\n   re-optimization after any removal stays fast and feasible — rather than as a\n   change in crowd psychology or route preferences?\n\nI need the interpretation of these four boundaries, not magnitudes or empirical\nconstants, so that the parameterization of the core mechanism (capacity\nallocation, objective, contingency logic, threat operator) is logically\ngrounded before I fix the structure.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven your Exchange-1 ground truth (N swept as a planning parameter over all\noccupants; two-objective time-to-empty vs. responder arrival, reported as a\nPareto frontier; service/secret exits as a closed-by-default contingent\nreserve; threats as edge/node deletion sets with fast route re-computation),\nplease accept or reject this one coherent structural hypothesis for the model.\n\n**Proposed structure — a three-layer macroscopic network model:**\n\n1. **Network abstraction (geometry layer).** Discretize the Louvre into a\n   directed cell network: 5 floor nodes, wing segments as edges, exits as\n   terminal nodes. Each edge i has length L_i (from the 480 m wing scale and\n   floor area 72,735 m²), width w_i, and capacity C_i = α · w_i persons/s\n   (α from the fundamental diagram, ~1.3 persons/s per meter of effective door\n   width, saturating). The network is **floor-stratified**: inter-floor edges\n   (stairs/elevators) have their own capacities and are the primary\n   bottlenecks for the 2 underground floors.\n\n2. **Flow dynamics (macroscopic layer).** Each edge carries a density ρ_i(t)\n   governed by a cell-transmission / LWR-style update:\n   - v_i = v_f · (1 − ρ_i/ρ_jam)  (triangular fundamental diagram)\n   - outflow = min(v_i · ρ_i · Δx, C_i)  (capacity-limited outflow)\n   - ρ_jam = 4 persons/m², v_f = 1.34 m/s (heterogeneous: disabled ≈ 0.94 m/s,\n     wheelchairs ≈ 0.5 m/s as a speed class with reduced v_f and reduced C_i).\n   The **dominant transformation mechanism** I am making explicit is the\n   *capacity-to-flow conversion at each door*: occupants arriving at an exit\n   node must pass through the door bottleneck, so the exit flow is\n   min(arrival rate, door capacity). This is where the speed–density relation\n   loses energy (flow) that the idealized \"everyone walks at v_f\" model\n   ignores.\n\n3. **Allocation and contingency (decision layer).**\n   - **Exit assignment:** each cell is assigned to its *effective* nearest\n     available exit, where \"available\" = 4 public entrances + (reserve exits if\n     the security-release flag is set). Assignment is by **shortest\n     time-weighted path** in the network, not Euclidean distance.\n   - **Responder corridor:** in each Pareto point, a **protected path** is\n     reserved from the nearest perimeter entrance to the incident floor, with a\n     minimum width and no egress flow allowed on it (or a reduced egress\n     allocation if the corridor must also carry evacuees). The responder\n     arrival time is computed as travel time along this protected path at free\n     speed (personnel walk unimpeded).\n   - **Two-objective sweep:** for each N in the sweep, compute (T_empty,\n     T_responder) over a grid of reserve-exit-release scenarios (0, 1, 2, 3\n     reserve exits opened) and Pareto-filter the points.\n   - **Threat adaptability:** a threat = a set S of deleted edges/nodes.\n     Re-run the allocation after deletion; report the new T_empty. The\n     adaptability metric = (T_empty_after − T_empty_before) /\n     T_empty_before, computed over a catalog of representative removals\n     (one wing, one stair, one exit, multiple edges).\n\n4. **Deliverable mapping (per the deliverable-alignment rule):**\n   - Core model → Tasks 1–2 (time-to-empty, bottlenecks, Pareto frontier).\n   - The *contingent reserve* layer is the interface to the **policy\n     recommendation** deliverable: the release threshold (how many reserve\n     exits, at what threat level) becomes a policy recommendation.\n   - The *threat-deletion re-optimization* layer is the interface to the\n     **adaptability / other-structures** deliverable: the same network\n     abstraction with a different geometry and N generalizes to other large\n     crowded buildings (stadiums, malls, airports).\n\nThis is one self-consistent mechanism, not a menu of alternatives. Accept or\nreject as a whole.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe accepted structure is the three-layer macroscopic network model: floor-\nstratified cell network; LWR/triangular fundamental-diagram dynamics with\nexplicit door-bottleneck capacity conversion; and a decision layer that\nassigns cells to time-weighted nearest available exits, reserves a protected\nresponder path, sweeps N and reserve-exit-release to produce a (T_empty,\nT_responder) Pareto frontier, and re-optimizes after edge/node deletion for\nthreat adaptability.\n\nName the specific boundary condition, failure mode, or case that would break\nthis mechanism — a case in which one of the following goes wrong, and why it\nis not captured by the structure as written:\n\n(a) the **Pareto frontier** as a reporting device (e.g., the frontier is\n    degenerate or the two objectives are infeasible simultaneously for some\n    N, making \"time-to-empty vs. responder arrival\" not actually a trade-off);\n(b) the **responder corridor** as a protected path (e.g., no protected path\n    exists from any perimeter entrance to the incident floor that does not\n    cut through the densest egress flow, or the corridor's own egress\n    contribution to T_empty is large enough that reserving it invalidates the\n    \"fast egress\" objective);\n(c) the **threat re-optimization** adaptability claim (e.g., a deletion set\n    S that leaves the network disconnected for some floor, or that removes\n    every available exit within time-weighted reach of a large cell group, so\n    re-optimization is infeasible rather than merely slower);\n(d) the **door-bottleneck capacity conversion** as the dominant loss\n    mechanism (e.g., a case where the binding constraint is not the door but\n    an upstream corridor cell that jams before the door, making the\n    door-capacity model misattribute the bottleneck);\n(e) the **generalization to other structures** deliverable (e.g., a building\n    class where the floor-stratified single-exit-per-cell assignment is\n    structurally wrong — an open plan with no discrete wings, or a vertical\n    structure like a stadium where \"nearest exit\" is dominated by vertical\n    travel).\n\nGive the case, not advice about how to fix it."
+            ],
+            "expert_answers": [
+              "1. Occupancy is a swept planning parameter, not derived from 8.1 M; \"empty the building\" means all occupants — visitors plus staff — since staff also egress.\n\n2. Two-objective trade-off, reporting the Pareto frontier; the responder corridor is not a hard constraint in every solution but a second objective, since the text asks for both simultaneously.\n\n3. Contingent capacity reserve: closed by default, opened only after a security-release decision, never in public-facing routing.\n\n4. Structural: edge/node deletion set plus route re-computation; adaptability means re-optimization stays fast and feasible, not crowd-psychology change.",
+              "accept",
+              "(c) A deletion set S that removes every exit within time-weighted reach of a large cell group — e.g., a threat isolating one underground floor by deleting its stair edges and its nearest exit nodes simultaneously. The network becomes disconnected for that floor: no path to any terminal node exists, so re-optimization is infeasible, not merely slower. The structure as written assumes a feasible re-route always exists and reports only a T_empty delta; it has no representation of an unreachable subpopulation, so the adaptability metric is undefined rather than large."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8208333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.7833333333333333,
+            "modeling_rigorousness_evaluation": 0.8000000000000002,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_12/train_parent_1/runs/round_12/r2p2_20260930_111651/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals, explicitly identifying the two-objective nature of the problem (evacuation speed vs. responder entry) and the need for a Pareto frontier. The definition of the macroscopic model is precise, specifying inputs (occupancy N) and outputs (T_empty, T_responder, bottlenecks). However, the definition could be slightly more explicit about how \"heterogeneous crowd\" characteristics (e.g., disabled visitors, groups) are mathematically incorporated into the macroscopic model, as this is a key challenge mentioned in the background. Overall, the goals are explicit and well-aligned with the problem requirements.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks cover all major aspects of the problem requirements: modeling, bottleneck identification, trade-off analysis, adaptability to threats, policy recommendations, and generalization. There is a logical flow from model development (Task 1) to specific analyses (Tasks 2-4) and then to implementation (Tasks 5-6). However, there is some redundancy between Task 1 (which includes identifying bottlenecks and reporting the Pareto frontier) and Tasks 2 and 3 (which specifically focus on bottlenecks and the trade-off). This overlap suggests the decomposition could be tighter to avoid repetitive work. Additionally, the specific consideration of \"additional exits\" and security concerns mentioned in the background is not explicitly isolated as a sub-task, though it is likely embedded in Task 4. Overall, the coverage is mostly complete and interrelated.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clear and reasonable for core mechanics but lack explicit justification for handling visitor diversity and specific behavioral factors mentioned in the background.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate methods (LWR, Pareto frontier) and a logical structure that accurately reflects the physical and decision-making aspects of evacuation, with strong handling of bottlenecks and adaptability.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are quantitatively precise, logically derived, and clearly explain the trade-offs and bottlenecks, providing strong support for the final policy recommendations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler identifies specific structural and data biases, assesses their directional impact on results (e.g., conservative estimates), and suggests appropriate mitigations, demonstrating a rigorous approach to model limitations.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, tailored to the Louvre's specific layout and security constraints. It provides actionable insights through Pareto optimization and threat analysis, directly supporting decision-making for emergency planners. Its adaptability to other structures further enhances its utility.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, employing standard crowd dynamics models (triangular fundamental diagram) and network theory (Dijkstra). Parameters are grounded in empirical data, and the mathematical formulation of trade-offs (Pareto frontier) is rigorous and appropriate for the domain.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        }
+      ],
+      "refined_report_utility": 0.8145833333333334,
+      "interaction_cost": 0.8685998216915052,
+      "interaction_penalty": 0.043429991084575265,
+      "net_utility": 0.7711533422487582,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2648,
+          "total_expert_latency_seconds": 2.91,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9253931726107021,
+          "latency_cost_component": 0.21666081879852073,
+          "interaction_cost": 0.8701572690442809,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2478,
+          "total_expert_latency_seconds": 3.64,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9176059358468238,
+          "latency_cost_component": 0.24386018128438777,
+          "interaction_cost": 0.8670423743387295,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T11:32:19.199309",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_bc49a013c7df",
+  "workflow": {
+    "name": "Deliverable-Aligned Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 8) achieved high scores in modeling rigorousness and practicality but lost points in analysis_evaluation, specifically for failing to decompose problems into distinct sub-problems and for not explicitly addressing all specific requirements (like policy recommendations and generalization) in the analysis. The rollouts showed that while the core model was strong, the interaction did not explicitly ensure that the structural choices made in Exchange 2 were mapped to all the distinct deliverables listed in the problem statement. This patch introduces a 'Deliverable Alignment Rule' that requires the agent to explicitly map structural ambiguities to all enumerated sub-tasks/deliverables in Exchange 1 and to propose a mechanism in Exchange 2 that includes a defined interface for these secondary components. This directly addresses the judge's feedback on analysis decomposition and coverage without changing the core operator sequence or rejection handling, which were already effective.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_bc49a013c7df",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 9,
+    "parent_workflow_ids": [
+      "interaction_workflow_ed9d84c49711"
+    ],
+    "training_batch": [
+      "2019_D",
+      "2018_F"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_parent_1",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2018_B",
+    "2019_D"
+  ],
+  "absolute_utility": 0.8072916666666667,
+  "interaction_cost": 0.8697682994966167,
+  "interaction_penalty": 0.043488414974830844,
+  "net_utility": 0.7638032516918359,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

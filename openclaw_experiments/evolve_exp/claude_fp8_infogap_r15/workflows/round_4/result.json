@@ -1,0 +1,730 @@
+{
+  "round": 4,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8166518643874282,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.7958333333333333,
+    "modeling_rigorousness_evaluation": 0.9,
+    "practicality_and_scientificity_evaluation": 0.8583333333333334,
+    "result_and_bias_analysis_evaluation": 0.8833333333333333
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_B",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating a model to determine the shape, size, and merging pattern of the\npost-barrier fan-in area that reduces B tollbooth egress lanes to L travel lanes,\nwith the stated considerations accident prevention, throughput at the plaza exit,\nand construction/land cost.\n\nBefore I parameterize the model, I need the logical reading of the objective and\nits constraints that the problem statement does not settle. I am NOT asking for\nany magnitude, rate, or empirical constant — only for the interpretation that\nbounds what a valid solution must satisfy:\n\n1. Objective reading: is the deliverable an explicit trade-off surface (cost vs.\n   throughput vs. accident risk, with the designer free to choose on it), a\n   single preferred design that minimizes a weighted combination, or a\n   constrained optimization — e.g. a fan-in geometry that is safe and meets a\n   target throughput at minimum cost? Which of these does the problem require,\n   and if it is constrained, which consideration is the hard constraint and which\n   are the soft/objective ones?\n\n2. Valid domain of the design variables: the problem states B > L per direction.\n   Are there structural bounds beyond B > L that a solution space must respect —\n   for instance, a requirement that the merging pattern be feasible for vehicles\n   at all lanes (no lane requiring more than one successive lane change), or that\n   the plaza exit be stable (sustained throughput, not a transient) — or is the\n   domain open to any geometrically realizable fan-in of B lanes into L?\n\n3. Reading of \"accident prevention\": is it to be treated as a hard admissibility\n   criterion (a design is inadmissible if any merge location exceeds some\n   structural conflict condition, such as an opposing-direction or weaving\n   conflict), or as a continuous cost/penalty term to be traded against\n   throughput and land cost?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your reading in exchange 1 — a constrained optimization whose hard\nconstraints are (a) accident prevention as an admissibility criterion and (b)\nsteady-state throughput at the plaza exit, with land/construction cost as the\nobjective to minimize, over fan-in geometries feasible for every egress lane — I\npropose to organize the model as the following single structural allocation.\nPlease accept or reject it as the organizing structure of the solution.\n\nStructure: model the fan-in as a discrete set of merge points placed at\nmonotonically increasing distances down-plaza from the barrier, at which groups\nof egress lanes are eliminated one at a time in sequence. For each merge point\ni, a vehicle in any egress lane that is eliminated at i must be able to reach the\nsurviving lane by a single lane change per merge, with a merge spacing between\nconsecutive merge points set by the steady-state merge demand (the number of\nvehicles per unit time that must change lanes at i, scaled by the available\ngap-acceptance rate at the local speed) so that the merge queue at i dissipates\nunder sustained demand. The structural admissibility rule is: a merge point is\ninadmissible if it requires any vehicle to make more than one successive lane\nchange, if it creates a weaving segment (a merge whose required lane change\noverlaps a downstream merge's), or if the merge demand at i exceeds what the\navailable length before the next merge point can accommodate — these three are\nthe conflict conditions that make a design inadmissible under the accident-\nprevention constraint. The admissible designs are then compared by total fan-in\nlength (hence land/pavement cost) and the plaza-exit throughput, and the\npreferred geometry is the shortest admissible fan-in that sustains the target\nthroughput in steady state; light and heavy traffic, autonomous-vehicle\npenetration, and the conventional/exact-change/ETC booth mix enter the model\nonly as inputs to the merge-demand rate and the booth-side arrival process\n(upstream of the fan-in), so they modulate which merge spacings are admissible\nand which is shortest, but do not alter the structure.\n\nPlease accept or reject this structure (one word).",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure accepted in exchange 2 is: a fan-in of B tollbooth egress lanes to\nL travel lanes built as a discrete sequence of merge points, each eliminating\none egress lane, with merge spacing set by steady-state merge demand so that\neach merge's queue dissipates; a design is inadmissible if it (a) forces more\nthan one successive lane change, (b) creates a weaving segment, or (c) presents\na merge whose demand exceeds what the available length before the next merge can\naccommodate; the preferred design is the shortest admissible fan-in sustaining\nthe target steady-state throughput, with cost proportional to fan-in length\n(land) plus merge-workmanship cost.\n\nQuestion: which specific case, boundary condition, or traffic scenario breaks\nthis mechanism — i.e., in which case does the model either wrongly declare a\ndesign admissible (a real accident/instability risk it misses) or wrongly\ndeclare an actually workable design inadmissible (or fail to identify any\nadmissible design where one exists)? For example, is there a regime of booth\narrival rates, booth-type mix, or autonomous-vehicle penetration where the\nsteady-state, one-lane-change-per-merge, queue-dissipation rules above give the\nwrong admissibility verdict, or where the \"shortest admissible fan-in\" rule\nselects a geometry that is not in fact the best? Please give the case that\nbreaks the mechanism, not advice about how to fix it."
+        ],
+        "expert_answers": [
+          "The deliverable is a constrained optimization: a fan-in geometry that is admissible on accident prevention and meets a target throughput at the plaza exit, with land/construction cost as the objective to be minimized. Accident prevention and throughput are hard constraints; cost is the soft objective. The problem does not ask for a trade-off surface or a single weighted-minimum design.\n\nThe domain is bounded beyond B > L: the merging pattern must be feasible for vehicles in every egress lane, and the exit must sustain throughput in steady state, not merely transiently. Any geometrically realizable fan-in that violates these is not a valid solution.\n\nAccident prevention is a hard admissibility criterion, not a continuous penalty term. A design is inadmissible if any merge location produces a structural conflict condition.",
+          "accept",
+          "The case that breaks it: a booth-type mix or autonomous-vehicle penetration that makes the *arrival process at the barrier non-stationary and correlated across booths* — e.g. a platoon released from an ETC lane arriving as a burst at one egress lane. The model's per-merge steady-state queue-dissipation test averages this burst away, so it declares admissible a merge whose local demand momentarily exceeds capacity, missing the real instability/accident risk. Conversely, a design with a short merge spacing that is safe under such bursty, speed-harmonized autonomous platooning (which can execute coordinated multi-lane merges) is wrongly declared inadmissible by the one-lane-change-per-merge rule, so no admissible design is found where one exists."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_e66285a1e847",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8041666666666667,
+      "dimension_scores": {
+        "analysis_evaluation": 0.625,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8166666666666668,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope as determining the geometry, size, and merging pattern of the fan-in area, explicitly distinguishing it from analyzing existing designs. The goals are well-stated, including the three key considerations (accident prevention, throughput, cost) and the parameterization by L and B. However, the analysis bundles the dynamic aspects (traffic levels, AV penetration, tollbooth mix) into the general task description without explicitly defining them as distinct sub-goals or performance metrics to be optimized, which slightly reduces the clarity of the specific objectives for those variables.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The task analysis covers the core requirement of designing the fan-in area and acknowledges the necessary constraints and variables. It correctly identifies that the solution must be general and parameterized. However, it fails to decompose the problem into distinct sub-problems (e.g., separating the geometric design from the traffic flow analysis or the sensitivity analysis for AVs and toll types). By presenting it as a single \"Task 1\" that encompasses all aspects, it lacks the structural decomposition needed to show how different components (shape, traffic dynamics, cost) interrelate and support the final goal in a step-by-step manner.",
+            "score": 6
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is well-tailored to the problem, uses realistic parameters, and provides actionable outputs for design optimization, including considerations for AVs and different toll types.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is grounded in established traffic engineering standards (HCM), uses physically consistent derivations for merge spacing, and incorporates justified theoretical adjustments for autonomous vehicle behavior.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are highly interpretable, with clear quantitative comparisons and logical explanations for the model's behavior under different scenarios, effectively highlighting the trade-offs between design length, cost, and safety constraints.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The modeler comprehensively identifies potential biases in data, assumptions, and parameters, and provides specific mitigation strategies or sensitivity checks to correct for them, ensuring the results are reliable within the stated uncertainties.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicitly justified, and consistent with the problem context. The modeler rigorously identifies limitations regarding non-stationary traffic and AV behavior, demonstrating a strong understanding of the assumptions' impact on model validity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model chooses an appropriate constrained optimization framework that realistically reflects the engineering trade-offs. The structural definitions of admissibility (weaving, lane changes) are scientifically valid, and the integration of AV and booth mix variables is logically consistent with the model's steady-state foundation.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 1,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2017_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p1_20260930_042829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p1_20260930_042829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the post-barrier fan-in area (shape, size, merging pattern) that\nrecombines B tollbooth egress lanes into L travel lanes. The problem names three\nconsiderations to \"incorporate\": accident prevention, throughput (veh/h crossing\nthe plaza-exit line), and cost (land and road construction). It does not settle\nhow these three interact in the design decision, and that is the gap my work\ncannot close from the text.\n\nMy working framing, which I would like you to confirm or correct at the logical\nlevel (no magnitudes, no rates, no constants):\n\n1. Accident prevention and capacity are treated as hard constraints on the\n   merging pattern: a candidate pattern is inadmissible if it produces\n   conflict points, gap-acceptance merges, or weave distances of the type that\n   generate accidents, and it is inadmissible if its bottleneck cannot sustain\n   the required throughput at the plaza-exit line.\n2. Cost is the sole optimization objective: among all merging patterns that\n   satisfy (1), choose the one with minimum construction/land cost.\n\nIs that the correct logical reading of what \"incorporate\" means here — i.e.,\nsafety and throughput define the feasible set and cost selects within it — or\ndoes the problem instead intend some trade-off or ranking among the three that\nchanges which structure of the model (constrained optimization vs. multi-objective\ntrade-off) is the right one?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven that the text leaves the relationship among accident prevention, throughput,\nand cost open, I need one structural decision fixed before the rest of the model\nis parameterized. I propose the following single coherent structure for the\nfan-in design problem, and ask you to accept or reject it as the structure the\nmodel should be built on:\n\n- **Accident prevention is a hard admissibility condition, applied in graded\n  form before selection.** Every candidate merging pattern is scored on the\n  number and severity class of its conflict points (forced lane changes per\n  vehicle, weaving, gap-acceptance merges) and on its merge geometry (weave\n  length, deceleration lanes, taper angles). A pattern is excluded from\n  consideration only if it contains conflict classes that no realistic operating\n  speed could make safe (e.g. a gap-acceptance merge at freeway speed, a weave\n  whose two conflict points are too close in distance). Patterns that pass this\n  screen carry their conflict score into the next layer.\n- **Throughput is a hard constraint.** The pattern's bottleneck — the minimum\n  over its sequential merge points of the merge capacity at that point — must\n  be at least as large as the design demand at the plaza-exit line for the heavy\n  traffic case being analyzed.\n- **Cost is the sole selection objective.** Among all patterns that pass the\n  safety screen and meet the throughput constraint, choose the one of minimum\n  construction cost (proportional to paved area and right-of-way), with the\n  safety conflict score used only as a tie-breaker among cost-equal or\n  near-cost-equal candidates.\n\nThis makes the model a lexicographic, two-level structure: (1) safety admissibility\nscreen, then (2) throughput-feasible, minimum-cost selection with safety as the\ntie-breaker. It is not a multi-objective Pareto trade-off: cost never buys its\nway past a safety exclusion, and safety never overrides cost once the screen is\npassed.\n\nAccept or reject this structure.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my previous structure, in which accident prevention entered only as\na binary admissibility screen plus a tie-breaker, and cost was the sole\nselection objective. I am revising the structure to integrate that flaw directly:\n\n**Revised structure.** The design problem becomes a single weighted multi-objective\noptimization with throughput as the only hard constraint. The objective is\n`maximize  w_safety * S(pattern)  −  w_cost * C(pattern)`, where:\n\n- `S(pattern)` is a graded safety score — the negative of a weighted sum of\n  conflict-point counts (each conflict class weighted by its severity and\n  frequency of occurrence per vehicle passing), so that safety is a continuous,\n  optimizable quantity rather than a screen;\n- `C(pattern)` is construction cost (proportional to paved area and\n  right-of-way width);\n- `w_safety` and `w_cost` are fixed a priori by a stated prioritization principle\n  (safety strictly dominates cost in the limit: a candidate must not be chosen\n  if a materially safer candidate exists at tolerable cost), and are held fixed\n  — they are not tuned to results;\n- **Throughput remains the sole hard constraint**: the bottleneck merge\n  capacity must meet the heavy-traffic design demand at the plaza-exit line.\n\nThe model then evaluates candidate fan-in patterns (parallel-merge, staggered,\nand their combinations) under this single objective, for light vs. heavy traffic\nand for varying proportions of manual / exact-change / ETC booths and of\nautonomous vehicles.\n\nGiven this revised structure, state the specific case, boundary condition, or\nfailure mode in which it breaks — i.e., where the weighted objective selects a\nfan-in pattern that is genuinely unsafe, infeasible in throughput, or\neconomically irrational, and no correction within the structure fixes it."
+            ],
+            "expert_answers": [
+              "The problem does not settle this, and your framing is not the only reading. \"Incorporate\" does not specify whether safety and throughput are hard constraints or objectives to be traded against cost. The text gives no basis for making safety a binary admissibility test rather than a graded quantity, nor for making cost the sole objective. Whether the right structure is constrained optimization or multi-objective trade-off is exactly the undetermined modeling choice the problem leaves open.",
+              "reject",
+              "The case that breaks it: two candidates with identical cost and identical throughput feasibility, where pattern A has one high-severity conflict class (a gap-acceptance merge at freeway speed) occurring rarely, and pattern B has many low-severity conflicts occurring often. A finite weighted sum can rank A above B whenever the severity weight times its low frequency falls below the summed low-severity terms — so the objective selects the pattern containing the one conflict class no operating speed makes safe. Because the weights are fixed a priori and safety is only a summed scalar, no reweighting within the structure can exclude A without also reordering the benign comparisons; the screen that would have removed A has been deleted."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e66285a1e847",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.775,
+          "dimension_scores": {
+            "analysis_evaluation": 0.55,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p1_20260930_042829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as determining the shape, size, and merging pattern of the fan-in area. It explicitly identifies the key constraints: accident prevention, throughput, and cost. The goal is correctly stated as finding an optimal solution rather than analyzing existing designs. However, the definition is slightly incomplete as it omits the specific requirements regarding traffic conditions (light/heavy) and the impact of autonomous vehicles and toll booth types, which are crucial parts of the problem requirements.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The provided task analysis only lists \"Task 1,\" which covers the core design optimization. It fails to decompose the problem into sub-problems for the specific performance evaluations required: light vs. heavy traffic, the integration of autonomous vehicles, and the mix of toll booth types. By missing these distinct analytical components, the decomposition does not completely cover the actual goals of the problem, leading to a significant gap in scope coverage.",
+                "score": 4
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is clear, interpretable, and provides sufficient quantitative evidence to support the design conclusions, effectively explaining the model's logic and robustness.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies key biases in parameters and structure, offering qualitative corrections and limitations, though it lacks quantitative sensitivity analysis to fully correct for them.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively translates problem requirements into actionable engineering constraints, balances safety and cost in its objective function, and provides specific, applicable design outputs for toll plaza optimization.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is grounded in established traffic engineering principles (HCM, taper ratios), uses rigorous mathematical formulations for capacity and safety, and integrates domain-specific scientific assumptions for toll types and AVs.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly sourced from authoritative standards (HCM, TTI), and logically justified. The simplification of cost to paved area is reasonable given data constraints, and the hard safety constraint is a rational structural choice.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses an appropriate structure with hard safety constraints and a weighted objective for feasible designs. It correctly identifies staggered merging as a superior pattern and integrates dynamic factors like AVs and toll types, reflecting the problem realistically.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        },
+        {
+          "problem_id": "2017_B",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am formulating a model to determine the shape, size, and merging pattern of the\npost-barrier fan-in area that reduces B tollbooth egress lanes to L travel lanes,\nwith the stated considerations accident prevention, throughput at the plaza exit,\nand construction/land cost.\n\nBefore I parameterize the model, I need the logical reading of the objective and\nits constraints that the problem statement does not settle. I am NOT asking for\nany magnitude, rate, or empirical constant — only for the interpretation that\nbounds what a valid solution must satisfy:\n\n1. Objective reading: is the deliverable an explicit trade-off surface (cost vs.\n   throughput vs. accident risk, with the designer free to choose on it), a\n   single preferred design that minimizes a weighted combination, or a\n   constrained optimization — e.g. a fan-in geometry that is safe and meets a\n   target throughput at minimum cost? Which of these does the problem require,\n   and if it is constrained, which consideration is the hard constraint and which\n   are the soft/objective ones?\n\n2. Valid domain of the design variables: the problem states B > L per direction.\n   Are there structural bounds beyond B > L that a solution space must respect —\n   for instance, a requirement that the merging pattern be feasible for vehicles\n   at all lanes (no lane requiring more than one successive lane change), or that\n   the plaza exit be stable (sustained throughput, not a transient) — or is the\n   domain open to any geometrically realizable fan-in of B lanes into L?\n\n3. Reading of \"accident prevention\": is it to be treated as a hard admissibility\n   criterion (a design is inadmissible if any merge location exceeds some\n   structural conflict condition, such as an opposing-direction or weaving\n   conflict), or as a continuous cost/penalty term to be traded against\n   throughput and land cost?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your reading in exchange 1 — a constrained optimization whose hard\nconstraints are (a) accident prevention as an admissibility criterion and (b)\nsteady-state throughput at the plaza exit, with land/construction cost as the\nobjective to minimize, over fan-in geometries feasible for every egress lane — I\npropose to organize the model as the following single structural allocation.\nPlease accept or reject it as the organizing structure of the solution.\n\nStructure: model the fan-in as a discrete set of merge points placed at\nmonotonically increasing distances down-plaza from the barrier, at which groups\nof egress lanes are eliminated one at a time in sequence. For each merge point\ni, a vehicle in any egress lane that is eliminated at i must be able to reach the\nsurviving lane by a single lane change per merge, with a merge spacing between\nconsecutive merge points set by the steady-state merge demand (the number of\nvehicles per unit time that must change lanes at i, scaled by the available\ngap-acceptance rate at the local speed) so that the merge queue at i dissipates\nunder sustained demand. The structural admissibility rule is: a merge point is\ninadmissible if it requires any vehicle to make more than one successive lane\nchange, if it creates a weaving segment (a merge whose required lane change\noverlaps a downstream merge's), or if the merge demand at i exceeds what the\navailable length before the next merge point can accommodate — these three are\nthe conflict conditions that make a design inadmissible under the accident-\nprevention constraint. The admissible designs are then compared by total fan-in\nlength (hence land/pavement cost) and the plaza-exit throughput, and the\npreferred geometry is the shortest admissible fan-in that sustains the target\nthroughput in steady state; light and heavy traffic, autonomous-vehicle\npenetration, and the conventional/exact-change/ETC booth mix enter the model\nonly as inputs to the merge-demand rate and the booth-side arrival process\n(upstream of the fan-in), so they modulate which merge spacings are admissible\nand which is shortest, but do not alter the structure.\n\nPlease accept or reject this structure (one word).",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure accepted in exchange 2 is: a fan-in of B tollbooth egress lanes to\nL travel lanes built as a discrete sequence of merge points, each eliminating\none egress lane, with merge spacing set by steady-state merge demand so that\neach merge's queue dissipates; a design is inadmissible if it (a) forces more\nthan one successive lane change, (b) creates a weaving segment, or (c) presents\na merge whose demand exceeds what the available length before the next merge can\naccommodate; the preferred design is the shortest admissible fan-in sustaining\nthe target steady-state throughput, with cost proportional to fan-in length\n(land) plus merge-workmanship cost.\n\nQuestion: which specific case, boundary condition, or traffic scenario breaks\nthis mechanism — i.e., in which case does the model either wrongly declare a\ndesign admissible (a real accident/instability risk it misses) or wrongly\ndeclare an actually workable design inadmissible (or fail to identify any\nadmissible design where one exists)? For example, is there a regime of booth\narrival rates, booth-type mix, or autonomous-vehicle penetration where the\nsteady-state, one-lane-change-per-merge, queue-dissipation rules above give the\nwrong admissibility verdict, or where the \"shortest admissible fan-in\" rule\nselects a geometry that is not in fact the best? Please give the case that\nbreaks the mechanism, not advice about how to fix it."
+            ],
+            "expert_answers": [
+              "The deliverable is a constrained optimization: a fan-in geometry that is admissible on accident prevention and meets a target throughput at the plaza exit, with land/construction cost as the objective to be minimized. Accident prevention and throughput are hard constraints; cost is the soft objective. The problem does not ask for a trade-off surface or a single weighted-minimum design.\n\nThe domain is bounded beyond B > L: the merging pattern must be feasible for vehicles in every egress lane, and the exit must sustain throughput in steady state, not merely transiently. Any geometrically realizable fan-in that violates these is not a valid solution.\n\nAccident prevention is a hard admissibility criterion, not a continuous penalty term. A design is inadmissible if any merge location produces a structural conflict condition.",
+              "accept",
+              "The case that breaks it: a booth-type mix or autonomous-vehicle penetration that makes the *arrival process at the barrier non-stationary and correlated across booths* — e.g. a platoon released from an ETC lane arriving as a burst at one egress lane. The model's per-merge steady-state queue-dissipation test averages this burst away, so it declares admissible a merge whose local demand momentarily exceeds capacity, missing the real instability/accident risk. Conversely, a design with a short merge spacing that is safe under such bursty, speed-harmonized autonomous platooning (which can execute coordinated multi-lane merges) is wrongly declared inadmissible by the one-lane-change-per-merge rule, so no admissible design is found where one exists."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e66285a1e847",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8333333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6999999999999998,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8333333333333334,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p1_20260930_042829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as determining the geometry, size, and merging pattern of the fan-in area, explicitly distinguishing it from analyzing existing designs. The goals are well-stated, including the three key considerations (accident prevention, throughput, cost) and the parameterization by L and B. However, the analysis bundles the dynamic aspects (traffic levels, AV penetration, tollbooth mix) into the general task description without explicitly defining them as distinct sub-goals or performance metrics to be optimized, which slightly reduces the clarity of the specific objectives for those variables.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The task analysis covers the core requirement of designing the fan-in area and acknowledges the necessary constraints and variables. It correctly identifies that the solution must be general and parameterized. However, it fails to decompose the problem into distinct sub-problems (e.g., separating the geometric design from the traffic flow analysis or the sensitivity analysis for AVs and toll types). By presenting it as a single \"Task 1\" that encompasses all aspects, it lacks the structural decomposition needed to show how different components (shape, traffic dynamics, cost) interrelate and support the final goal in a step-by-step manner.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is well-tailored to the problem, uses realistic parameters, and provides actionable outputs for design optimization, including considerations for AVs and different toll types.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is grounded in established traffic engineering standards (HCM), uses physically consistent derivations for merge spacing, and incorporates justified theoretical adjustments for autonomous vehicle behavior.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are highly interpretable, with clear quantitative comparisons and logical explanations for the model's behavior under different scenarios, effectively highlighting the trade-offs between design length, cost, and safety constraints.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler comprehensively identifies potential biases in data, assumptions, and parameters, and provides specific mitigation strategies or sensitivity checks to correct for them, ensuring the results are reliable within the stated uncertainties.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified, and consistent with the problem context. The modeler rigorously identifies limitations regarding non-stationary traffic and AV behavior, demonstrating a strong understanding of the assumptions' impact on model validity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model chooses an appropriate constrained optimization framework that realistically reflects the engineering trade-offs. The structural definitions of admissibility (weaving, lane changes) are scientifically valid, and the integration of AV and booth mix variables is logically consistent with the model's steady-state foundation.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        }
+      ],
+      "refined_report_utility": 0.8041666666666667,
+      "interaction_cost": 0.8501277041724805,
+      "interaction_penalty": 0.04250638520862403,
+      "net_utility": 0.7616602814580427,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1652,
+          "total_expert_latency_seconds": 3.5199999999999996,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8700252470071828,
+          "latency_cost_component": 0.23969672558041208,
+          "interaction_cost": 0.8480100988028731,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1808,
+          "total_expert_latency_seconds": 3.58,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8806132738552198,
+          "latency_cost_component": 0.24179208959441922,
+          "interaction_cost": 0.8522453095420879,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2019_A",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM Problem A (three dragons, ~10 kg at hatching, ~30–40 kg at one year, continuous growth). The core mechanism I must build is an energy-balance model: metabolic demand scales with body mass (Kleiber-type allometry), and that demand sets caloric intake, prey biomass, foraging range, and finally the territory and the human community required to support the dragons.\n\nThe problem statement leaves a structural/definitional boundary unsettled that I cannot resolve from the text or from physical first principles alone: the **valid domain of the dragon's growth trajectory**, i.e., the interpretation under which \"they continue to grow throughout their life\" is to be modeled. Two logically distinct readings are possible, and everything downstream (maintenance energy at maturity, caloric intake, territory area, community size, and the climate question) parameterizes differently depending on which one holds:\n\n1. **Indeterminate (von Bertalanffy-type) growth** — the dragon asymptotically approaches a finite adult size M_max; \"grow throughout their life\" is shorthand for slow continuing growth toward that asymptote, so at any modeled age the maintenance energy is bounded and well-defined.\n2. **Unbounded (continuous power-law) growth** — mass grows without bound (e.g., M ~ t^p), so the \"adult\" stage has no fixed mass, and all area/community/climate answers must be reported parametrically in the age at which the community is supposed to sustain the dragon, rather than at a single maturity point.\n\nI am not asking for any magnitude, rate, or empirical constant (I will take the asymptote, the exponent, or the time constants from standard mammalian/large-vertebrate allometry and from the one-year 30–40 kg anchor given in the text). I am asking for the **logical boundary of the problem**: which of these two structural readings is the intended domain for the \"requirements of the dragons\" questions, or — if the text is meant to stay open — what is the correct way the final deliverable should treat the unbounded reading (e.g., report the maturity-stage numbers, the full growth curve, or both)? This choice determines whether the area and community-size answers are single numbers or age-indexed functions, and therefore the whole shape of the deliverable.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your Exchange 1 ruling — growth is a decision variable, with the bounded (von Bertalanffy) case as the baseline and the unbounded power-law case as the age-indexed sensitivity — I propose the following specific structural organization of the model, and I ask you to accept or reject it:\n\nThe model is a **single energy-budget backbone with two nested decision levels**, not a set of parallel sub-models:\n\n1. **Core layer (shared by both readings):** a daily energy balance,  E_in = E_maintenance(M) + E_growth(dM/dt) + E_activity, where E_maintenance follows Kleiber's law, E_growth = ΔM · k (with k the energetic cost of synthesizing 1 kg of dragon tissue, taken from standard mammalian growth-partitioning data), and E_activity is a fixed multiplier over maintenance that I treat as one sensitivity parameter. The food chain then runs in strict cascade: E_in (kcal/day) → assimilated energy (via a fixed carnivore assimilation efficiency) → prey biomass (kg/day) → prey population required (via a trophic efficiency from prey to available primary production) → territory area (ha, via net primary productivity) → human community size (via the assumption that the community is the primary production source that feeds the prey base).\n\n2. **Baseline layer (bounded reading):** a von Bertalanffy trajectory anchored at the two data points in the text (10 kg at hatching, 30–40 kg at 1 year), with the asymptote M_max left as the single free structural parameter of this layer — I will report territory and community size at the age where the dragon reaches 95% of M_max, as the \"maturity-stage\" number.\n\n3. **Sensitivity layer (unbounded reading):** a power-law M(t) = a·t^b anchored at the same two points, reporting territory and community size as functions of age at several ages (e.g., 1, 5, 10, 20 years), so the deliverable carries both the single maturity number and the age-indexed curve, each explicitly labeled with which reading it assumes.\n\nI ask you to accept or reject this specific two-level (core + baseline + sensitivity) organization, or — if you reject it — to name which of the three layers is structurally the problem.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe two-level structure was accepted in Exchange 2: a shared energy-budget core (E_in = E_maintenance + E_growth + E_activity, Kleiber maintenance, fixed growth-energy cost k, fixed carnivore assimilation efficiency), cascading through prey biomass → prey population → territory area → human community size, with a bounded (von Bertalanffy, asymptote M_max free, maturity defined as 95% of M_max) baseline layer and an unbounded (power-law, same two anchor points) sensitivity layer.\n\nThe new structural weakness this acceptance introduces is that **both layers share a single fixed M_max-independent growth-energy cost k and a single fixed assimilation efficiency**, and the maturity-stage single-number answers (territory area, community size) all hang off the one free parameter M_max, which is not pinned by the problem text. I ask you for the specific boundary condition, extreme value, or failure mode that would break this mechanism — concretely: at what value or behavior of M_max (or of the age at which 95% of M_max is reached) does the \"maturity-stage\" single-number answer become misleading or self-contradictory, such that the baseline layer's headline territory and community-size numbers no longer represent a defensible \"adult dragon\" and only the age-indexed sensitivity layer's curve carries the real answer? This will directly inform the bias analysis and robustness discussion in the final report."
+        ],
+        "expert_answers": [
+          "The text does not settle this, and it cannot be settled from first principles — it is a modeling choice, not a fact. The problem's own language (\"continue to grow throughout their life depending on the conditions and amount of food available\") points to growth being *condition-dependent*, which is neither pure asymptotic nor pure power-law; it is a trajectory whose asymptote is itself set by caloric supply. So the correct treatment is to make the growth law a *decision variable* of your model, not an input: present the bounded (von Bertalanffy) case as the baseline that yields single maturity-stage numbers, and present the unbounded case as the sensitivity that converts area and community size into age-indexed functions. Report both, and state explicitly which reading each downstream number assumes.",
+          "accept",
+          "The mechanism breaks when M_max is large enough that the 95%-of-asymptote age exceeds the dragon's plausible lifespan, or when the von Bertalanffy curve anchored at 10 kg and 30–40 kg at one year forces a growth-rate constant so small that 95% of M_max is reached only after decades. In that regime the \"maturity-stage\" number describes an age the dragon never attains, so the single headline territory and community-size figures are self-contradictory: they report resources for an animal that does not exist at any modeled time. The failure is sharpest when M_max is set high enough that the 95% crossing falls beyond the lifespan implied by the same allometry used to fix k — then only the age-indexed curve is defensible."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_e66285a1e847",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.9145833333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9666666666666666,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.9,
+        "result_and_bias_analysis_evaluation": 0.8916666666666666
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing specific quantitative insights, explaining the inference logic, and clearly distinguishing between robust conclusions and sensitive parameters, which effectively supports decision-making.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key uncertainties in parameters and model structure, and effectively correcting for them by using sensitivity sweeps and conservative bounds, ensuring the results are not over-interpreted.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, grounded in realistic biological analogs, and include sensitivity analyses to account for uncertainty, demonstrating high rigor and justification.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate ecological and physiological frameworks (energy balance, trophic cascades) with a logical structure that effectively addresses the problem's requirements regarding diet, area, and climate.",
+            "score": 9
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task. Task 1 correctly identifies the need to establish a growth law as a prerequisite. Subsequent tasks have specific, measurable objectives (energy, area, community size, climate impact). The distinction between analytical modeling and the final letter deliverable is clear, ensuring all problem requirements are addressed with explicit goals.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all problem requirements without deviation. Dependencies are logical: growth law (Task 1) drives energy (Task 2), which drives ecological area (Task 3) and community needs (Task 4). Climate sensitivity (Task 5) integrates across these. Tasks 6 and 7 address the specific non-modeling deliverables. The structure ensures that all constraints and questions from the prompt are addressed in a coherent, step-by-step manner.",
+            "score": 10
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, directly addressing all problem requirements with clear, actionable outputs. It uses parameter sweeps to handle uncertainty, provides meaningful insights into resource management and community support, and includes a real-world analog to validate its applicability. The approach is tailored to the specific constraints of the problem, offering reliable predictions for decision-making regarding dragon maintenance and ecological impact.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically rigorous, utilizing established biological growth models (von Bertalanffy, allometry) and ecological principles (NPP, trophic efficiency). It correctly incorporates thermoregulation and metabolic scaling, with assumptions clearly justified and grounded in real-world physics and biology. The approach demonstrates a sophisticated understanding of the problem's unique characteristics, ensuring the model is both theoretically sound and scientifically valid.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 7,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2019_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p2_20260930_042829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p2_20260930_042829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM Problem A (three dragons, ~10 kg hatchlings, ~30–40 kg\nat one year, continued growth, flight and fire-breathing assumed) using a\nKleiber-scaling (BMR ∝ M^β, β ≈ 0.75) energy-balance core, with the problem's\nown calibration points as the only empirical anchor and a livestock-analogue\nprey chain for converting metabolizable energy into prey biomass and territory.\n\nBefore I parameterize the energy model, the problem text leaves three structural\n/ interpretive choices unsettled that will determine how the model is built:\n\n1. **Time horizon and growth domain.** What is the intended domain of the\n   analysis — is the model required to track the dragons' full life course\n   (hatchling → yearling → mature adult, with an implied asymptotic maximum\n   mass), or is it acceptable to calibrate on the two given points and\n   extrapolate to a fixed \"adult\" reference mass (e.g., ~1,000 kg, a large\n   crocodilian scale)? Which reading makes the \"area required\" and \"community\n   required\" questions well-posed?\n\n2. **Objective-function interpretation.** The problem asks four related\n   quantities (ecological impact, energy expenditure / caloric intake, area,\n   supporting community). How should these be logically related in the model?\n   Specifically: is \"area required\" defined as the territory whose *prey\n   carrying capacity* balances the dragon's long-run caloric intake\n   (energy-flow, bottom-up), or as a home-range area fixed by *foraging /\n   flight-range geometry* (top-down, independent of prey density)? And should\n   \"community size\" be derived as a function of how much of the dragons' diet\n   humans substitute (the \"varying levels of assistance\"), i.e., a one-to-one\n   mapping from subsidy fraction to minimum human population?\n\n3. **Role of the climate comparison.** The problem names three climate regions\n   (arid, warm temperate, arctic). What is the logical boundary on their\n   treatment: are they to enter the model only as *multipliers on the energy\n   budget* (e.g., thermoregulation / heat-loss correction on maintenance,\n   productivity limits on the prey base), or also as *defining* different\n   model regimes (e.g., food-seasonality forcing in arctic, water/cooling\n   limits in arid) that change the model's structure rather than just its\n   coefficients?\n\nThese are readings the text does not settle; I do not ask for magnitudes or\nempirical constants — only the logical boundaries so that the mechanism is\nparameterized consistently.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange 1 ruling — the text settles none of the three open\nchoices, so the model must declare them — I put the following single structural\nconfiguration to you for acceptance or rejection:\n\n**Proposed structure:**\n\n(a) **Declared growth domain.** I adopt Gompertz growth calibrated only on the\ntwo given points (M(0) = 10 kg, M(1 yr) = 35 kg midpoint), which fixes the\nasymptotic mass by a declared additional assumption: adult (asymptotic) mass\nM∞ ≈ 1,000 kg, with time-to-maturity defined as the age reaching 95% of M∞\n(~4.5 yr). All \"area\", \"community\", and \"ecological impact\" answers are then\nreported at two reference ages — yearling (35 kg) and mature (≈950 kg) — so\nthe deliverable covers both the given data's domain and the declared adult.\n\n(b) **Bottom-up energy-flow linkage (primary), with the top-down reading\nretained as a secondary check only.** \"Area required\" is defined as the\nterritory whose prey-biomass carrying capacity (prey productivity per unit\narea, from a livestock-analogue trophic chain) balances the dragons' long-run\ndaily caloric intake at steady state (mature reference mass), corrected for\nclimate. \"Community size\" is then defined as the minimum human population such\nthat (i) its surplus-livestock output covers the dragons' caloric deficit after\nwild-prey supply, across a declared grid of human subsidy fractions (0%, 25%,\n50%, 75%, 100% of dragon caloric intake), and (ii) a one-way mapping subsidy\nfraction → minimum community size results. The home-range / flight-geometry\nreading is computed only as an order-of-magnitude consistency check, not as\nthe definition.\n\n(c) **Climate as coefficient multipliers within one structural model (not\nregimes).** All three regions (arid, warm temperate, arctic) modify the same\nenergy-balance equations through two declared multipliers: a thermoregulation\n/ heat-loss factor on maintenance energy, and a prey-productivity / availability\nfactor on the carrying capacity per unit area (e.g., shortened growing season\nin arctic). No separate model regime, no structural change of equations\nbetween regions.\n\nPlease accept or reject this configuration (a)+(b)+(c) as the structure the\nrest of the work will follow. If you reject any part, please identify which\nelement is flawed and why, so the revision integrates your specific correction.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYour Exchange 2 accepted the full configuration (a)+(b)+(c). Proceeding on it,\nthe mechanism is now: Gompertz growth (M∞ = 1,000 kg) → Kleiber-scaled energy\ndemand (BMR ∝ M^0.75, sensitivity over β) → bottom-up territory (prey\ncarrying capacity per unit area from a livestock-analogue trophic chain,\nclimate-adjusted by two multipliers) → community size as a one-way mapping from\ndeclared subsidy fraction (0–100%) to minimum human population.\n\nFor the bias / robustness discussion of the final report, I ask for the\n**specific case, boundary condition, or failure mode that would break this\nmechanism** — i.e., where its quantitative answer (energy demand, required\narea, or required community size) becomes unreliable or structurally wrong.\n\nConcrete candidates I can see, to which you may respond with one (or another):\n\n1. **Flight-energy gap.** The model treats the dragon's caloric need as\n   Kleiber-scaled maintenance; flight is an active, intermittent activity not\n   in BMR. Is there a regime of flight frequency / distance where the\n   maintenance-only core underestimates daily energy demand enough to change\n   the area/community answers, and if so, at roughly what flight budget?\n\n2. **Subsidy-mapping breakdown at extremes.** The community-size mapping\n   assumes human surplus livestock scales roughly linearly with population.\n   Which boundary of the subsidy grid (near 0% or near 100% substitution)\n   first invalidates the one-way mapping, and why?\n\n3. **Arctic carrying-capacity floor.** The climate treatment multiplies prey\n   productivity down in the arctic. Is there a point where the multiplier\n   drives per-capita prey supply below the dragon's minimum requirement such\n   that no finite arctic territory suffices — and if so, does that break\n   \"area required\" (it becomes infinite) and what should the report say\n   instead?\n\n4. **Gompertz extrapolation beyond the data.** Growth is calibrated on\n   0–1 yr but extrapolated to ~4.5 yr with a declared M∞. Which feature of the\n   declared adult mass (1,000 kg) is the model most sensitive to, and is there\n   an M∞ range where the area/community answers stop being robust?\n\nPlease name the single most consequential failure mode for the mechanism as\nconfigured (or correct my ranking), so the report's limitations and bias\nanalysis is anchored on the mechanism's actual weakest link."
+            ],
+            "expert_answers": [
+              "The text does not settle these; the missing structural commitments are:\n\n1. **Growth domain:** No terminal mass or lifespan is given, so the model must *declare* an asymptotic adult mass and a time-to-maturity as assumptions, not derive them. \"Area\" and \"community\" are only well-posed once a target adult mass and a steady-state (or life-course) demand are fixed — the text supplies neither.\n\n2. **Objective linkage:** The problem never states whether area is prey-carrying-capacity (bottom-up) or home-range geometry (top-down), nor whether community size is a subsidy-fraction mapping. Both are modeling choices the text leaves open.\n\n3. **Climate:** The text asks only whether climate \"makes a big difference,\" not whether it restructures the model. Whether regions are coefficient multipliers or distinct regimes is undetermined.",
+              "accept",
+              "The single most consequential failure mode is candidate 3: the arctic carrying-capacity floor. Because the mechanism is bottom-up — area is defined as the territory whose prey productivity balances demand — a climate multiplier that drives per-area prey productivity below the dragon's per-capita minimum requirement makes required area diverge to infinity, not merely large. This is structural, not a coefficient error: the accepted configuration (c) forbids regime change, so the model cannot represent migration, torpor, or prey switching that would bound the answer. The report should state that arctic \"area required\" is unbounded under the accepted structure and that the finite answer holds only where the productivity multiplier stays above the demand-per-area threshold."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e66285a1e847",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9208333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 1.0,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r1p2_20260930_042829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative outputs, logical inference paths, and clear conclusions that effectively explain the ecological constraints and model limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key modeling assumptions and extrapolation risks, quantifying their impact, and demonstrating the robustness of the main conclusions against parameter uncertainty.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively solves the specific problem requirements with clear, quantitative outputs, supports decision-making through sensitivity analysis, and provides meaningful ecological insights that are directly applicable to the narrative context.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, employing established biological scaling laws and ecological principles to justify assumptions and derive predictions, demonstrating a deep understanding of the physiological and environmental constraints.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated, explicitly justified with biological analogies and empirical laws (Kleiber's law), and their impact is rigorously tested via sensitivity analysis, providing a robust foundation for the model.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses a scientifically sound bottom-up energy-flow structure with appropriate allometric scaling and carrying capacity constraints, effectively addressing the problem's requirements and validating its logic through real-world analogies.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the goal and scope for each of the seven sub-tasks, directly mapping them to the problem requirements. The explicit separation of \"Goal\" and \"Scope\" for each task ensures clarity, precision, and alignment with the specific questions asked (ecological impact, energy, area, community, climate, real-world transfer, and letter). The definitions are detailed enough to guide accurate analysis without ambiguity.",
+                "score": 10
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks completely cover all problem requirements with no deviations. The logical flow is strong, with clear dependencies (e.g., Task 5 uses Task 2/3 outputs, Task 7 synthesizes Tasks 1-5). All key components—ecological impact, energy, area, community, climate, real-world application, and the letter—are addressed. The scope definitions ensure that the interrelated nature of the tasks supports the final goal effectively, providing a comprehensive and coherent decomposition.",
+                "score": 10
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 7
+        },
+        {
+          "problem_id": "2019_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM Problem A (three dragons, ~10 kg at hatching, ~30–40 kg at one year, continuous growth). The core mechanism I must build is an energy-balance model: metabolic demand scales with body mass (Kleiber-type allometry), and that demand sets caloric intake, prey biomass, foraging range, and finally the territory and the human community required to support the dragons.\n\nThe problem statement leaves a structural/definitional boundary unsettled that I cannot resolve from the text or from physical first principles alone: the **valid domain of the dragon's growth trajectory**, i.e., the interpretation under which \"they continue to grow throughout their life\" is to be modeled. Two logically distinct readings are possible, and everything downstream (maintenance energy at maturity, caloric intake, territory area, community size, and the climate question) parameterizes differently depending on which one holds:\n\n1. **Indeterminate (von Bertalanffy-type) growth** — the dragon asymptotically approaches a finite adult size M_max; \"grow throughout their life\" is shorthand for slow continuing growth toward that asymptote, so at any modeled age the maintenance energy is bounded and well-defined.\n2. **Unbounded (continuous power-law) growth** — mass grows without bound (e.g., M ~ t^p), so the \"adult\" stage has no fixed mass, and all area/community/climate answers must be reported parametrically in the age at which the community is supposed to sustain the dragon, rather than at a single maturity point.\n\nI am not asking for any magnitude, rate, or empirical constant (I will take the asymptote, the exponent, or the time constants from standard mammalian/large-vertebrate allometry and from the one-year 30–40 kg anchor given in the text). I am asking for the **logical boundary of the problem**: which of these two structural readings is the intended domain for the \"requirements of the dragons\" questions, or — if the text is meant to stay open — what is the correct way the final deliverable should treat the unbounded reading (e.g., report the maturity-stage numbers, the full growth curve, or both)? This choice determines whether the area and community-size answers are single numbers or age-indexed functions, and therefore the whole shape of the deliverable.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nFollowing your Exchange 1 ruling — growth is a decision variable, with the bounded (von Bertalanffy) case as the baseline and the unbounded power-law case as the age-indexed sensitivity — I propose the following specific structural organization of the model, and I ask you to accept or reject it:\n\nThe model is a **single energy-budget backbone with two nested decision levels**, not a set of parallel sub-models:\n\n1. **Core layer (shared by both readings):** a daily energy balance,  E_in = E_maintenance(M) + E_growth(dM/dt) + E_activity, where E_maintenance follows Kleiber's law, E_growth = ΔM · k (with k the energetic cost of synthesizing 1 kg of dragon tissue, taken from standard mammalian growth-partitioning data), and E_activity is a fixed multiplier over maintenance that I treat as one sensitivity parameter. The food chain then runs in strict cascade: E_in (kcal/day) → assimilated energy (via a fixed carnivore assimilation efficiency) → prey biomass (kg/day) → prey population required (via a trophic efficiency from prey to available primary production) → territory area (ha, via net primary productivity) → human community size (via the assumption that the community is the primary production source that feeds the prey base).\n\n2. **Baseline layer (bounded reading):** a von Bertalanffy trajectory anchored at the two data points in the text (10 kg at hatching, 30–40 kg at 1 year), with the asymptote M_max left as the single free structural parameter of this layer — I will report territory and community size at the age where the dragon reaches 95% of M_max, as the \"maturity-stage\" number.\n\n3. **Sensitivity layer (unbounded reading):** a power-law M(t) = a·t^b anchored at the same two points, reporting territory and community size as functions of age at several ages (e.g., 1, 5, 10, 20 years), so the deliverable carries both the single maturity number and the age-indexed curve, each explicitly labeled with which reading it assumes.\n\nI ask you to accept or reject this specific two-level (core + baseline + sensitivity) organization, or — if you reject it — to name which of the three layers is structurally the problem.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe two-level structure was accepted in Exchange 2: a shared energy-budget core (E_in = E_maintenance + E_growth + E_activity, Kleiber maintenance, fixed growth-energy cost k, fixed carnivore assimilation efficiency), cascading through prey biomass → prey population → territory area → human community size, with a bounded (von Bertalanffy, asymptote M_max free, maturity defined as 95% of M_max) baseline layer and an unbounded (power-law, same two anchor points) sensitivity layer.\n\nThe new structural weakness this acceptance introduces is that **both layers share a single fixed M_max-independent growth-energy cost k and a single fixed assimilation efficiency**, and the maturity-stage single-number answers (territory area, community size) all hang off the one free parameter M_max, which is not pinned by the problem text. I ask you for the specific boundary condition, extreme value, or failure mode that would break this mechanism — concretely: at what value or behavior of M_max (or of the age at which 95% of M_max is reached) does the \"maturity-stage\" single-number answer become misleading or self-contradictory, such that the baseline layer's headline territory and community-size numbers no longer represent a defensible \"adult dragon\" and only the age-indexed sensitivity layer's curve carries the real answer? This will directly inform the bias analysis and robustness discussion in the final report."
+            ],
+            "expert_answers": [
+              "The text does not settle this, and it cannot be settled from first principles — it is a modeling choice, not a fact. The problem's own language (\"continue to grow throughout their life depending on the conditions and amount of food available\") points to growth being *condition-dependent*, which is neither pure asymptotic nor pure power-law; it is a trajectory whose asymptote is itself set by caloric supply. So the correct treatment is to make the growth law a *decision variable* of your model, not an input: present the bounded (von Bertalanffy) case as the baseline that yields single maturity-stage numbers, and present the unbounded case as the sensitivity that converts area and community size into age-indexed functions. Report both, and state explicitly which reading each downstream number assumes.",
+              "accept",
+              "The mechanism breaks when M_max is large enough that the 95%-of-asymptote age exceeds the dragon's plausible lifespan, or when the von Bertalanffy curve anchored at 10 kg and 30–40 kg at one year forces a growth-rate constant so small that 95% of M_max is reached only after decades. In that regime the \"maturity-stage\" number describes an age the dragon never attains, so the single headline territory and community-size figures are self-contradictory: they report resources for an animal that does not exist at any modeled time. The failure is sharpest when M_max is set high enough that the 95% crossing falls beyond the lifespan implied by the same allometry used to fix k — then only the age-indexed curve is defensible."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_e66285a1e847",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9083333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9333333333333332,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_4/train_candidate/runs/round_4/r2p2_20260930_042829/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing specific quantitative insights, explaining the inference logic, and clearly distinguishing between robust conclusions and sensitive parameters, which effectively supports decision-making.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key uncertainties in parameters and model structure, and effectively correcting for them by using sensitivity sweeps and conservative bounds, ensuring the results are not over-interpreted.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, grounded in realistic biological analogs, and include sensitivity analyses to account for uncertainty, demonstrating high rigor and justification.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate ecological and physiological frameworks (energy balance, trophic cascades) with a logical structure that effectively addresses the problem's requirements regarding diet, area, and climate.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task. Task 1 correctly identifies the need to establish a growth law as a prerequisite. Subsequent tasks have specific, measurable objectives (energy, area, community size, climate impact). The distinction between analytical modeling and the final letter deliverable is clear, ensuring all problem requirements are addressed with explicit goals.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all problem requirements without deviation. Dependencies are logical: growth law (Task 1) drives energy (Task 2), which drives ecological area (Task 3) and community needs (Task 4). Climate sensitivity (Task 5) integrates across these. Tasks 6 and 7 address the specific non-modeling deliverables. The structure ensures that all constraints and questions from the prompt are addressed in a coherent, step-by-step manner.",
+                "score": 10
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, directly addressing all problem requirements with clear, actionable outputs. It uses parameter sweeps to handle uncertainty, provides meaningful insights into resource management and community support, and includes a real-world analog to validate its applicability. The approach is tailored to the specific constraints of the problem, offering reliable predictions for decision-making regarding dragon maintenance and ecological impact.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, utilizing established biological growth models (von Bertalanffy, allometry) and ecological principles (NPP, trophic efficiency). It correctly incorporates thermoregulation and metabolic scaling, with assumptions clearly justified and grounded in real-world physics and biology. The approach demonstrates a sophisticated understanding of the problem's unique characteristics, ensuring the model is both theoretically sound and scientifically valid.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 7
+        }
+      ],
+      "refined_report_utility": 0.9145833333333333,
+      "interaction_cost": 0.8587977203303907,
+      "interaction_penalty": 0.04293988601651954,
+      "net_utility": 0.8716434473168138,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2265,
+          "total_expert_latency_seconds": 4.66,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9070582144208946,
+          "latency_cost_component": 0.2754343569705418,
+          "interaction_cost": 0.8628232857683579,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1908,
+          "total_expert_latency_seconds": 2.85,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8869303872310592,
+          "latency_cost_component": 0.21420361310279343,
+          "interaction_cost": 0.8547721548924236,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T04:43:38.412737",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_e66285a1e847",
+  "workflow": {
+    "name": "Interaction Policy with Rejection-Integrated Counterexample",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "Round 3 was rejected because it changed the logic for Exchange 3 to ask for the flaw in a rejected proposal, which reduced net utility. This patch retains the successful Round 2 structure for accepted cases but adds a specific behavioral rule for rejected cases: the fallback structure must integrate the expert's correction before asking for a counterexample. This addresses the failure mode where the agent might ask for a counterexample against a structure that is already known to be flawed in a specific way, ensuring the interaction validates the *revised* model rather than re-validating the original.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step. If Exchange 2 is rejected, the fallback structure for Exchange 3 must explicitly integrate the specific element the expert identified as flawed, rather than defaulting to the original proposal's skeleton or a generic revision. The counterexample query should target the new structural weakness introduced by the integration of the expert's correction, ensuring the final report addresses the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step. If Exchange 2 is rejected, the fallback structure for Exchange 3 must explicitly integrate the specific element the expert identified as flawed, rather than defaulting to the original proposal's skeleton or a generic revision. The counterexample query should target the new structural weakness introduced by the integration of the expert's correction, ensuring the final report addresses the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step. If Exchange 2 is rejected, the fallback structure for Exchange 3 must explicitly integrate the specific element the expert identified as flawed, rather than defaulting to the original proposal's skeleton or a generic revision. The counterexample query should target the new structural weakness introduced by the integration of the expert's correction, ensuring the final report addresses the most current limitation of the model.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If the expert rejects the weighting due to a specific term's priority, the agent revises the structure to prioritize that term differently and asks which boundary condition would break this *revised* hierarchy. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_e66285a1e847",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 4,
+    "parent_workflow_ids": [
+      "interaction_workflow_e0f19556bdd2"
+    ],
+    "training_batch": [
+      "2017_B",
+      "2019_A"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_B",
+    "2019_A"
+  ],
+  "absolute_utility": 0.859375,
+  "interaction_cost": 0.8544627122514357,
+  "interaction_penalty": 0.04272313561257178,
+  "net_utility": 0.8166518643874282,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  },
+  "training_batch": [
+    "2017_B",
+    "2019_A"
+  ],
+  "training_parent_workflow_ids": [
+    "interaction_workflow_e0f19556bdd2"
+  ],
+  "parent_train_net_utilities": [
+    0.8151063468065076
+  ],
+  "candidate_train_net_utility": 0.8166518643874282,
+  "train_pre_utility": 0.8151063468065076,
+  "train_post_utility": 0.8166518643874282,
+  "train_accepted": false,
+  "training_elites_after_selection": [
+    {
+      "rank": 1,
+      "source_round": 4,
+      "source_phase": "train_parent_1",
+      "workflow_id": "interaction_workflow_e0f19556bdd2",
+      "workflow": {
+        "name": "Structural-Only Grounding Policy",
+        "changed_components": [
+          "## Interaction Strategy"
+        ],
+        "evolution_rationale": "The previous proposal (Round 1) was rejected for being too similar to the parent (similarity 0.9851). The parent's main weakness, observed in the 2014_C and 2016_C rollouts, was that Exchange 1 often asked for empirical magnitudes (e.g., 'typical decay rate', 'order of magnitude of influence') that the expert could not and should not supply, leading to wasted exchanges or 'reject' responses in Exchange 2 that lacked specificity. This patch explicitly forbids asking for empirical magnitudes in Exchange 1, shifting the focus to 'structural' or 'definitional' constraints (e.g., hard vs. soft constraints, logical boundaries). This differentiates the behavior significantly from the parent's 'foundational magnitudes' instruction while maintaining the 1-2-3 operator sequence. It addresses the 'too similar' rejection by changing the core instruction of Exchange 1 from 'magnitudes' to 'logical/structural boundaries'.",
+        "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "max_exchanges": 3,
+        "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+        "evolution_mode": "mutation",
+        "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "actions": [
+          {
+            "action_id": "apply_policy_trigger",
+            "action_type": "agent_step",
+            "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+          },
+          {
+            "action_id": "request_strategic_feedback",
+            "action_type": "expert_exchange",
+            "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+          },
+          {
+            "action_id": "integrate_strategic_feedback",
+            "action_type": "agent_analysis",
+            "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+          },
+          {
+            "action_id": "close_policy_interaction",
+            "action_type": "close",
+            "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+          }
+        ],
+        "entry_action": "apply_policy_trigger",
+        "workflow_id": "interaction_workflow_e0f19556bdd2",
+        "evolution_operator": "cpe_batch_reflection_patch",
+        "created_round": 2,
+        "parent_workflow_ids": [
+          "interaction_workflow_c8ac03cd254d"
+        ],
+        "training_batch": [
+          "2016_C",
+          "2014_C"
+        ]
+      },
+      "selection_utility": 0.8151063468065076,
+      "selection_basis": "current_shared_training_batch_net_utility"
+    }
+  ],
+  "validation_utility": null,
+  "validation_accepted": null,
+  "validation_result_path": null,
+  "best_validation_utility": 0.8374079295625156,
+  "best_workflow_id": "interaction_workflow_05df287cb4d3",
+  "cpe_round_complete": true
+}

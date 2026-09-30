@@ -1,0 +1,730 @@
+{
+  "round": 3,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8124129568249127,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8791666666666667,
+    "modeling_rigorousness_evaluation": 0.8374999999999999,
+    "practicality_and_scientificity_evaluation": 0.825,
+    "result_and_bias_analysis_evaluation": 0.8791666666666667
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a macroscopic capacity model (HCM-style speed–density fundamental diagram, critical density 45 pc/mi/ln) for the I-5 / I-90 / I-405 / SR-520 corridor segments, to compare equilibrium throughput as the share of self-driving cooperating cars (SDC) rises from 10% to 50% to 90%, and to test whether dedicated SDC lanes pay off. Before I can parameterize the core mechanism, the problem text leaves three structural interpretations unsettled. Please resolve their logical scope:\n\n1. **Interpretation of the cooperation mechanism.** Does \"self-driving, cooperating cars\" mean (a) *platooning* — SDCs that follow each other at a reduced internal headway while maintaining a normal headway to any human car ahead — i.e., a platoon's capacity benefit scales with the *length* of consecutive SDC runs, or (b) *V2V coordination* — any SDC pair in the same lane can coordinate headways regardless of human cars between them, so the benefit depends only on the overall SDC share? Which reading is the intended domain of the \"cooperation\" variable, and does the benefit depend on contiguity of SDC runs or only on fleet share?\n\n2. **Definition of the equilibrium / tipping-point object.** The question asks \"do equilibria exist\" and \"is there a tipping point\". Which macroscopic object do you want this to refer to: (a) steady-state *throughput* — comparing the peak of the mixed-fleet fundamental diagram q(k) at each SDC share, where a tipping point is a sharp change in peak flow or in the density at which it occurs; or (b) *service stability* — the density boundary between free-flow and congested regimes on the congested branch, where a tipping point is where demand at peak-hour volume crosses that boundary; or (c) something else (e.g., a bistable phase boundary in a traffic-phase diagram)? This choice determines what \"performance changes markedly\" means quantitatively.\n\n3. **Performance objective and its domain.** \"Performance\" for the governor's decision: is it (a) maximum sustainable throughput per corridor segment (peak-hour capacity in pc/h/ln), (b) travel-time / delay (e.g., average vehicle-hours of delay at peak demand), or (c) a composite (capacity plus stability margin, i.e., the headroom between peak demand and the LOS-E density boundary)? And is the daily average traffic count in the dataset to be treated as the peak-hour demand divided by a peak-hour factor, or as the demand level directly? This fixes which quantity the tipping-point search and the dedicated-lane decision rule optimize.\n\nPlease answer with the logical boundary/interpretation for each (1, 2, 3), not with magnitudes — magnitudes I will take from the data and from the HCM/literature items already in hand.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange 1 answers (platooning = cooperation, benefit scales with consecutive-SDC-run length; objective = steady-state throughput, peak of the mixed-fleet q(k); stability margin as secondary check; daily count → peak demand via peak-hour factor), I propose the following specific structural allocation of the model. Please accept or reject it as a coherent whole:\n\n**The mixed-fleet capacity model.**\n\n1. **Fleet microstructure.** Given SDC share p in a lane, the sequence of vehicles is a Bernoulli run-length process with P(SDC)=p. A *platoon* is a maximal run of consecutive SDCs. Expected platoon length L = p/(1−p); the probability a given gap between platoons is a human car is (1−p). The mixed fleet is a repeating unit: [platoon of mean length L] + [1 human car], so the SDC fraction within a unit is p by construction.\n\n2. **Headway structure.** Humans follow humans (or any car) at a human headway h_h(k) consistent with the HCM free-flow speed–density law at critical density 45 pc/mi/ln. An SDC follows a human at the same human headway (no gain when the leader is human). An SDC follows an SDC within the same platoon at a reduced platooning headway h_p = α·h_h(k) with α ∈ (0,1) fixed (platooning intensity). The platoon's internal density contribution is therefore boosted by 1/α relative to human spacing, but the platoon still closes at human spacing behind the human car ahead, so the *mean* density per unit is k = [L·h_p + h_h]⁻¹ per lane-mile.\n\n3. **Mixed-fleet fundamental diagram.** q(k; p, α) = k · v(k) where v(k) is the HCM speed law, but with the effective capacity density k_cap(p, α) solved from k = k_cap when the unit [L h_p + h_h] packs to the critical human density of the closing gap; i.e., the platoon compresses the fleet so that stable density exceeds 45 pc/mi/ln by a factor depending on L and α. Peak flow is max over k of q(k; p, α); throughput at SDC share p is the per-lane peak, and the corridor segment capacity is lanes × peak per lane.\n\n4. **Tipping-point object.** The primary output is T(p) = peak mixed-fleet flow per lane at share p, reported at p ∈ {10%, 50%, 90%} (plus a fine sweep to locate any sharp kink). A \"tipping point\" is reported if dT/dp changes sharply or the density-argmax jumps, consistent with the literature expectation that T(p) is concave/slow at low p and steepens toward p→1 (capacity increment ~a few percent at 50%, larger only near full penetration).\n\n5. **Dedicated-lane decision rule.** For a segment with N lanes and peak demand D (pc/h), mixed mode: D ≤ N·T(p). Dedicated mode: convert d lanes to SDC-only, giving D ≤ d·T_CAV + (N−d)·T_human, where T_CAV is the pure-SDC peak flow (platoon headways throughout) and T_human is the 45 pc/mi/ln baseline peak. Recommend d > 0 only where this inequality holds at the same demand but mixed mode at the same SDC share fails (or where stability margin — headroom between D and the LOS-E density on the congested branch — improves materially).\n\nDo you accept this structure (items 1–5 together), or do you reject it, in which case please say which item(s) carry the flaw (I will then ask, in Exchange 3, for the specific boundary case or mechanism that the flawed item gets wrong)?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the proposed structure in Exchange 2 without specifying which item carried the flaw. Per the consultation plan, I am not re-proposing a full structure now. Instead, please identify the specific structural flaw or boundary condition in my proposal (items 1–5: Bernoulli run-length fleet microstructure; headway structure with platoon headway h_p = α·h_h(k) and human closing gap; mixed-fleet fundamental diagram q(k;p,α) with capacity density k_cap(p,α) > 45 pc/mi/ln from platoon compression; tipping point = sharp change in per-lane peak flow T(p) or in the density at which it occurs; dedicated-lane rule comparing N·T(p) vs d·T_CAV + (N−d)·T_human) that necessitates a different mechanism.\n\nConcretely: which item produces the wrong answer on which specific case? For example:\n- At what SDC share or platoon configuration does the Bernoulli run-length model (item 1) misstate the fleet composition or the expected platoon length?\n- Does the headway model (item 2) break at any boundary — e.g., p → 0 (no platoons possible), p = 1 (pure SDC fleet, no closing human gap so the \"closing gap is human\" construction has no limit), or a given α — and what is the correct limiting behavior?\n- Does the fundamental-diagram construction (item 3) fail to give a well-defined peak or a capacity above 45 pc/mi/ln at some (p, α), and if so on which branch of q(k)?\n- Does the tipping-point object (item 4) miss the actual mechanism of the sharp change — e.g., is the sharp change in peak flow, in the stability boundary, in the travel-time function, or in the demand threshold at which a segment becomes LOS-F?\n- Does the dedicated-lane rule (item 5) give the wrong recommendation at any demand level or lane count, and what is the case it fails on?\n\nPlease name the item(s), the specific case or boundary condition, and the correct behavior the mechanism must reproduce. I will use your identification to build the corrected mechanism for the solution."
+        ],
+        "expert_answers": [
+          "1. **Cooperation mechanism:** Reading (a), platooning. The benefit is a function of the length of consecutive SDC runs, not fleet share alone; a human car between two SDCs breaks the platoon. Contiguity is the intended domain of the cooperation variable.\n\n2. **Equilibrium/tipping object:** Reading (a), steady-state throughput — the peak of the mixed-fleet q(k) at each SDC share. A tipping point is a sharp change in peak flow or in the density at which it occurs. Service stability (b) is a downstream diagnostic, not the primary object.\n\n3. **Performance objective:** Reading (a), maximum sustainable throughput per segment (pc/h/ln), with (c)'s stability margin as a secondary check. The daily average count is a demand level to be converted to peak-hour demand via a peak-hour factor, not treated as peak demand directly.",
+          "reject",
+          "Item 2, at the boundary p → 1. With no human cars, the \"closing gap is human\" construction has no limit: the repeating unit [platoon of mean length L] + [1 human car] requires (1−p) > 0, and L = p/(1−p) diverges as p → 1, so the unit density k = [L·h_p + h_h]⁻¹ collapses toward zero and the mean-density formula is undefined rather than approaching the pure-SDC platoon spacing. The correct limit is a fleet of pure SDC platoons separated by SDC-to-SDC gaps at h_p, i.e. k → 1/h_p, not 1/h_h. The same flaw appears at p = 1 in item 3: k_cap(p,α) is derived from packing against a human closing gap that no longer exists, so the claimed capacity density above 45 pc/mi/ln is not well-defined at full penetration. The mechanism must treat the human closing gap as a term weighted by (1−p), vanishing at p = 1."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bca6034fee77",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8229166666666666,
+      "dimension_scores": {
+        "analysis_evaluation": 0.825,
+        "modeling_rigorousness_evaluation": 0.825,
+        "practicality_and_scientificity_evaluation": 0.7583333333333333,
+        "result_and_bias_analysis_evaluation": 0.8833333333333333
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The analysis is very clear, directly answering all policy questions with quantitative support and providing a logical, interpretable path from model output to recommendation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying key structural and data biases, and effectively demonstrating through sensitivity analysis that the core conclusions are robust to these biases.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicitly justified, and validated against empirical literature. The handling of the platooning mechanism and the correction for the pure-SDC limit show high rigor and consistency with the physical problem.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model choice is appropriate for the steady-state capacity analysis required. The structure scientifically reflects the problem by focusing on throughput and platoon dynamics, and the method is justified as efficient for the specific policy questions regarding capacity and tipping points.",
+            "score": 9
+          }
+        },
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The problem definition is clear and explicitly lists the key components (lanes, volume, SDC %) and the Governor's specific questions. It correctly identifies the scope as a macroscopic model for the specified corridors. However, it lacks specificity on the exact performance metrics to be used, which slightly reduces the precision of the goal definition.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The content covers all necessary elements including model building, data application, and policy questions. However, the \"decomposition\" is weak because it presents the entire problem as a single monolithic task rather than breaking it down into distinct, interrelated sub-problems (e.g., modeling, simulation, analysis). This lacks the structural clarity expected in a problem decomposition evaluation.",
+            "score": 6
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is practical, using real data and standard traffic metrics to provide clear, actionable insights on capacity, tipping points, and lane dedication policies, directly addressing the problem's requirements.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically grounded in HCM traffic flow theory and physical platooning principles, though it simplifies dynamic interactions and assumes constant free-flow speed, limiting its depth in modeling complex human-SDC dynamics.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 1,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2017_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a macroscopic capacity model (HCM-style speed–density fundamental diagram, critical density 45 pc/mi/ln) for the I-5 / I-90 / I-405 / SR-520 corridor segments, to compare equilibrium throughput as the share of self-driving cooperating cars (SDC) rises from 10% to 50% to 90%, and to test whether dedicated SDC lanes pay off. Before I can parameterize the core mechanism, the problem text leaves three structural interpretations unsettled. Please resolve their logical scope:\n\n1. **Interpretation of the cooperation mechanism.** Does \"self-driving, cooperating cars\" mean (a) *platooning* — SDCs that follow each other at a reduced internal headway while maintaining a normal headway to any human car ahead — i.e., a platoon's capacity benefit scales with the *length* of consecutive SDC runs, or (b) *V2V coordination* — any SDC pair in the same lane can coordinate headways regardless of human cars between them, so the benefit depends only on the overall SDC share? Which reading is the intended domain of the \"cooperation\" variable, and does the benefit depend on contiguity of SDC runs or only on fleet share?\n\n2. **Definition of the equilibrium / tipping-point object.** The question asks \"do equilibria exist\" and \"is there a tipping point\". Which macroscopic object do you want this to refer to: (a) steady-state *throughput* — comparing the peak of the mixed-fleet fundamental diagram q(k) at each SDC share, where a tipping point is a sharp change in peak flow or in the density at which it occurs; or (b) *service stability* — the density boundary between free-flow and congested regimes on the congested branch, where a tipping point is where demand at peak-hour volume crosses that boundary; or (c) something else (e.g., a bistable phase boundary in a traffic-phase diagram)? This choice determines what \"performance changes markedly\" means quantitatively.\n\n3. **Performance objective and its domain.** \"Performance\" for the governor's decision: is it (a) maximum sustainable throughput per corridor segment (peak-hour capacity in pc/h/ln), (b) travel-time / delay (e.g., average vehicle-hours of delay at peak demand), or (c) a composite (capacity plus stability margin, i.e., the headroom between peak demand and the LOS-E density boundary)? And is the daily average traffic count in the dataset to be treated as the peak-hour demand divided by a peak-hour factor, or as the demand level directly? This fixes which quantity the tipping-point search and the dedicated-lane decision rule optimize.\n\nPlease answer with the logical boundary/interpretation for each (1, 2, 3), not with magnitudes — magnitudes I will take from the data and from the HCM/literature items already in hand.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your Exchange 1 answers (platooning = cooperation, benefit scales with consecutive-SDC-run length; objective = steady-state throughput, peak of the mixed-fleet q(k); stability margin as secondary check; daily count → peak demand via peak-hour factor), I propose the following specific structural allocation of the model. Please accept or reject it as a coherent whole:\n\n**The mixed-fleet capacity model.**\n\n1. **Fleet microstructure.** Given SDC share p in a lane, the sequence of vehicles is a Bernoulli run-length process with P(SDC)=p. A *platoon* is a maximal run of consecutive SDCs. Expected platoon length L = p/(1−p); the probability a given gap between platoons is a human car is (1−p). The mixed fleet is a repeating unit: [platoon of mean length L] + [1 human car], so the SDC fraction within a unit is p by construction.\n\n2. **Headway structure.** Humans follow humans (or any car) at a human headway h_h(k) consistent with the HCM free-flow speed–density law at critical density 45 pc/mi/ln. An SDC follows a human at the same human headway (no gain when the leader is human). An SDC follows an SDC within the same platoon at a reduced platooning headway h_p = α·h_h(k) with α ∈ (0,1) fixed (platooning intensity). The platoon's internal density contribution is therefore boosted by 1/α relative to human spacing, but the platoon still closes at human spacing behind the human car ahead, so the *mean* density per unit is k = [L·h_p + h_h]⁻¹ per lane-mile.\n\n3. **Mixed-fleet fundamental diagram.** q(k; p, α) = k · v(k) where v(k) is the HCM speed law, but with the effective capacity density k_cap(p, α) solved from k = k_cap when the unit [L h_p + h_h] packs to the critical human density of the closing gap; i.e., the platoon compresses the fleet so that stable density exceeds 45 pc/mi/ln by a factor depending on L and α. Peak flow is max over k of q(k; p, α); throughput at SDC share p is the per-lane peak, and the corridor segment capacity is lanes × peak per lane.\n\n4. **Tipping-point object.** The primary output is T(p) = peak mixed-fleet flow per lane at share p, reported at p ∈ {10%, 50%, 90%} (plus a fine sweep to locate any sharp kink). A \"tipping point\" is reported if dT/dp changes sharply or the density-argmax jumps, consistent with the literature expectation that T(p) is concave/slow at low p and steepens toward p→1 (capacity increment ~a few percent at 50%, larger only near full penetration).\n\n5. **Dedicated-lane decision rule.** For a segment with N lanes and peak demand D (pc/h), mixed mode: D ≤ N·T(p). Dedicated mode: convert d lanes to SDC-only, giving D ≤ d·T_CAV + (N−d)·T_human, where T_CAV is the pure-SDC peak flow (platoon headways throughout) and T_human is the 45 pc/mi/ln baseline peak. Recommend d > 0 only where this inequality holds at the same demand but mixed mode at the same SDC share fails (or where stability margin — headroom between D and the LOS-E density on the congested branch — improves materially).\n\nDo you accept this structure (items 1–5 together), or do you reject it, in which case please say which item(s) carry the flaw (I will then ask, in Exchange 3, for the specific boundary case or mechanism that the flawed item gets wrong)?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the proposed structure in Exchange 2 without specifying which item carried the flaw. Per the consultation plan, I am not re-proposing a full structure now. Instead, please identify the specific structural flaw or boundary condition in my proposal (items 1–5: Bernoulli run-length fleet microstructure; headway structure with platoon headway h_p = α·h_h(k) and human closing gap; mixed-fleet fundamental diagram q(k;p,α) with capacity density k_cap(p,α) > 45 pc/mi/ln from platoon compression; tipping point = sharp change in per-lane peak flow T(p) or in the density at which it occurs; dedicated-lane rule comparing N·T(p) vs d·T_CAV + (N−d)·T_human) that necessitates a different mechanism.\n\nConcretely: which item produces the wrong answer on which specific case? For example:\n- At what SDC share or platoon configuration does the Bernoulli run-length model (item 1) misstate the fleet composition or the expected platoon length?\n- Does the headway model (item 2) break at any boundary — e.g., p → 0 (no platoons possible), p = 1 (pure SDC fleet, no closing human gap so the \"closing gap is human\" construction has no limit), or a given α — and what is the correct limiting behavior?\n- Does the fundamental-diagram construction (item 3) fail to give a well-defined peak or a capacity above 45 pc/mi/ln at some (p, α), and if so on which branch of q(k)?\n- Does the tipping-point object (item 4) miss the actual mechanism of the sharp change — e.g., is the sharp change in peak flow, in the stability boundary, in the travel-time function, or in the demand threshold at which a segment becomes LOS-F?\n- Does the dedicated-lane rule (item 5) give the wrong recommendation at any demand level or lane count, and what is the case it fails on?\n\nPlease name the item(s), the specific case or boundary condition, and the correct behavior the mechanism must reproduce. I will use your identification to build the corrected mechanism for the solution."
+            ],
+            "expert_answers": [
+              "1. **Cooperation mechanism:** Reading (a), platooning. The benefit is a function of the length of consecutive SDC runs, not fleet share alone; a human car between two SDCs breaks the platoon. Contiguity is the intended domain of the cooperation variable.\n\n2. **Equilibrium/tipping object:** Reading (a), steady-state throughput — the peak of the mixed-fleet q(k) at each SDC share. A tipping point is a sharp change in peak flow or in the density at which it occurs. Service stability (b) is a downstream diagnostic, not the primary object.\n\n3. **Performance objective:** Reading (a), maximum sustainable throughput per segment (pc/h/ln), with (c)'s stability margin as a secondary check. The daily average count is a demand level to be converted to peak-hour demand via a peak-hour factor, not treated as peak demand directly.",
+              "reject",
+              "Item 2, at the boundary p → 1. With no human cars, the \"closing gap is human\" construction has no limit: the repeating unit [platoon of mean length L] + [1 human car] requires (1−p) > 0, and L = p/(1−p) diverges as p → 1, so the unit density k = [L·h_p + h_h]⁻¹ collapses toward zero and the mean-density formula is undefined rather than approaching the pure-SDC platoon spacing. The correct limit is a fleet of pure SDC platoons separated by SDC-to-SDC gaps at h_p, i.e. k → 1/h_p, not 1/h_h. The same flaw appears at p = 1 in item 3: k_cap(p,α) is derived from packing against a human closing gap that no longer exists, so the claimed capacity density above 45 pc/mi/ln is not well-defined at full penetration. The mechanism must treat the human closing gap as a term weighted by (1−p), vanishing at p = 1."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bca6034fee77",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8291666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.7999999999999999,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.75,
+            "result_and_bias_analysis_evaluation": 0.8666666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p1_20260930_035637/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is very clear, directly answering all policy questions with quantitative support and providing a logical, interpretable path from model output to recommendation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key structural and data biases, and effectively demonstrating through sensitivity analysis that the core conclusions are robust to these biases.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicitly justified, and validated against empirical literature. The handling of the platooning mechanism and the correction for the pure-SDC limit show high rigor and consistency with the physical problem.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model choice is appropriate for the steady-state capacity analysis required. The structure scientifically reflects the problem by focusing on throughput and platoon dynamics, and the method is justified as efficient for the specific policy questions regarding capacity and tipping points.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The problem definition is clear and explicitly lists the key components (lanes, volume, SDC %) and the Governor's specific questions. It correctly identifies the scope as a macroscopic model for the specified corridors. However, it lacks specificity on the exact performance metrics to be used, which slightly reduces the precision of the goal definition.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The content covers all necessary elements including model building, data application, and policy questions. However, the \"decomposition\" is weak because it presents the entire problem as a single monolithic task rather than breaking it down into distinct, interrelated sub-problems (e.g., modeling, simulation, analysis). This lacks the structural clarity expected in a problem decomposition evaluation.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical, using real data and standard traffic metrics to provide clear, actionable insights on capacity, tipping points, and lane dedication policies, directly addressing the problem's requirements.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically grounded in HCM traffic flow theory and physical platooning principles, though it simplifies dynamic interactions and assumes constant free-flow speed, limiting its depth in modeling complex human-SDC dynamics.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        },
+        {
+          "problem_id": "2017_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p1_20260930_035637",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p1_20260930_035637/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the effect of self-driving, cooperating cars on freeway capacity for the\n2017 MCM Problem C roads (I-5, I-90, I-405, SR 520), sweeping the self-driving share\np from 10% to 50% to 90%. The dataset gives only per-segment average *daily* traffic\ncounts, lane counts, and mileposts; it carries no peak factor, no speed, and no\nfree-flow information.\n\nBefore parameterizing the core capacity mechanism, I need the logical/structural\nboundaries the problem statement leaves open. Specifically:\n\n1. **Definition of \"capacity\" in the deliverable.** Is the target quantity the\n   steady maximum sustainable flow per segment (pc/h) obtained from the\n   speed-density relation — i.e., the capacity of the fundamental diagram —\n   or an operational service-level measure (e.g., LOS, travel time, delay)?\n   This decides whether the core output of the model is q_cap or a derived\n   delay indicator.\n\n2. **Domain of the self-driving share p.** Is p a uniform penetration applied\n   simultaneously to all vehicles in a segment (all drivers in the four\n   counties adopt at the same rate), so p is a single scalar per scenario,\n   or can it vary by route, direction, or segment? I plan to treat p as one\n   global scalar per scenario unless you rule otherwise.\n\n3. **Equilibrium concept.** For \"Do equilibria exist?\", what is the valid\n   domain of the equilibrium state: a stable steady flow at a fixed density\n   below critical density for the given demand, or should it also admit\n   capacity/queue equilibrium where demand exceeds supply and flow is pinned\n   at capacity with growing delay? This determines how I read the\n   capacity-vs-p curve for the tipping-point question.\n\nPlease settle these three structural readings; I will not ask for magnitudes or\nempirical constants in this exchange.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven your answers that (a) the target is q_cap from a fundamental diagram, (b) p is\none global scalar per scenario, and (c) the tipping point is the p at which a segment\ncrosses from stable sub-critical flow to demand-pinned-at-capacity flow, I propose the\nfollowing single structural configuration for the model. Accept or reject it.\n\n**Proposed structure — mixed-fleet fundamental diagram with two capacity regimes and a\ntwo-regime segment state:**\n\n1. Baseline (p = 0): speed-density relation v = S_ff (1 − (k/45)^a) per lane, free-flow\n   speed S_ff and exponent a fixed for the route class, density at capacity k_cap = 45\n   pc/mi/ln, q_cap,0 = max k·v(k) = 45·S_ff per lane.\n\n2. Self-driving share p (global scalar per scenario, p ∈ {0.10, 0.50, 0.90} plus a\n   continuous sweep for the tipping point):\n   - **Cooperation term.** CAVs run in platoons. The effective capacity density per\n     lane rises as k_cap(p) = k_cap·(1 + γ·p), where γ is a fixed cooperation factor\n     reflecting reduced headway between cooperating vehicles. The speed-density curve\n     is v_p(k) = S_ff·(1 − (k / k_cap(p))^a), so capacity is\n     q_cap,p = L · 45·(1+γp) · S_ff · a/(1+a)^(a/(a-1))... (formally\n     q_cap,p = max_k k · v_p(k) over k ≤ k_cap(p)).\n   - **Mixed-traffic interaction term.** At partial penetration the benefit is not\n     proportional to p: human drivers do not adopt platooning headways, and CAVs\n     must maintain human-safe headways when surrounded by humans. I model the\n     effective gain as sub-linear: the capacity multiplier is (1 + γ·p) only in the\n     limit p → 1; at finite p the realized multiplier is (1 + γ·p^β) with β > 1, so\n     the curve is flat at low p and steepens toward high p — matching the literature\n     finding that gains are small at 50% penetration and concentrate near full\n     penetration. The two parameters (γ, β) are the only new model parameters.\n\n3. **Two-regime segment state.** For each segment i with L_i lanes and demand D_i\n   (converted from daily count via a fixed peak factor), the segment is in\n   - **Regime A (stable):** D_i ≤ q_cap,p · L_i → steady flow at density\n     k_i = D_i / (L_i · S_ff), below k_cap(p).\n   - **Regime B (pinned):** D_i > q_cap,p · L_i → flow pinned at q_cap,p·L_i,\n     delay grows unboundedly (operational equilibrium at capacity).\n\n4. **Tipping point** p*(segment) = the p at which D_i = q_cap,p* · L_i, i.e., the\n   scenario share at which the segment flips from Regime A to Regime B. A route- or\n   corridor-level tipping point is the p at which the fraction of segments in\n   Regime B crosses a fixed threshold (I propose: the first p at which any\n   peak-hour segment flips, and the p at which >50% of peak-hour segments are\n   flipped, as two reported values).\n\n5. **Dedicated-lane decision rule.** Dedicate one lane of a segment to CAVs when\n   q_cap,ded = (L_i − 1)·q_cap,0 + 1·q_cap,p=1 (mixed lanes at p=0 capacity plus\n   one CAV-only lane at full cooperation capacity) exceeds the mixed-fleet\n   q_cap,p·L_i at the scenario p, net of the lane lost; i.e., dedicate when the\n   dedicated configuration carries more total peak-hour vehicles than the\n   mixed configuration.\n\nThis is one coherent structural hypothesis. Please reply with a single word:\naccept or reject.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy proposed structure was rejected. To guide the fallback construction, identify the\nspecific structural flaw in it — the boundary condition, the failure case, or the\nspecific aspect of the configuration that does not hold.\n\nThe rejected structure was: (1) a single mixed-fleet fundamental diagram whose\nper-lane capacity density rises as (1 + γ·p^β) with β > 1, (2) a two-regime segment\nstate (stable sub-critical flow vs. demand pinned at capacity), (3) a per-segment\ntipping point p* where demand equals capacity, and (4) a dedicated-lane rule that\ndedicates a lane when (L−1) mixed lanes plus one full-cooperation CAV-only lane\ncarries more peak-hour flow than L mixed lanes at penetration p.\n\nWhich specific case breaks this mechanism, or which specific aspect of it is invalid?"
+            ],
+            "expert_answers": [
+              "1. The deliverable's \"capacity\" is the fundamental-diagram capacity q_cap (max sustainable flow), with delay/LOS as a derived reporting layer, not the core target.\n\n2. p is a single global scalar per scenario, applied uniformly across all segments and routes; segment-level variation is not licensed by the statement.\n\n3. Equilibrium must admit both: stable steady flow below critical density, and demand-exceeds-supply equilibrium with flow pinned at capacity and growing delay. The tipping point is read as the p at which the system crosses from the former regime to the latter.",
+              "reject",
+              "The dedicated-lane rule breaks. It compares a CAV-only lane at p=1 capacity against mixed lanes at p, but the CAV-only lane can only be filled by the p·D_i CAV demand, not by full capacity flow. When p is small (10%), the dedicated lane is starved — its throughput is bounded by p·D_i, far below q_cap,p=1 — while the removed mixed lane penalizes the (1−p)·D_i human demand. The rule therefore recommends dedication precisely in the low-p case where it destroys capacity, and the failure case is any segment with p·D_i < q_cap,p=1."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bca6034fee77",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8166666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.85,
+            "modeling_rigorousness_evaluation": 0.75,
+            "practicality_and_scientificity_evaluation": 0.7666666666666666,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p1_20260930_035637/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope as the fundamental-diagram capacity of freeway segments, explicitly identifying key variables: lane count, traffic volume, and self-driving share. The goals are well-stated, focusing on modeling capacity as a function of these variables and addressing both cooperation among self-driving cars and interaction with non-self-driving vehicles. The specific scenarios (10%, 50%, 90%) are clearly noted. However, the definition could be slightly more explicit about the specific metrics for \"equilibria\" and \"tipping points\" in the context of the capacity model, though these are implied in the application phase. Overall, the problem definition is clear and accurate.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The decomposition into two tasks is logical and covers the core requirements. Task 1 focuses on building the theoretical model, and Task 2 applies it to the specific data and answers the policy questions. The sub-tasks are interrelated, with Task 2 depending on the output of Task 1. All key parts of the problem (modeling effects, applying to data, answering specific questions about equilibria, tipping points, and policy) are addressed. There is no significant deviation or missing key component. The coverage is comprehensive and directly supports the final goal of providing analysis to the Governor.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively addresses the problem's requirements with a clear, interpretable framework that supports decision-making on lane dedication and tipping points, going beyond generic data analysis to provide actionable policy insights.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, utilizing established traffic flow theory with justified modifications for autonomous vehicle cooperation, and demonstrates a rigorous mathematical approach to deriving capacity and equilibrium conditions.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is highly interpretable, directly answers all policy questions with specific data, and clearly explains the non-linear dynamics and equilibrium states without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler identifies key data and structural biases, performs sensitivity analyses to test robustness, and clearly explains how these factors limit or support the conclusions.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clearly stated and justified with sources, but the simplification of demand to average daily traffic ignores peak-hour dynamics critical to capacity analysis.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The fundamental diagram model is a rational and appropriate choice for macro-level capacity analysis given the data constraints, effectively linking AV penetration to system performance.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 2
+        }
+      ],
+      "refined_report_utility": 0.8229166666666666,
+      "interaction_cost": 0.85966610576585,
+      "interaction_penalty": 0.0429833052882925,
+      "net_utility": 0.7799333613783741,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2464,
+          "total_expert_latency_seconds": 3.81,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9169410087447847,
+          "latency_cost_component": 0.24957769608599195,
+          "interaction_cost": 0.866776403497914,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1820,
+          "total_expert_latency_seconds": 3.05,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8813895200844651,
+          "latency_cost_component": 0.22225070651495163,
+          "interaction_cost": 0.8525558080337861,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2019_A",
+      "repetition": 2,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM dragon problem (three dragons, ~10 kg at hatching,\n30-40 kg at one year, continuing to grow). The problem leaves several structural\nchoices open, and I need the logical ground truth before I parameterize the core\nenergy-balance and carrying-capacity mechanism. Three related questions:\n\n1. **Life-stage structure.** The statement gives two anchors (10 kg at hatching,\n   30-40 kg at one year) and says dragons \"continue to grow throughout their\n   life.\" Should the model (a) treat growth as an open-ended trajectory with a\n   terminal adult mass to be inferred, (b) use a finite life-stage partition\n   (juvenile/adult/senior with defined boundaries), or (c) something else? What\n   logical reading of \"continue to grow depending on the conditions and amount\n   of food available\" is required to make the mass trajectory a closed system\n   rather than an unbounded extrapolation?\n\n2. **Objective of \"supporting\" a dragon.** The question \"How large a community is\n   necessary to support a dragon for varying levels of assistance\" admits several\n   definitions of support: (a) net-zero caloric deficit from local foraging only,\n   (b) foraging plus periodic community provisioning (livestock tribute),\n   (c) full provisioning. What is the intended logical boundary — i.e., what is\n   the minimal self-sufficiency condition the model must satisfy before\n   assistance enters, and does \"support\" require the prey base itself to be\n   sustainable (carrying-capacity closure), or is the prey stock treated as an\n   exogenous flux?\n\n3. **Climate treatment.** The problem asks whether moving a dragon between\n   arid, temperate, and arctic regions \"make[s] a big difference in the resources\n   required.\" Structurally, should climate enter the model only as a multiplier\n   on maintenance energy (thermal-regulation cost and prey availability as a\n   scalar function of region), or must it also shift the *form* of the model\n   (e.g., arctic seasons impose a stored-food/income-seasonality structure that\n   arid/temperate regions do not)? In other words: is climate a parameter or a\n   regime switch in the intended reading?\n\nPlease settle these three interpretation questions; I will not ask for\nmagnitudes.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBased on your three answers, I propose the following structural allocation for\nthe model. Please accept, reject, or amend this single configuration:\n\n**Proposed structure (one coherent configuration):**\n\n1. **Energy allocation split.** A single scalar `phi(t)` — the growth fraction\n   of assimilated energy — declines smoothly from a juvenile maximum to an\n   asymptotic floor as mass approaches the food-capped terminal mass. The\n   maintenance demand is Kleiber-based `E_m = c · M^(3/4)`; the growth demand\n   is the mass-derivative term. Total intake = `(E_m + dM/dt · E_grow) / eta`,\n   where `eta` is assimilation efficiency. This matches your \"allocation split\n   that declines as mass rises.\"\n\n2. **Carrying-capacity closure as the definition of support.** The prey base is\n   modeled as a logistic population with carrying capacity `K_prey` set by\n   regional productivity. \"Supporting a dragon\" means the dragon's sustained\n   per-capita intake rate does not drive `K_prey` to collapse over a\n   multi-year horizon. The community size is the human population whose\n   provisioning (livestock tribute) exactly closes the gap between the\n   foraging-only intake and the dragon's total intake, **under the constraint\n   that the foraged portion is sustainable** (i.e., the dragon's foraged take\n   stays below a fixed fraction of the prey population's natural regeneration\n   rate). Assistance = the residual deficit, by your definition in Q1.2.\n\n3. **Climate as a regime switch with two distinct model forms.**\n   - **Arid and temperate:** single-form model. Climate enters as a scalar\n     multiplier on maintenance energy (thermal cost) and on prey-productivity\n     (which sets `K_prey`). No storage structure.\n   - **Arctic:** the model form changes. A two-phase annual cycle is imposed:\n     an **income season** (prey available, dragon forages + stores energy as\n     fat) and a **debt season** (prey scarce/absent, dragon draws on stored\n     fat, possibly torpor). The dragon's annual energy balance must close over\n     the full year, not per-instant. Assistance in the arctic may need to be\n     timed to the debt season specifically.\n\nThis is one structural hypothesis. Please accept or reject it as a whole, and\nif you reject, name the specific flaw (I will not re-ask for magnitudes).",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my proposed structure (asymptotic growth with declining\nenergy-allocation split, logistic prey carrying capacity as the definition of\nsupport, and a two-form climate model: scalar multiplier for arid/temperate,\nincome/debt season for arctic).\n\nPer the interaction policy, I do not propose a new full structure. Instead:\n\n**Please identify the specific structural flaw or boundary condition in the\nrejected proposal that necessitates a different mechanism.** In particular,\ntell me:\n\n- Is the flaw in the **growth mechanism** (the asymptotic/food-capped\n  trajectory itself), the **support/carrying-capacity definition** (logistic\n  prey base, assistance as residual deficit), or the **climate regime\n  switch** (arctic two-phase annual cycle)?\n- Or is the flaw at their **junction** — e.g., does the arctic debt-season\n  structure conflict with the asymptotic-growth assumption (does a dragon that\n  can be in energy deficit seasonally still have a well-defined food-capped\n  asymptote)?\n- What is the boundary condition or failure mode that the rejected structure\n  produces a wrong or infeasible answer for, which a different mechanism would\n  handle correctly?\n\nA specific counterexample (e.g., \"at mass M* in the arctic debt season, the\ngrowth fraction phi becomes negative, which is unphysical\") would be the most\nuseful. This will guide the fallback construction in my model."
+        ],
+        "expert_answers": [
+          "1. **Life-stage structure.** The statement's two anchors plus \"continue to grow\" require reading growth as asymptotic: mass approaches a terminal adult mass set by food availability, not an unbounded extrapolation. A closed system needs a saturating growth law with an energy-allocation split (maintenance vs. growth) that declines as mass rises. Finite life-stage partitions are a modeling convenience, not a logical requirement; the required reading is that food supply caps the asymptote.\n\n2. **Support.** The minimal self-sufficiency condition is net-zero caloric balance from local foraging alone; assistance is defined as the deficit below that. \"Support\" requires carrying-capacity closure — the prey base must be sustainable, not an exogenous flux, or the community size is meaningless.\n\n3. **Climate.** Climate must be a regime switch, not merely a scalar multiplier. Arctic seasonality imposes stored-food/income-seasonality structure (fasting, torpor, migration) that arid and temperate regions do not, changing the model's form.",
+          "reject",
+          "The flaw is at the junction: the arctic debt season breaks the asymptotic-growth closure. A dragon drawing down stored fat in the debt season has negative net energy, so `phi(t)` goes negative — but the rejected structure defines `phi` as a growth fraction declining toward a floor, with no term for catabolism of existing tissue. The food-capped asymptote is then ill-defined: mass falls in winter and recovers in the income season, so no single terminal mass exists. The failure case is a mature arctic dragon at its supposed asymptote entering the debt season: the model predicts it cannot lose mass, yet it must fast. A mechanism allowing reversible mass loss (fat store as a state variable, asymptote as an annual-cycle average rather than a point) is required."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bca6034fee77",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8875,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9333333333333333,
+        "modeling_rigorousness_evaluation": 0.85,
+        "practicality_and_scientificity_evaluation": 0.8916666666666666,
+        "result_and_bias_analysis_evaluation": 0.875
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The problem definition is completely clear, with explicit goals and well-identified key components for each sub-task, directly addressing the problem requirements.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are well-structured and cover the core ecological and resource questions with clear dependencies. However, the requirement to discuss a real-world application outside of dragons is not explicitly included as a sub-task, leading to a minor gap in complete coverage.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is well-structured, directly addresses all problem requirements with clear variables and equations, and provides actionable insights for decision-making, such as area and community size calculations, making it highly practical for the given scenario.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model employs rigorous scientific principles, including allometric scaling and logistic growth, with justified assumptions for climate and metabolism. It integrates ecological and physiological factors effectively, demonstrating a deep understanding of the biological constraints involved.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, biologically plausible, and rigorously justified with specific numerical values and logical constraints on growth and energy balance.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model employs appropriate biological and ecological methods, such as Kleiber's law and logistic growth, to realistically reflect the problem's constraints and dynamics.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are clear, quantitatively supported, and well-interpreted, with explicit identification of model limitations and logical connections to the problem context.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model identifies major structural and data biases, performs sensitivity analysis on key parameters, and qualitatively assesses the impact of these biases on the final results.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 2,
+      "repetitions": [
+        {
+          "problem_id": "2019_A",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p2_20260930_035637",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p2_20260930_035637/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nProblem 2019_A asks for the energy, area, and community requirements of three dragons (10 kg at hatching, 30–40 kg at one year, continuing to grow with food and conditions). I am building an energy-balance model whose core is: BMR(M) = 70·M^(3/4) kcal/day (Kleiber), multiplied by an activity multiplier; growth energy from the food-energy gap; daily prey biomass from assimilation efficiency; and supporting area from prey carrying capacity.\n\nThe problem statement leaves three structural interpretations unsettled, and each one determines which mechanism I parameterize:\n\n1. **Terminal mass / lifespan boundary.** \"They continue to grow throughout their life depending on the conditions and amount of food available\" gives no adult asymptote, lifespan, or the \"resist tremendous trauma\" upper size bound. Does the analysis settle at a defined adult size and working lifespan (a bounded horizon over which all energy, area, and community demands are integrated), or is the dragon treated as growing indefinitely so requirements are reported only as per-unit-time rates and no total exists? In other words: is the deliverable an integral over a fixed life history, or a steady-state flow rate per current mass?\n\n2. **The \"community\" variable's role.** \"How large a community is necessary to support a dragon for varying levels of assistance\" — should the human community be modeled as the sole supplier of prey biomass to the dragons (a provisioning model where the required community size is total daily prey mass divided by per-capita food supply), or as a coexisting population whose losses to predation the dragons impose (an impact model where the question is how large a population is needed so that losses stay tolerable)? These give different, non-interchangeable formulas.\n\n3. **Climate's locus of action.** When a dragon moves from arid to warm-temperate to arctic region, should climate enter (a) through the thermoregulatory cost of maintaining endothermic body temperature in ambient temperature T_a, changing BMR (so climate changes the dragon's own energy demand), (b) through the region's prey carrying capacity and prey availability (so climate changes the food supply side while the dragon's demand is invariant), or (c) through both? Which side of the energy balance is the mechanism of climate in this problem?\n\nAnswer only which interpretation each item has; no magnitudes or constants.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nSince the text does not settle the three structural readings, I propose this single configuration for the model and ask you to accept or reject it as the governing interpretation:\n\n1. **Bounded horizon:** I fix a working adult size of 250 kg — reached at roughly age 3–4 by a logistic growth curve anchored at 10 kg hatched and 35 kg at one year, with the asymptote set by the air-breathing constraint (the maximum mass a flying vertebrate can sustain) rather than by trauma resistance — and a working lifespan of 50 years. All energy, prey, and area requirements are then reported two ways: as per-day flow rates at representative masses (10 kg, 35 kg, 100 kg, 250 kg), and as lifetime totals integrated over the 50-year life history, so the deliverable is a bounded integral over a fixed life history rather than an unbounded rate.\n\n2. **Community as sole provisioner:** \"Varying levels of assistance\" is read as provisioning. The required community size is total daily prey biomass the dragons consume, divided by per-capita food supply available from that community; assistance levels are a discount on the per-capita burden as the community shifts more supply toward the dragons. The impact on the community (predation losses, territory loss, fire risk) is reported as a separate ecological-impact section, not as the sizing mechanism.\n\n3. **Climate on both sides of the energy balance:** moving between arid, warm-temperate, and arctic regions changes (a) the dragon's thermoregulatory demand — endothermic maintenance cost in cold, so BMR rises toward a bounded multiple of the temperate baseline in the arctic — and (b) the region's prey carrying capacity and food supply. The climate question is answered by computing the ratio of total required resources (dragon demand + prey area) across the three regions.\n\nDo you accept or reject this configuration?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nMy proposed configuration was rejected. Of its three structural parts — (1) the bounded horizon with a 250 kg air-breathing-flight adult asymptote, 50-year lifespan, and lifetime-integrated totals; (2) the community treated as sole provisioner, sized by total prey biomass divided by per-capita food supply with assistance as a discount; (3) climate acting on both the dragon's thermoregulatory demand and the region's prey carrying capacity — which specific part is the structural flaw that breaks the mechanism, and what is the case or boundary condition on which the model fails because of it? Name the flaw and the case that exposes it; do not propose the replacement structure."
+            ],
+            "expert_answers": [
+              "1. **Terminal mass / lifespan boundary:** The problem does not settle this. It supplies no adult asymptote, lifespan, or trauma-resistance size bound, so the deliverable's horizon — fixed-life-history integral versus per-mass steady-state flow — is an interpretation the text cannot fix.\n\n2. **Community variable's role:** The text does not settle whether the community is sole provisioner (supply-side division) or coexisting population bearing predation losses (impact-side tolerance). \"Varying levels of assistance\" hints at provisioning, but the wording admits both.\n\n3. **Climate's locus:** The text does not settle whether climate acts on the dragon's thermoregulatory demand, on prey carrying capacity, or both. It asks only whether climate \"makes a big difference,\" leaving the mechanism's side of the balance open.",
+              "reject",
+              "The flaw is part (1): the 250 kg air-breathing-flight asymptote is imposed as a hard cap, but the problem's own growth rule makes mass a function of food and conditions, not of a fixed ceiling. The case that breaks it is a high-food, low-activity regime — abundant prey and no forced flight — where the logistic curve's asymptote, not the flight constraint, should govern, so the model reports a terminal mass and lifetime totals that the stated biology does not require. Any dragon fed past the cap exposes the contradiction: the mechanism caps growth where the problem says conditions and food set it."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bca6034fee77",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.9208333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 1.0,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8833333333333333,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r1p2_20260930_035637/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "Assumptions are clearly stated, empirically grounded, and include sensitivity analyses to account for uncertainty, making them highly reasonable and robust.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate energy-balance and carrying-capacity methods, logically separating climate effects on demand and supply to realistically reflect the ecological problem.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative outputs, transparent inference logic, and strong interpretability through contextual comparisons and explicit limitation discussions.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying key data and model biases, and effectively mitigates their impact through sensitivity analysis and clear delineation of uncertainty ranges.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides clear, actionable metrics for ecological impact and resource needs, uses sensitivity analysis for robustness, and successfully applies the framework to a real-world analog, demonstrating high practical utility for decision-making and narrative consistency.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, employing established biological scaling laws, thermodynamic principles, and ecological dynamics. It clearly justifies assumptions and uses appropriate mathematical methods to integrate multiple scientific factors, demonstrating a strong theoretical basis.",
+                "score": 9
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the goal and scope for each of the seven sub-tasks. The objectives are explicit, directly addressing all specific questions in the problem statement (energy, ecology, area, community, climate, real-world analogy, and letter). The use of specific variables and defined parameters ensures that the goals are unambiguous and measurable, providing a solid foundation for the modeling process.",
+                "score": 10
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks comprehensively cover all problem requirements with no deviations. There is a strong logical dependency structure where core biological/energy models (Task 1) feed into ecological and spatial analyses (Tasks 2-4), which are then synthesized in the climate analysis (Task 5). The final tasks address the specific deliverables (real-world application and letter) based on the preceding analysis. This structure ensures that all parts of the problem are addressed in a coherent and interconnected manner.",
+                "score": 10
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 7
+        },
+        {
+          "problem_id": "2019_A",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am modeling the 2019 MCM dragon problem (three dragons, ~10 kg at hatching,\n30-40 kg at one year, continuing to grow). The problem leaves several structural\nchoices open, and I need the logical ground truth before I parameterize the core\nenergy-balance and carrying-capacity mechanism. Three related questions:\n\n1. **Life-stage structure.** The statement gives two anchors (10 kg at hatching,\n   30-40 kg at one year) and says dragons \"continue to grow throughout their\n   life.\" Should the model (a) treat growth as an open-ended trajectory with a\n   terminal adult mass to be inferred, (b) use a finite life-stage partition\n   (juvenile/adult/senior with defined boundaries), or (c) something else? What\n   logical reading of \"continue to grow depending on the conditions and amount\n   of food available\" is required to make the mass trajectory a closed system\n   rather than an unbounded extrapolation?\n\n2. **Objective of \"supporting\" a dragon.** The question \"How large a community is\n   necessary to support a dragon for varying levels of assistance\" admits several\n   definitions of support: (a) net-zero caloric deficit from local foraging only,\n   (b) foraging plus periodic community provisioning (livestock tribute),\n   (c) full provisioning. What is the intended logical boundary — i.e., what is\n   the minimal self-sufficiency condition the model must satisfy before\n   assistance enters, and does \"support\" require the prey base itself to be\n   sustainable (carrying-capacity closure), or is the prey stock treated as an\n   exogenous flux?\n\n3. **Climate treatment.** The problem asks whether moving a dragon between\n   arid, temperate, and arctic regions \"make[s] a big difference in the resources\n   required.\" Structurally, should climate enter the model only as a multiplier\n   on maintenance energy (thermal-regulation cost and prey availability as a\n   scalar function of region), or must it also shift the *form* of the model\n   (e.g., arctic seasons impose a stored-food/income-seasonality structure that\n   arid/temperate regions do not)? In other words: is climate a parameter or a\n   regime switch in the intended reading?\n\nPlease settle these three interpretation questions; I will not ask for\nmagnitudes.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBased on your three answers, I propose the following structural allocation for\nthe model. Please accept, reject, or amend this single configuration:\n\n**Proposed structure (one coherent configuration):**\n\n1. **Energy allocation split.** A single scalar `phi(t)` — the growth fraction\n   of assimilated energy — declines smoothly from a juvenile maximum to an\n   asymptotic floor as mass approaches the food-capped terminal mass. The\n   maintenance demand is Kleiber-based `E_m = c · M^(3/4)`; the growth demand\n   is the mass-derivative term. Total intake = `(E_m + dM/dt · E_grow) / eta`,\n   where `eta` is assimilation efficiency. This matches your \"allocation split\n   that declines as mass rises.\"\n\n2. **Carrying-capacity closure as the definition of support.** The prey base is\n   modeled as a logistic population with carrying capacity `K_prey` set by\n   regional productivity. \"Supporting a dragon\" means the dragon's sustained\n   per-capita intake rate does not drive `K_prey` to collapse over a\n   multi-year horizon. The community size is the human population whose\n   provisioning (livestock tribute) exactly closes the gap between the\n   foraging-only intake and the dragon's total intake, **under the constraint\n   that the foraged portion is sustainable** (i.e., the dragon's foraged take\n   stays below a fixed fraction of the prey population's natural regeneration\n   rate). Assistance = the residual deficit, by your definition in Q1.2.\n\n3. **Climate as a regime switch with two distinct model forms.**\n   - **Arid and temperate:** single-form model. Climate enters as a scalar\n     multiplier on maintenance energy (thermal cost) and on prey-productivity\n     (which sets `K_prey`). No storage structure.\n   - **Arctic:** the model form changes. A two-phase annual cycle is imposed:\n     an **income season** (prey available, dragon forages + stores energy as\n     fat) and a **debt season** (prey scarce/absent, dragon draws on stored\n     fat, possibly torpor). The dragon's annual energy balance must close over\n     the full year, not per-instant. Assistance in the arctic may need to be\n     timed to the debt season specifically.\n\nThis is one structural hypothesis. Please accept or reject it as a whole, and\nif you reject, name the specific flaw (I will not re-ask for magnitudes).",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected my proposed structure (asymptotic growth with declining\nenergy-allocation split, logistic prey carrying capacity as the definition of\nsupport, and a two-form climate model: scalar multiplier for arid/temperate,\nincome/debt season for arctic).\n\nPer the interaction policy, I do not propose a new full structure. Instead:\n\n**Please identify the specific structural flaw or boundary condition in the\nrejected proposal that necessitates a different mechanism.** In particular,\ntell me:\n\n- Is the flaw in the **growth mechanism** (the asymptotic/food-capped\n  trajectory itself), the **support/carrying-capacity definition** (logistic\n  prey base, assistance as residual deficit), or the **climate regime\n  switch** (arctic two-phase annual cycle)?\n- Or is the flaw at their **junction** — e.g., does the arctic debt-season\n  structure conflict with the asymptotic-growth assumption (does a dragon that\n  can be in energy deficit seasonally still have a well-defined food-capped\n  asymptote)?\n- What is the boundary condition or failure mode that the rejected structure\n  produces a wrong or infeasible answer for, which a different mechanism would\n  handle correctly?\n\nA specific counterexample (e.g., \"at mass M* in the arctic debt season, the\ngrowth fraction phi becomes negative, which is unphysical\") would be the most\nuseful. This will guide the fallback construction in my model."
+            ],
+            "expert_answers": [
+              "1. **Life-stage structure.** The statement's two anchors plus \"continue to grow\" require reading growth as asymptotic: mass approaches a terminal adult mass set by food availability, not an unbounded extrapolation. A closed system needs a saturating growth law with an energy-allocation split (maintenance vs. growth) that declines as mass rises. Finite life-stage partitions are a modeling convenience, not a logical requirement; the required reading is that food supply caps the asymptote.\n\n2. **Support.** The minimal self-sufficiency condition is net-zero caloric balance from local foraging alone; assistance is defined as the deficit below that. \"Support\" requires carrying-capacity closure — the prey base must be sustainable, not an exogenous flux, or the community size is meaningless.\n\n3. **Climate.** Climate must be a regime switch, not merely a scalar multiplier. Arctic seasonality imposes stored-food/income-seasonality structure (fasting, torpor, migration) that arid and temperate regions do not, changing the model's form.",
+              "reject",
+              "The flaw is at the junction: the arctic debt season breaks the asymptotic-growth closure. A dragon drawing down stored fat in the debt season has negative net energy, so `phi(t)` goes negative — but the rejected structure defines `phi` as a growth fraction declining toward a floor, with no term for catabolism of existing tissue. The food-capped asymptote is then ill-defined: mass falls in winter and recovers in the income season, so no single terminal mass exists. The failure case is a mature arctic dragon at its supposed asymptote entering the debt season: the model predicts it cannot lose mass, yet it must fast. A mechanism allowing reversible mass loss (fat store as a state variable, asymptote as an annual-cycle average rather than a point) is required."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bca6034fee77",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8541666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8666666666666667,
+            "modeling_rigorousness_evaluation": 0.7999999999999999,
+            "practicality_and_scientificity_evaluation": 0.9,
+            "result_and_bias_analysis_evaluation": 0.85
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_3/train_candidate/runs/round_3/r2p2_20260930_035637/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The problem definition is completely clear, with explicit goals and well-identified key components for each sub-task, directly addressing the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are well-structured and cover the core ecological and resource questions with clear dependencies. However, the requirement to discuss a real-world application outside of dragons is not explicitly included as a sub-task, leading to a minor gap in complete coverage.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is well-structured, directly addresses all problem requirements with clear variables and equations, and provides actionable insights for decision-making, such as area and community size calculations, making it highly practical for the given scenario.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model employs rigorous scientific principles, including allometric scaling and logistic growth, with justified assumptions for climate and metabolism. It integrates ecological and physiological factors effectively, demonstrating a deep understanding of the biological constraints involved.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, biologically plausible, and rigorously justified with specific numerical values and logical constraints on growth and energy balance.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model employs appropriate biological and ecological methods, such as Kleiber's law and logistic growth, to realistically reflect the problem's constraints and dynamics.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are clear, quantitatively supported, and well-interpreted, with explicit identification of model limitations and logical connections to the problem context.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model identifies major structural and data biases, performs sensitivity analysis on key parameters, and qualitatively assesses the impact of these biases on the final results.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8875,
+      "interaction_cost": 0.852148954570974,
+      "interaction_penalty": 0.0426074477285487,
+      "net_utility": 0.8448925522714512,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1645,
+          "total_expert_latency_seconds": 3.13,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8695270057614635,
+          "latency_cost_component": 0.22535879847383963,
+          "interaction_cost": 0.8478108023045854,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1979,
+          "total_expert_latency_seconds": 3.75,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8912177670934062,
+          "latency_cost_component": 0.24758315774126236,
+          "interaction_cost": 0.8564871068373625,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T04:11:34.231587",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_bca6034fee77",
+  "workflow": {
+    "name": "Adaptive Counterexample Strategy",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 2) successfully established a strict 1-2-3 sequence but assumed Exchange 3 would always follow an accepted structure from Exchange 2. Evidence from the 2017_C rollout shows that when Exchange 2 is rejected (as it was), the agent in the parent policy still proceeded to Exchange 3 by proposing a *new* fallback mechanism (the two-term capacity model) and asking for a counterexample to *that new* mechanism. This is inefficient because it risks proposing another flawed structure and wastes the Exchange 3 opportunity on a mechanism that hasn't been validated. The 2017_C expert's response to Exchange 3 was highly specific about the flaw in the *original* proposal's handling of dedicated lanes, which the agent had already partially addressed in its fallback. By modifying Exchange 3 to explicitly handle rejection by asking for the *flaw* in the rejected proposal rather than a counterexample to a new guess, the agent can extract more precise structural guidance for the final report's bias analysis without risking a second rejection or a misaligned counterexample. This change differentiates from Round 2 by adding a conditional branch in Exchange 3 that leverages the rejection signal more effectively, moving from 'test a new guess' to 'diagnose the old failure'.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, prioritizing logical interpretation over empirical estimation:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** If the structure from Exchange 2 is accepted, ask for the specific case, boundary condition, or failure mode that would break the mechanism. If the structure is rejected, do not immediately propose a new full structure; instead, ask the expert to identify the specific structural flaw or boundary condition in the rejected proposal that necessitates a different mechanism, thereby guiding the fallback construction.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If accepted, the agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. If rejected, the agent asks which specific aspect of the weighting structure (e.g., the relative priority of terms) was invalid, to inform a revised mechanism. Operator 3 asks for the counterexample or the specific flaw.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, prioritizing logical interpretation over empirical estimation:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** If the structure from Exchange 2 is accepted, ask for the specific case, boundary condition, or failure mode that would break the mechanism. If the structure is rejected, do not immediately propose a new full structure; instead, ask the expert to identify the specific structural flaw or boundary condition in the rejected proposal that necessitates a different mechanism, thereby guiding the fallback construction.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If accepted, the agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. If rejected, the agent asks which specific aspect of the weighting structure (e.g., the relative priority of terms) was invalid, to inform a revised mechanism. Operator 3 asks for the counterexample or the specific flaw.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, prioritizing logical interpretation over empirical estimation:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** If the structure from Exchange 2 is accepted, ask for the specific case, boundary condition, or failure mode that would break the mechanism. If the structure is rejected, do not immediately propose a new full structure; instead, ask the expert to identify the specific structural flaw or boundary condition in the rejected proposal that necessitates a different mechanism, thereby guiding the fallback construction.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): If accepted, the agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. If rejected, the agent asks which specific aspect of the weighting structure (e.g., the relative priority of terms) was invalid, to inform a revised mechanism. Operator 3 asks for the counterexample or the specific flaw.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_bca6034fee77",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 3,
+    "parent_workflow_ids": [
+      "interaction_workflow_e0f19556bdd2"
+    ],
+    "training_batch": [
+      "2017_C",
+      "2019_A"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_C",
+    "2019_A"
+  ],
+  "absolute_utility": 0.8552083333333333,
+  "interaction_cost": 0.855907530168412,
+  "interaction_penalty": 0.0427953765084206,
+  "net_utility": 0.8124129568249127,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  },
+  "training_batch": [
+    "2017_C",
+    "2019_A"
+  ],
+  "training_parent_workflow_ids": [
+    "interaction_workflow_e0f19556bdd2"
+  ],
+  "parent_train_net_utilities": [
+    0.8448173478992633
+  ],
+  "candidate_train_net_utility": 0.8124129568249127,
+  "train_pre_utility": 0.8448173478992633,
+  "train_post_utility": 0.8124129568249127,
+  "train_accepted": false,
+  "training_elites_after_selection": [
+    {
+      "rank": 1,
+      "source_round": 3,
+      "source_phase": "train_parent_1",
+      "workflow_id": "interaction_workflow_e0f19556bdd2",
+      "workflow": {
+        "name": "Structural-Only Grounding Policy",
+        "changed_components": [
+          "## Interaction Strategy"
+        ],
+        "evolution_rationale": "The previous proposal (Round 1) was rejected for being too similar to the parent (similarity 0.9851). The parent's main weakness, observed in the 2014_C and 2016_C rollouts, was that Exchange 1 often asked for empirical magnitudes (e.g., 'typical decay rate', 'order of magnitude of influence') that the expert could not and should not supply, leading to wasted exchanges or 'reject' responses in Exchange 2 that lacked specificity. This patch explicitly forbids asking for empirical magnitudes in Exchange 1, shifting the focus to 'structural' or 'definitional' constraints (e.g., hard vs. soft constraints, logical boundaries). This differentiates the behavior significantly from the parent's 'foundational magnitudes' instruction while maintaining the 1-2-3 operator sequence. It addresses the 'too similar' rejection by changing the core instruction of Exchange 1 from 'magnitudes' to 'logical/structural boundaries'.",
+        "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "max_exchanges": 3,
+        "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+        "evolution_mode": "mutation",
+        "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+        "actions": [
+          {
+            "action_id": "apply_policy_trigger",
+            "action_type": "agent_step",
+            "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines an objective but does not specify whether the constraints are hard or soft. Operator 1 asks for the logical interpretation of the constraint violation in the objective function.\n- Gap 2 (Exchange 2): Based on the constraint interpretation, the agent proposes a specific hierarchical weighting of the objective terms. Operator 2 asks the expert to accept or reject this specific weighting structure.\n- Gap 3 (Exchange 3): The agent asks which specific boundary condition (e.g., zero resource availability, maximum demand spike) would cause this hierarchical weighting to produce a suboptimal or infeasible solution. Operator 3 asks for the counterexample.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+          },
+          {
+            "action_id": "request_strategic_feedback",
+            "action_type": "expert_exchange",
+            "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+          },
+          {
+            "action_id": "integrate_strategic_feedback",
+            "action_type": "agent_analysis",
+            "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+          },
+          {
+            "action_id": "close_policy_interaction",
+            "action_type": "close",
+            "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+          }
+        ],
+        "entry_action": "apply_policy_trigger",
+        "workflow_id": "interaction_workflow_e0f19556bdd2",
+        "evolution_operator": "cpe_batch_reflection_patch",
+        "created_round": 2,
+        "parent_workflow_ids": [
+          "interaction_workflow_c8ac03cd254d"
+        ],
+        "training_batch": [
+          "2016_C",
+          "2014_C"
+        ]
+      },
+      "selection_utility": 0.8448173478992633,
+      "selection_basis": "current_shared_training_batch_net_utility"
+    }
+  ],
+  "validation_utility": null,
+  "validation_accepted": null,
+  "validation_result_path": null,
+  "best_validation_utility": 0.8374079295625156,
+  "best_workflow_id": "interaction_workflow_05df287cb4d3",
+  "cpe_round_complete": true
+}

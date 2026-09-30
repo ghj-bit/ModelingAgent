@@ -1,0 +1,837 @@
+{
+  "round": 9,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.8368612359772543,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8958333333333334,
+    "modeling_rigorousness_evaluation": 0.9,
+    "practicality_and_scientificity_evaluation": 0.8291666666666667,
+    "result_and_bias_analysis_evaluation": 0.8958333333333334
+  },
+  "problem_results": [
+    {
+      "problem_id": "2020_B",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a model for MM-Bench 2020_B: the best 3D geometric shape for a\nsandcastle foundation that lasts longest under waves and tides, with sub-tasks\nfor (1) optimal shape, (2) optimal sand-to-water mixture proportion, (3) effect\nof rain on the recommended shape, and (4) other longevity strategies.\n\nThe physical mechanism I intend is: wet-sand capillary cohesion (per the\nPakpour et al. 2012 finding that strength peaks near ~1% liquid volume\nfraction) resists two dominant loss channels — (a) wave/swash-driven erosion\nacting on the seaward face and the waterline perimeter, and (b) gravity\ninstability (slumping/toppling) when the unsupported height of the structure\nexceeds a cohesion-limited limit.\n\nThe problem statement leaves three structural choices unsettled, and I cannot\nsettle them from the text or the supplied data:\n\n1. Objective interpretation: \"lasts the longest\" can mean (a) time until\n   structural failure (the shape collapses/loses its form) or (b) time until\n   the volume is reduced to some fraction of the original. Which reading is\n   intended as the deliverable's primary criterion?\n\n2. Domain of \"shape\": is the foundation constrained to convex solids of\n   revolution / standard geometric solids (cone, frustum, cylinder, truncated\n   pyramid, hemisphere, box, mound), or are arbitrary shapes (including\n   non-convex features such as moats or notches, which are physically\n   plausible but complicate the erosion model) in scope for the comparison?\n\n3. Coupling of sub-tasks: requirement 3 asks whether the shape \"remains the\n   best\" when it rains. Should rain be modeled purely as a moisture-driven\n   decay of the capillary cohesion (shifting the mixture off its ~1% optimum\n   and reducing strength) with the same shape competition re-run under the\n   degraded cohesion, or does the intended reading require rain to introduce\n   a separate new loss channel (e.g., surface runoff scouring) beyond cohesion\n   decay?\n\nPlease tell me how each of these three structural/definitional choices should\nbe settled so that the model parameterization and the rain-adjustment extend\ncorrectly across requirements 1–4.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange-1 answers (failure-time objective; standard convex\nsolids only; rain = cohesion decay with runoff only if the ranking does not\nreverse), I propose the following complete structural configuration for the\ncore model. Please accept or reject it as a whole.\n\n**Structure (equal-volume, same-moisture competition over convex solids of\nrevolution):**\n\n- **Geometry set:** cone, truncated cone (frustum), cylinder, truncated\n  pyramid, hemisphere, half-ellipsoid (\"mound\"), and rectangular prism\n  (box), all normalized to the same volume V and same wet-sand mixture\n  quality.\n\n- **Two coupled failure clocks, life = min of the two:**\n  1. *Swash-erosion clock.* The wetted waterline perimeter P(z) is swept up\n     and down the face each tidal cycle; erosion depth per wetted second is\n     taken proportional to wave impact energy E_w (set by significant wave\n     height H ~ 1 m, period T ~ 8 s per the supplied data) divided by a\n     resistance R(z) = capillary cohesion c(w) · (height of solid above the\n     waterline, z), so erosion is strongest near the waterline and tapers\n     with height. The shape dies of erosion when the swept perimeter shrinks\n     the volume below a critical residual (equivalently, when the face has\n     retreated so far that the remaining solid can no longer hold its form).\n  2. *Gravity-stability clock.* Slumping/toppling when the unsupported\n     height of the structure exceeds a cohesion-limited height limit\n     H_crit ∝ sqrt(c(w)·A_base/ρg) (a standard capillary-arch scaling);\n     the wider the base for a given volume, the larger the stability margin.\n     Erosion shrinks the base over time, so the two clocks couple: erosion\n     erodes the base → stability margin falls → failure.\n\n- **Dominant-loss accounting (no idealized negligible terms):** the model\n  retains both loss channels explicitly — (i) hydrodynamic (wave/swash)\n  erosion of the seaward face and (ii) gravitational instability — because\n  neither is negligible for a wet-sand structure: cohesion is weak (c(w) at\n  its ~1% peak is still only a small fraction of dry-grain friction), so\n  base loss from erosion feeds slumping, and tall narrow shapes (cone) are\n  erosion-slow but stability-limited, while short wide shapes (hemisphere,\n  mound) are stability-strong but expose more waterline perimeter per unit\n  volume. The competition is decided by the min of the two clocks, and I\n  expect the optimum to be a short, wide, low-perimeter-to-volume convex\n  solid (hemisphere or mound-like), with a sensitivity check over H ∈ [0.5, 2] m,\n  T ∈ [4, 10] s, and tidal range [1, 4] m.\n\n- **Mixture sub-model (req 2):** capillary cohesion c(w) follows the\n  unimodal curve from Pakpour et al. 2012, peaked at ~1% liquid volume\n  fraction; the optimal proportion is read off the c(w) peak, and both clocks\n  inherit c(w), so the mixture choice is coupled to the shape competition.\n\n- **Rain extension (req 3):** rainfall raises the liquid fraction w above the\n  optimum → c(w) decays → both clocks slow down their failure time\n  monotonically; re-run the same seven-shape competition under the degraded\n  c(w) to test whether the ranking (and hence the best shape) survives.\n\n- **Strategies (req 4) and article (req 5)** inherit from the same model:\n  strategies are levers on the model's variables (raise c(w) back toward\n  optimum by shade/cover, extend H_crit by raising base area, reduce E_w\n  exposure by siting, etc.).\n\nDo you accept or reject this structural configuration?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange-2 structure without specifying the flaw. The minimal\nrevision I can infer is that the coupled two-clock mechanism was\nunder-specified at its interface: in my draft, the erosion clock and the\ngravity-stability clock both consumed the *current* shape, but the erosion\nlaw used a fixed per-wetted-second rate rather than tracking how the shape\nitself deforms as material is removed. I revise the structure minimally as\nfollows:\n\n**Revised structure:** the competition is still over the same seven convex\nsolids at equal volume and mixture, but erosion now acts as *progressive\nface recession*: the seaward face retreats a depth δs per tidal cycle, with\nδs ∝ E_w · P_wetted / (c(w) · face-height), so the shape at cycle n+1 is the\nshape at cycle n with its lower band of thickness δs removed (a \"worn-down\"\nprofile). The stability clock then evaluates the *worn* profile: H_crit\nshrinks as the base narrows and the height thins, and failure occurs when\nthe worn profile's stability margin reaches zero. The life of the shape is\nthe number of tidal cycles to that point. This keeps both dominant loss\nchannels (hydrodynamic erosion + gravitational instability) but couples them\nthrough the actual evolving geometry instead of through two independent\nclocks on a static shape.\n\nGiven this revised structure, what is the specific case, boundary condition,\nor failure mode that would break it — i.e., where would this mechanism give\nan incorrect or misleading ranking of the seven shapes (or the wrong\nrain-adjusted recommendation)?"
+        ],
+        "expert_answers": [
+          "1. Primary criterion: time until structural failure — loss of recognizable form (collapse/slumping/toppling), not a volume-fraction threshold. Volume loss is a secondary metric.\n\n2. Domain: standard convex solids of revolution and simple prisms/frusta (cone, frustum, cylinder, truncated pyramid, hemisphere, mound, box). Non-convex features (moats, notches) are out of scope for the foundation comparison.\n\n3. Rain: both. Model rain as moisture-driven decay of capillary cohesion (shifting off the ~1% optimum, reducing strength) and re-run the same shape competition under degraded cohesion; add surface runoff scouring as a separate loss channel only if the degraded-cohesion re-run does not already reverse the ranking.",
+          "reject",
+          "The case that breaks it: a shape whose failure is governed by *toppling of the whole body* rather than by base narrowing — e.g. a tall truncated pyramid or cone on a wide, still-intact base. Your worn-profile stability clock only shrinks H_crit as the base narrows and the height thins, so it predicts these shapes survive until the base erodes. In reality, wave impact applies an overturning moment about the seaward toe; a tall narrow solid can topple while its base is barely eroded and its height nearly intact. Your mechanism never evaluates the moment balance, so it ranks tall shapes as erosion-limited when they are actually moment-limited, and it will mis-rank them against short wide shapes — and under rain, where cohesion (and thus the toppling threshold) drops fastest, the error reverses the recommendation."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8833333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.85,
+        "result_and_bias_analysis_evaluation": 0.8833333333333333
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each of the five requirements. Task 1 explicitly limits the search space to convex solids of revolution and simple prisms, which is a rational constraint for mathematical tractability while still addressing the \"best shape\" query. Task 2 correctly identifies the need for a capillary-cohesion model to determine the optimal water proportion. Task 3 logically extends the previous model to include rain as a variable. Task 4 and 5 are appropriately scoped as derivative analyses and communication tasks. The goals are explicit, and the key components (shape, mixture, environmental factors) are effectively identified without ambiguity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all five requirements comprehensively. There is a strong logical dependency chain: Task 1 establishes the baseline shape, Task 2 optimizes the material property, Task 3 tests the robustness of the Task 1 result under new conditions, and Task 4/5 synthesize the findings. The sub-tasks are directly related and support the final goal of providing a complete solution and a public-facing summary. No key parts are missing, and there is no deviation from the actual goals. The interrelation between tasks (e.g., re-running the competition in Task 3) ensures coherence and completeness.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively translates physical constraints into a solvable mathematical framework, providing clear, actionable insights for shape selection and mixture optimization that directly support practical decision-making.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model integrates valid physical principles like capillary cohesion and wave mechanics, though it relies on simplifications for erosion and rain effects that limit its full scientific rigor.",
+            "score": 7
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed sensitivity tests, clear physical interpretations of the model outputs, and robust conclusions that effectively address the problem requirements.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying specific model simplifications and data uncertainties, and explaining how they affect the interpretation of results, ensuring a realistic view of the model's limitations.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clear, explicit, and rigorously justified with literature anchors. They logically define the problem scope, failure modes, and physical mechanisms (capillary cohesion), ensuring a robust foundation for the model.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically sound, using appropriate methods (progressive erosion, capillary cohesion model) to reflect the complex interplay of wave, gravity, and material properties. The structure realistically captures the problem's dynamics.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 1,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_B",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a model for MM-Bench 2020_B: the best 3D geometric shape for a\nsandcastle foundation that lasts longest under waves and tides, with sub-tasks\nfor (1) optimal shape, (2) optimal sand-to-water mixture proportion, (3) effect\nof rain on the recommended shape, and (4) other longevity strategies.\n\nThe physical mechanism I intend is: wet-sand capillary cohesion (per the\nPakpour et al. 2012 finding that strength peaks near ~1% liquid volume\nfraction) resists two dominant loss channels — (a) wave/swash-driven erosion\nacting on the seaward face and the waterline perimeter, and (b) gravity\ninstability (slumping/toppling) when the unsupported height of the structure\nexceeds a cohesion-limited limit.\n\nThe problem statement leaves three structural choices unsettled, and I cannot\nsettle them from the text or the supplied data:\n\n1. Objective interpretation: \"lasts the longest\" can mean (a) time until\n   structural failure (the shape collapses/loses its form) or (b) time until\n   the volume is reduced to some fraction of the original. Which reading is\n   intended as the deliverable's primary criterion?\n\n2. Domain of \"shape\": is the foundation constrained to convex solids of\n   revolution / standard geometric solids (cone, frustum, cylinder, truncated\n   pyramid, hemisphere, box, mound), or are arbitrary shapes (including\n   non-convex features such as moats or notches, which are physically\n   plausible but complicate the erosion model) in scope for the comparison?\n\n3. Coupling of sub-tasks: requirement 3 asks whether the shape \"remains the\n   best\" when it rains. Should rain be modeled purely as a moisture-driven\n   decay of the capillary cohesion (shifting the mixture off its ~1% optimum\n   and reducing strength) with the same shape competition re-run under the\n   degraded cohesion, or does the intended reading require rain to introduce\n   a separate new loss channel (e.g., surface runoff scouring) beyond cohesion\n   decay?\n\nPlease tell me how each of these three structural/definitional choices should\nbe settled so that the model parameterization and the rain-adjustment extend\ncorrectly across requirements 1–4.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange-1 answers (failure-time objective; standard convex\nsolids only; rain = cohesion decay with runoff only if the ranking does not\nreverse), I propose the following complete structural configuration for the\ncore model. Please accept or reject it as a whole.\n\n**Structure (equal-volume, same-moisture competition over convex solids of\nrevolution):**\n\n- **Geometry set:** cone, truncated cone (frustum), cylinder, truncated\n  pyramid, hemisphere, half-ellipsoid (\"mound\"), and rectangular prism\n  (box), all normalized to the same volume V and same wet-sand mixture\n  quality.\n\n- **Two coupled failure clocks, life = min of the two:**\n  1. *Swash-erosion clock.* The wetted waterline perimeter P(z) is swept up\n     and down the face each tidal cycle; erosion depth per wetted second is\n     taken proportional to wave impact energy E_w (set by significant wave\n     height H ~ 1 m, period T ~ 8 s per the supplied data) divided by a\n     resistance R(z) = capillary cohesion c(w) · (height of solid above the\n     waterline, z), so erosion is strongest near the waterline and tapers\n     with height. The shape dies of erosion when the swept perimeter shrinks\n     the volume below a critical residual (equivalently, when the face has\n     retreated so far that the remaining solid can no longer hold its form).\n  2. *Gravity-stability clock.* Slumping/toppling when the unsupported\n     height of the structure exceeds a cohesion-limited height limit\n     H_crit ∝ sqrt(c(w)·A_base/ρg) (a standard capillary-arch scaling);\n     the wider the base for a given volume, the larger the stability margin.\n     Erosion shrinks the base over time, so the two clocks couple: erosion\n     erodes the base → stability margin falls → failure.\n\n- **Dominant-loss accounting (no idealized negligible terms):** the model\n  retains both loss channels explicitly — (i) hydrodynamic (wave/swash)\n  erosion of the seaward face and (ii) gravitational instability — because\n  neither is negligible for a wet-sand structure: cohesion is weak (c(w) at\n  its ~1% peak is still only a small fraction of dry-grain friction), so\n  base loss from erosion feeds slumping, and tall narrow shapes (cone) are\n  erosion-slow but stability-limited, while short wide shapes (hemisphere,\n  mound) are stability-strong but expose more waterline perimeter per unit\n  volume. The competition is decided by the min of the two clocks, and I\n  expect the optimum to be a short, wide, low-perimeter-to-volume convex\n  solid (hemisphere or mound-like), with a sensitivity check over H ∈ [0.5, 2] m,\n  T ∈ [4, 10] s, and tidal range [1, 4] m.\n\n- **Mixture sub-model (req 2):** capillary cohesion c(w) follows the\n  unimodal curve from Pakpour et al. 2012, peaked at ~1% liquid volume\n  fraction; the optimal proportion is read off the c(w) peak, and both clocks\n  inherit c(w), so the mixture choice is coupled to the shape competition.\n\n- **Rain extension (req 3):** rainfall raises the liquid fraction w above the\n  optimum → c(w) decays → both clocks slow down their failure time\n  monotonically; re-run the same seven-shape competition under the degraded\n  c(w) to test whether the ranking (and hence the best shape) survives.\n\n- **Strategies (req 4) and article (req 5)** inherit from the same model:\n  strategies are levers on the model's variables (raise c(w) back toward\n  optimum by shade/cover, extend H_crit by raising base area, reduce E_w\n  exposure by siting, etc.).\n\nDo you accept or reject this structural configuration?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou rejected the Exchange-2 structure without specifying the flaw. The minimal\nrevision I can infer is that the coupled two-clock mechanism was\nunder-specified at its interface: in my draft, the erosion clock and the\ngravity-stability clock both consumed the *current* shape, but the erosion\nlaw used a fixed per-wetted-second rate rather than tracking how the shape\nitself deforms as material is removed. I revise the structure minimally as\nfollows:\n\n**Revised structure:** the competition is still over the same seven convex\nsolids at equal volume and mixture, but erosion now acts as *progressive\nface recession*: the seaward face retreats a depth δs per tidal cycle, with\nδs ∝ E_w · P_wetted / (c(w) · face-height), so the shape at cycle n+1 is the\nshape at cycle n with its lower band of thickness δs removed (a \"worn-down\"\nprofile). The stability clock then evaluates the *worn* profile: H_crit\nshrinks as the base narrows and the height thins, and failure occurs when\nthe worn profile's stability margin reaches zero. The life of the shape is\nthe number of tidal cycles to that point. This keeps both dominant loss\nchannels (hydrodynamic erosion + gravitational instability) but couples them\nthrough the actual evolving geometry instead of through two independent\nclocks on a static shape.\n\nGiven this revised structure, what is the specific case, boundary condition,\nor failure mode that would break it — i.e., where would this mechanism give\nan incorrect or misleading ranking of the seven shapes (or the wrong\nrain-adjusted recommendation)?"
+            ],
+            "expert_answers": [
+              "1. Primary criterion: time until structural failure — loss of recognizable form (collapse/slumping/toppling), not a volume-fraction threshold. Volume loss is a secondary metric.\n\n2. Domain: standard convex solids of revolution and simple prisms/frusta (cone, frustum, cylinder, truncated pyramid, hemisphere, mound, box). Non-convex features (moats, notches) are out of scope for the foundation comparison.\n\n3. Rain: both. Model rain as moisture-driven decay of capillary cohesion (shifting off the ~1% optimum, reducing strength) and re-run the same shape competition under degraded cohesion; add surface runoff scouring as a separate loss channel only if the degraded-cohesion re-run does not already reverse the ranking.",
+              "reject",
+              "The case that breaks it: a shape whose failure is governed by *toppling of the whole body* rather than by base narrowing — e.g. a tall truncated pyramid or cone on a wide, still-intact base. Your worn-profile stability clock only shrinks H_crit as the base narrows and the height thins, so it predicts these shapes survive until the base erodes. In reality, wave impact applies an overturning moment about the seaward toe; a tall narrow solid can topple while its base is barely eroded and its height nearly intact. Your mechanism never evaluates the moment balance, so it ranks tall shapes as erosion-limited when they are actually moment-limited, and it will mis-rank them against short wide shapes — and under rain, where cohesion (and thus the toppling threshold) drops fastest, the error reverses the recommendation."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8833333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.8833333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p1_20260930_092627/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each of the five requirements. Task 1 explicitly limits the search space to convex solids of revolution and simple prisms, which is a rational constraint for mathematical tractability while still addressing the \"best shape\" query. Task 2 correctly identifies the need for a capillary-cohesion model to determine the optimal water proportion. Task 3 logically extends the previous model to include rain as a variable. Task 4 and 5 are appropriately scoped as derivative analyses and communication tasks. The goals are explicit, and the key components (shape, mixture, environmental factors) are effectively identified without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all five requirements comprehensively. There is a strong logical dependency chain: Task 1 establishes the baseline shape, Task 2 optimizes the material property, Task 3 tests the robustness of the Task 1 result under new conditions, and Task 4/5 synthesize the findings. The sub-tasks are directly related and support the final goal of providing a complete solution and a public-facing summary. No key parts are missing, and there is no deviation from the actual goals. The interrelation between tasks (e.g., re-running the competition in Task 3) ensures coherence and completeness.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively translates physical constraints into a solvable mathematical framework, providing clear, actionable insights for shape selection and mixture optimization that directly support practical decision-making.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model integrates valid physical principles like capillary cohesion and wave mechanics, though it relies on simplifications for erosion and rain effects that limit its full scientific rigor.",
+                "score": 7
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed sensitivity tests, clear physical interpretations of the model outputs, and robust conclusions that effectively address the problem requirements.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific model simplifications and data uncertainties, and explaining how they affect the interpretation of results, ensuring a realistic view of the model's limitations.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clear, explicit, and rigorously justified with literature anchors. They logically define the problem scope, failure modes, and physical mechanisms (capillary cohesion), ensuring a robust foundation for the model.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically sound, using appropriate methods (progressive erosion, capillary cohesion model) to reflect the complex interplay of wave, gravity, and material properties. The structure realistically captures the problem's dynamics.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8833333333333333,
+      "interaction_cost": 0.8624278516615527,
+      "interaction_penalty": 0.043121392583077636,
+      "net_utility": 0.8402119407502556,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2246,
+          "total_expert_latency_seconds": 5.82,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9060696291538816,
+          "latency_cost_component": 0.30505825002132403,
+          "interaction_cost": 0.8624278516615527,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2020_D",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a passing-network analysis of the Huskies season (38 games, 23,429 passes, 30 Huskies players) to answer four deliverables: (1) multi-scale network structure (dyadic/triadic, micro-to-macro, minute-to-season), (2) performance indicators of teamwork beyond wins plus a model of structural/configurational/dynamical teamwork, (3) concrete structural-strategy recommendations for next season, (4) generalization to how to design effective teams.\n\nThe data and problem statement leave three structural/definitional boundaries unsettled, and each one fixes how I parameterize the core mechanism and extend it to the secondary deliverables. I cannot settle them from the data or the text:\n\n**Gap 1 — Scope of the network (affects deliverables 1 and 2).** Passing events sometimes carry a Huskies pass to an opponent player (e.g., 16 such rows in Match 29, plus goal kicks aimed at no destination). For the primary in-possession teamwork network: which link set counts as a valid edge — only passes between two Huskies players (in-possession passes), or must cross-team rows (losses of possession, long balls into opponents) be modeled as a distinct \"defective\" edge type with its own structure, since they are information about how possession breaks down? This determines whether the core network is a pure in-possession graph or a two-layer (possession vs. possession-break) structure, and the answer changes how the same mechanism extends to deliverable 2's \"dynamical\" component (possession-break as a state transition).\n\n**Gap 2 — Scale of the \"teamwork success\" indicators (affects deliverable 2).** The literature baseline (Buldú et al. 2018; Duch et al. 2010) validates betweenness centrality and network-centroid indicators at the *match* level, while the problem asks for indicators across time from minute-to-minute to the whole season. What is the correct structural reading: are the teamwork indicators quantities to be defined once at match level (38 samples) and only compared across the season at that single scale, or must they be re-defined at intermediate windows (e.g., 5- or 10-minute rolling windows within a match, plus per-half) so that \"adaptability/tempo\" deliverable-2 processes become measurable dynamics rather than one match-level number per game? In other words, is the unit of analysis for \"successful teamwork\" the match, or the match-window?\n\n**Gap 3 — Transferability of the recommendation and generalization layers (affects deliverables 3 and 4).** Deliverable 3 asks for structural-strategy changes for next season, and deliverable 4 asks to generalize findings to the design of effective teams in general. Which structural elements of the Huskies passing-network mechanism are intended to be the transferable core (so the generalization is about, e.g., hub-structure and triadic-clustering design principles stated in network terms independent of soccer), and which elements must stay soccer-specific (so the policy advice in deliverable 3 is phrased as on-field tactics — formation, roles, pass routes — rather than abstract network properties)? That is: does the \"generalization\" step reuse the same network-metric mechanism with domain terms stripped, or is it a separate mechanism layer that I must define on its own terms?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nGiven that the text leaves the edge inclusion rule, the window length, and the transfer boundary open (per your reply), I propose the following single, self-consistent structural configuration for the whole mechanism. Please accept or reject it as a whole.\n\n**Layer A — possession network (primary).** Edges are exactly the passes whose origin and destination are both Huskies players (in-possession, team-internal). Cross-team rows (Huskies→Opponent, 16 rows in Match 29) and rows with no destination are excluded from the edge set; they are not \"defective edges\" but the *boundary events* that define possession-breaks (see Layer B). Goal kicks with no valid destination are excluded from the network but counted as break-events.\n\n**Layer B — possession-break as a state transition (dynamical component, deliverable 2).** A possession episode is the maximal run of consecutive Huskies-origin passes (same half, no opponent-origin event and no >90 s gap between consecutive Huskies passes); it ends at a Huskies→Opponent pass, a Huskies event of type other than Pass (shot, duel-loss, clearance...), or a half break. The episode's *break mode* (conceded cross-team pass / shot / other) and its terminal x-position and duration are the state-transition observables. This makes \"how and where possession breaks down\" a first-class dynamical quantity without needing to treat cross-team rows as network edges — this is the loss/transformation mechanism the in-possession layer alone would silently assume away (a passing chain is not evaluated as successful merely because its internal passes exist; it is evaluated by how it ends and how far up the field it carried the ball).\n\n**Layer C — indicator windowing (deliverable 2 time scales).** The unit of analysis is the *10-minute window* within a half (6 windows per match, 228 window-outcomes for the season, each window inheriting its match's outcome and goal margin). Indicators are computed at both the match level (38 samples, for literature-validated comparisons such as betweenness-vs-win-probability) and the 10-minute window level (228 samples, for tempo/adaptability: first-vs-second-half drift, within-match entropy/centroid trajectories, minute-scale clustering). A window-level indicator is \"associated with success\" if it correlates with the match outcome it belongs to; this fixes the window→outcome assignment rule you noted was open.\n\n**Layer D — transfer boundary (deliverables 3 and 4).** Deliverable 3 (policy) uses soccer-specific phrasing of the same metric results (formation balance, hub-player dependence, pass-route redundancy). Deliverable 4 (generalization) reuses the *same* network-metric mechanism — small-world clustering vs. null, betweenness/balance, hub heterogeneity, possession-episode break-mode distribution — with domain terms stripped, stated as four domain-independent design principles for any team-like system, and explicitly flagged for which principles are validated only by the soccer data. I do not define a separate mechanism layer for generalization; the transfer is a relabeling plus an honesty annotation, not new modeling.\n\nOne coherent hypothesis: internal-pass network + break-mode state transitions + two-scale (match/10-min) indicators + relabeling-transfer. Accept or reject — if rejecting, name the specific structural flaw so I can make a minimal revision.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nSince you rejected the Exchange-2 structure, I have applied the minimal revision that addresses the one flaw a rejection of that structure can point at — the flaw that the mechanism evaluates a passing chain as successful from internal structure alone, and that the break-mode state layer is bolted on after the network rather than being what makes the network's quantities comparable across matches. The revised structure is:\n\n**Revised core:** the passing network is no longer the primary object. The primary object is the *possession-episode graph*: nodes are possession episodes (Huskies-only pass runs as in Layer A/B), and an episode is characterized by its internal passing subgraph (dyad/triad structure, hub usage, centroid advance) *and* its terminal state (break mode, terminal x, duration, whether it ended in a shot). All \"successful teamwork\" indicators are defined on this episode graph — e.g., episode-average advance per pass, fraction of episodes breaking by conceded pass, triadic closure rate inside episodes — so that a high-internal-structure chain that ends in a conceded pass away from goal is scored as unsuccessful, and two matches with similar internal networks are compared on how their chains *end*. The null-model comparison (small-world test) stays, but it is applied to the episode graph's internal structure, and the association with match outcome is computed on episode-graph indicators at both match (38) and 10-minute window (228) scales. Deliverables 3 and 4 are unchanged in principle: policy phrasing of the episode-graph results for the coach, and domain-stripped design principles (episode closure, advance-before-break, hub dependence) for the generalization, with an honesty annotation on which are soccer-data-validated.\n\nAgainst this revised structure, what is the specific case, boundary condition, or failure mode that would break it — e.g., a regime where the episode segmentation itself is ill-defined (long goal-kick routines, stoppages, substitution waves), a match type (high-scoring chaos, 0-0 low-pass game) where the episode indicators carry no outcome signal, a scale (match vs. window) at which the window→outcome assignment rule fails, or a limit where the generalization step over-claims from one team's single season? Identify the most damaging one so I can put it in the limitations/bias analysis with the corrected scope stated."
+        ],
+        "expert_answers": [
+          "Gap 1: The text does not settle whether cross-team rows are edges or state transitions; it also never defines what counts as a \"pass\" for network purposes (goal kicks to no destination, throw-ins, clearances). You need a stated inclusion rule — in-possession only, or a two-layer possession/possession-break graph — and the data cannot supply it.\n\nGap 2: The problem asks for minute-to-minute through season scales but gives no window length, no minimum pass count per window, and no rule for assigning a window's indicator to a match outcome. The unit of analysis (match vs. match-window) is a modeling choice the text leaves open.\n\nGap 3: The text does not say which structural elements are meant to transfer. Whether generalization strips domain terms from the same metric mechanism or requires a separate layer is undetermined; no criterion for \"soccer-specific\" is given.",
+          "reject",
+          "The most damaging break: episode segmentation is not identifiable from the data. The 90-second gap rule and \"no opponent-origin event\" rule cannot be applied, because fullevents.csv records only events, not ball-out-of-play or possession-change intervals, and passingevents.csv has no opponent-origin rows at all — so a Huskies pass run interrupted by an opponent's uncontested pass, a throw-in, or a stoppage is indistinguishable from a continuous Huskies possession. Any episode boundary is therefore an artifact of the gap threshold, and every episode-graph indicator (advance per pass, break-mode fraction, closure rate) inherits that arbitrariness. The 0-0 low-pass match is the concrete case: few episodes, long stoppages, and the threshold alone decides whether the match has 20 episodes or 60, flipping the outcome association."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8875,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.85,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler accurately defines the scope and goals for all four tasks, explicitly incorporating key data points (38 matches, 23,429 passes) and specific analytical requirements (dyadic/triadic configurations, multi-scale analysis). The goals are clearly stated as building a network, identifying performance indicators, advising on strategies, and generalizing findings. The definition is precise and directly addresses the coach's requests without ambiguity.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically sequenced and cover all aspects of the problem requirements. Task 1 establishes the structural foundation, Task 2 builds the dynamic model and metrics, Task 3 applies the model for specific advice, and Task 4 generalizes the insights. There are clear dependencies between tasks (e.g., Task 3 relies on Task 2's model), and no key components from the original problem statement are missing or deviated from. The coverage is complete and coherent.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model provides actionable, specific tactical advice derived from network metrics, effectively translating complex data into clear strategies for the coach, and is well-tailored to the soccer domain.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model adheres to scientific principles by using rigorous network metrics, clearly stating assumptions and limitations, and proposing theoretically sound extensions for generalization, demonstrating high scientific integrity.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, explicitly justified with data evidence, and their impact is rigorously tested through sensitivity analysis (e.g., gap parameter sweep) and expert validation, ensuring a robust modeling foundation.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model employs appropriate network metrics and null models, effectively captures both structural and dynamical aspects of teamwork across multiple scales, and aligns well with the problem's requirements for analyzing complex team interactions.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The analysis is highly transparent, correctly identifying that structural metrics do not drive outcomes while execution does. It provides clear, data-backed conclusions and honestly addresses the limitations of the network model in this specific context.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The modeler rigorously identifies statistical biases (multiple testing, small sample size) and methodological biases (non-identifiability of episodes, near-complete graph limitations). It effectively corrects for these by treating certain signals as noise and clearly delineating the boundaries of what the data can support.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 1,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_D",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a passing-network analysis of the Huskies season (38 games, 23,429 passes, 30 Huskies players) to answer four deliverables: (1) multi-scale network structure (dyadic/triadic, micro-to-macro, minute-to-season), (2) performance indicators of teamwork beyond wins plus a model of structural/configurational/dynamical teamwork, (3) concrete structural-strategy recommendations for next season, (4) generalization to how to design effective teams.\n\nThe data and problem statement leave three structural/definitional boundaries unsettled, and each one fixes how I parameterize the core mechanism and extend it to the secondary deliverables. I cannot settle them from the data or the text:\n\n**Gap 1 — Scope of the network (affects deliverables 1 and 2).** Passing events sometimes carry a Huskies pass to an opponent player (e.g., 16 such rows in Match 29, plus goal kicks aimed at no destination). For the primary in-possession teamwork network: which link set counts as a valid edge — only passes between two Huskies players (in-possession passes), or must cross-team rows (losses of possession, long balls into opponents) be modeled as a distinct \"defective\" edge type with its own structure, since they are information about how possession breaks down? This determines whether the core network is a pure in-possession graph or a two-layer (possession vs. possession-break) structure, and the answer changes how the same mechanism extends to deliverable 2's \"dynamical\" component (possession-break as a state transition).\n\n**Gap 2 — Scale of the \"teamwork success\" indicators (affects deliverable 2).** The literature baseline (Buldú et al. 2018; Duch et al. 2010) validates betweenness centrality and network-centroid indicators at the *match* level, while the problem asks for indicators across time from minute-to-minute to the whole season. What is the correct structural reading: are the teamwork indicators quantities to be defined once at match level (38 samples) and only compared across the season at that single scale, or must they be re-defined at intermediate windows (e.g., 5- or 10-minute rolling windows within a match, plus per-half) so that \"adaptability/tempo\" deliverable-2 processes become measurable dynamics rather than one match-level number per game? In other words, is the unit of analysis for \"successful teamwork\" the match, or the match-window?\n\n**Gap 3 — Transferability of the recommendation and generalization layers (affects deliverables 3 and 4).** Deliverable 3 asks for structural-strategy changes for next season, and deliverable 4 asks to generalize findings to the design of effective teams in general. Which structural elements of the Huskies passing-network mechanism are intended to be the transferable core (so the generalization is about, e.g., hub-structure and triadic-clustering design principles stated in network terms independent of soccer), and which elements must stay soccer-specific (so the policy advice in deliverable 3 is phrased as on-field tactics — formation, roles, pass routes — rather than abstract network properties)? That is: does the \"generalization\" step reuse the same network-metric mechanism with domain terms stripped, or is it a separate mechanism layer that I must define on its own terms?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nGiven that the text leaves the edge inclusion rule, the window length, and the transfer boundary open (per your reply), I propose the following single, self-consistent structural configuration for the whole mechanism. Please accept or reject it as a whole.\n\n**Layer A — possession network (primary).** Edges are exactly the passes whose origin and destination are both Huskies players (in-possession, team-internal). Cross-team rows (Huskies→Opponent, 16 rows in Match 29) and rows with no destination are excluded from the edge set; they are not \"defective edges\" but the *boundary events* that define possession-breaks (see Layer B). Goal kicks with no valid destination are excluded from the network but counted as break-events.\n\n**Layer B — possession-break as a state transition (dynamical component, deliverable 2).** A possession episode is the maximal run of consecutive Huskies-origin passes (same half, no opponent-origin event and no >90 s gap between consecutive Huskies passes); it ends at a Huskies→Opponent pass, a Huskies event of type other than Pass (shot, duel-loss, clearance...), or a half break. The episode's *break mode* (conceded cross-team pass / shot / other) and its terminal x-position and duration are the state-transition observables. This makes \"how and where possession breaks down\" a first-class dynamical quantity without needing to treat cross-team rows as network edges — this is the loss/transformation mechanism the in-possession layer alone would silently assume away (a passing chain is not evaluated as successful merely because its internal passes exist; it is evaluated by how it ends and how far up the field it carried the ball).\n\n**Layer C — indicator windowing (deliverable 2 time scales).** The unit of analysis is the *10-minute window* within a half (6 windows per match, 228 window-outcomes for the season, each window inheriting its match's outcome and goal margin). Indicators are computed at both the match level (38 samples, for literature-validated comparisons such as betweenness-vs-win-probability) and the 10-minute window level (228 samples, for tempo/adaptability: first-vs-second-half drift, within-match entropy/centroid trajectories, minute-scale clustering). A window-level indicator is \"associated with success\" if it correlates with the match outcome it belongs to; this fixes the window→outcome assignment rule you noted was open.\n\n**Layer D — transfer boundary (deliverables 3 and 4).** Deliverable 3 (policy) uses soccer-specific phrasing of the same metric results (formation balance, hub-player dependence, pass-route redundancy). Deliverable 4 (generalization) reuses the *same* network-metric mechanism — small-world clustering vs. null, betweenness/balance, hub heterogeneity, possession-episode break-mode distribution — with domain terms stripped, stated as four domain-independent design principles for any team-like system, and explicitly flagged for which principles are validated only by the soccer data. I do not define a separate mechanism layer for generalization; the transfer is a relabeling plus an honesty annotation, not new modeling.\n\nOne coherent hypothesis: internal-pass network + break-mode state transitions + two-scale (match/10-min) indicators + relabeling-transfer. Accept or reject — if rejecting, name the specific structural flaw so I can make a minimal revision.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nSince you rejected the Exchange-2 structure, I have applied the minimal revision that addresses the one flaw a rejection of that structure can point at — the flaw that the mechanism evaluates a passing chain as successful from internal structure alone, and that the break-mode state layer is bolted on after the network rather than being what makes the network's quantities comparable across matches. The revised structure is:\n\n**Revised core:** the passing network is no longer the primary object. The primary object is the *possession-episode graph*: nodes are possession episodes (Huskies-only pass runs as in Layer A/B), and an episode is characterized by its internal passing subgraph (dyad/triad structure, hub usage, centroid advance) *and* its terminal state (break mode, terminal x, duration, whether it ended in a shot). All \"successful teamwork\" indicators are defined on this episode graph — e.g., episode-average advance per pass, fraction of episodes breaking by conceded pass, triadic closure rate inside episodes — so that a high-internal-structure chain that ends in a conceded pass away from goal is scored as unsuccessful, and two matches with similar internal networks are compared on how their chains *end*. The null-model comparison (small-world test) stays, but it is applied to the episode graph's internal structure, and the association with match outcome is computed on episode-graph indicators at both match (38) and 10-minute window (228) scales. Deliverables 3 and 4 are unchanged in principle: policy phrasing of the episode-graph results for the coach, and domain-stripped design principles (episode closure, advance-before-break, hub dependence) for the generalization, with an honesty annotation on which are soccer-data-validated.\n\nAgainst this revised structure, what is the specific case, boundary condition, or failure mode that would break it — e.g., a regime where the episode segmentation itself is ill-defined (long goal-kick routines, stoppages, substitution waves), a match type (high-scoring chaos, 0-0 low-pass game) where the episode indicators carry no outcome signal, a scale (match vs. window) at which the window→outcome assignment rule fails, or a limit where the generalization step over-claims from one team's single season? Identify the most damaging one so I can put it in the limitations/bias analysis with the corrected scope stated."
+            ],
+            "expert_answers": [
+              "Gap 1: The text does not settle whether cross-team rows are edges or state transitions; it also never defines what counts as a \"pass\" for network purposes (goal kicks to no destination, throw-ins, clearances). You need a stated inclusion rule — in-possession only, or a two-layer possession/possession-break graph — and the data cannot supply it.\n\nGap 2: The problem asks for minute-to-minute through season scales but gives no window length, no minimum pass count per window, and no rule for assigning a window's indicator to a match outcome. The unit of analysis (match vs. match-window) is a modeling choice the text leaves open.\n\nGap 3: The text does not say which structural elements are meant to transfer. Whether generalization strips domain terms from the same metric mechanism or requires a separate layer is undetermined; no criterion for \"soccer-specific\" is given.",
+              "reject",
+              "The most damaging break: episode segmentation is not identifiable from the data. The 90-second gap rule and \"no opponent-origin event\" rule cannot be applied, because fullevents.csv records only events, not ball-out-of-play or possession-change intervals, and passingevents.csv has no opponent-origin rows at all — so a Huskies pass run interrupted by an opponent's uncontested pass, a throw-in, or a stoppage is indistinguishable from a continuous Huskies possession. Any episode boundary is therefore an artifact of the gap threshold, and every episode-graph indicator (advance per pass, break-mode fraction, closure rate) inherits that arbitrariness. The 0-0 low-pass match is the concrete case: few episodes, long stoppages, and the threshold alone decides whether the match has 20 episodes or 60, flipping the outcome association."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8875,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.85,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p2_20260930_092627/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler accurately defines the scope and goals for all four tasks, explicitly incorporating key data points (38 matches, 23,429 passes) and specific analytical requirements (dyadic/triadic configurations, multi-scale analysis). The goals are clearly stated as building a network, identifying performance indicators, advising on strategies, and generalizing findings. The definition is precise and directly addresses the coach's requests without ambiguity.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically sequenced and cover all aspects of the problem requirements. Task 1 establishes the structural foundation, Task 2 builds the dynamic model and metrics, Task 3 applies the model for specific advice, and Task 4 generalizes the insights. There are clear dependencies between tasks (e.g., Task 3 relies on Task 2's model), and no key components from the original problem statement are missing or deviated from. The coverage is complete and coherent.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model provides actionable, specific tactical advice derived from network metrics, effectively translating complex data into clear strategies for the coach, and is well-tailored to the soccer domain.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model adheres to scientific principles by using rigorous network metrics, clearly stating assumptions and limitations, and proposing theoretically sound extensions for generalization, demonstrating high scientific integrity.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, explicitly justified with data evidence, and their impact is rigorously tested through sensitivity analysis (e.g., gap parameter sweep) and expert validation, ensuring a robust modeling foundation.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model employs appropriate network metrics and null models, effectively captures both structural and dynamical aspects of teamwork across multiple scales, and aligns well with the problem's requirements for analyzing complex team interactions.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The analysis is highly transparent, correctly identifying that structural metrics do not drive outcomes while execution does. It provides clear, data-backed conclusions and honestly addresses the limitations of the network model in this specific context.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The modeler rigorously identifies statistical biases (multiple testing, small sample size) and methodological biases (non-identifiability of episodes, near-complete graph limitations). It effectively corrects for these by treating certain signals as noise and clearly delineating the boundaries of what the data can support.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8875,
+      "interaction_cost": 0.871811977186295,
+      "interaction_penalty": 0.04359059885931475,
+      "net_utility": 0.8439094011406852,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2743,
+          "total_expert_latency_seconds": 4.33,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9295299429657374,
+          "latency_cost_component": 0.2658890444185472,
+          "interaction_cost": 0.871811977186295,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2020_E",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a stock-and-flow model of global single-use/disposable plastic waste for the ICM task, with four deliverables: (1) the maximum level of waste that can be safely mitigated, (2) the extent to which waste can be reduced to an environmentally safe level, (3) a minimal achievable global waste target with its impacts, and (4) equity issues plus a two-page memo with a target, timeline, and accelerators/hindrances. I will anchor it to the provided data (353 Mt waste and 460 Mt production in 2019, ~9% recycled, packaging 40% of waste; 4.8–12.7 Mt/yr ocean input in 2010 with a regional mismanaged share of 0.5–4.6%). Three structural/definitional questions are left open by the problem text, and they govern how I parameterize the core mechanism rather than what magnitudes to use:\n\n1. **Scope of \"single-use or disposable\":** the data give packaging as 40% of the waste stream and consumer goods as roughly 12%, but the text does not settle the valid domain of the single-use/disposable class. Should the model's core stock be defined (a) as a fixed percentage band of total plastic waste (e.g., the 40–60% range the data suggest), with the same flow structure applied to that share, or (b) as an independently tracked stock with its own per-sector generation rates that only coincidentally aligns with the aggregate? In other words, is the single-use share a fixed proportion of the total, or a state variable in its own right — and does that choice change what \"maximum safely mitigated\" refers to?\n\n2. **Meaning of \"safely mitigated\" (the damage boundary):** the problem asks for the maximum waste that can be mitigated *without further environmental damage*, but does not define the damage threshold. The natural candidate is keeping net ocean input at or below the current level (≈8 Mt/yr midpoint of the 2010 band). Should \"safe mitigation capacity\" be defined as the throughput at which the *net* addition to the marine environment is zero (collection + recycling + energy recovery fully offset mismanagement, with no net new leakage and the existing marine stock held constant), or does \"no further damage\" require an additional decay/drawdown term (the existing stock must shrink at some rate, which would lower the safe throughput)? Which boundary condition — zero net leakage, or zero net growth of the environmental stock — is the correct interpretation of \"without further environmental damage\"?\n\n3. **Aggregation across deliverables:** the same core flow model must feed all four deliverables. Should regional heterogeneity (income class × collection strength, giving the 0.5–4.6% mismanaged range) be built into the *core* mechanism so that deliverables 2–4 (reduction extent, minimal target, equity) read directly off the regional state vector, or should the core model be global-aggregate and regional differences handled as a downstream allocation layer for the equity and policy analysis? This determines whether the equity conclusions are emergent from the mechanism or imposed on it.",
+          "# Expert Question 2 (Operator 2: judgment)\n\nYou confirmed that the damage boundary is the governing choice. I propose one concrete structure for it, and ask you to accept or reject it as a whole.\n\n**The proposed structure:** The environment is modeled as a marine plastic stock M with two flows. New input I (the mismanaged leakage, per-region mismanaged share of generated waste) enters. A decay/drawdown flow D = δ·M leaves, where δ is a single effective removal rate for the existing stock (fragmentation + export + retrieval combined into one parameter, anchored to the data only by the sign and by the requirement that the existing 2010 marine stock is large relative to the annual input). \"No further environmental damage\" is defined as the condition I ≤ D, i.e. new input does not exceed the stock's own drawdown — the stock stops growing. The safe throughput is then the maximum generated waste W* such that I(W*) = δ·M holds; above W* the marine stock grows and damage accrues. I do *not* ask for a value of δ: I will treat it as a declared parameter, sweep it over a stated range, and report the sensitivity of W* to it.\n\n**Three structural commitments embedded in it, each needing your accept/reject:**\n\n1. The damage boundary is **zero net growth of the marine stock** (I ≤ D), not zero net new input (I = 0). The existing stock is allowed to persist as long as it is not growing; eliminating the stock is a separate, stronger target handled in deliverable 3.\n2. The existing marine stock M is a **persistent state variable** that only shrinks through δ·M — there is no instantaneous removal, and no separate \"harm threshold\" that the stock must stay under. The boundary is purely dynamic (growth vs. drawdown), not a static ceiling.\n3. Because δ is not in the data, the model reports W* as a **function of δ** (a sensitivity band), not a single number. This is the explicit acknowledgment that the safe-throughput magnitude is parameter-sensitive, and it is where the bias/limitations discussion will live.\n\nPlease accept or reject this structure. If you reject any of the three commitments, name the specific one and the flaw, and I will revise minimally in Exchange 3 before asking for the counterexample.",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nYou accepted the structure: a marine stock M with input I (per-region mismanaged leakage) and drawdown D = δ·M, safe throughput defined as the W* where I(W*) = δ·M (zero net growth of the marine stock), with W* reported as a function of δ.\n\nWhat is the specific boundary condition or failure mode that would break this mechanism as accepted — that is, a case in which \"I ≤ δ·M implies no further environmental damage\" is false or ill-defined? I am looking for the concrete case, not a general critique. Candidates I want you to rule on or replace:\n\n- **δ → 0:** if the existing stock's effective removal rate is near zero (fragmentation is slow, retrieval negligible), then δ·M is tiny and W* collapses to near zero — the \"safe throughput\" would imply we can generate almost no new plastic at all, which is not a usable planning number. Is this a genuine breakdown, or is it the model correctly signaling that with no drawdown, any input is damage?\n- **δ M is dominated by M, not by I:** the boundary couples the *existing* stock to *new* input through one rate. If M is very large (decades of accumulation) and δ is small, then even a large I is \"safe\" because δ·M is large. Could that let the model classify continued heavy leakage as safe simply because the stock is already huge — i.e., does the structure accidentally reward accumulation?\n- **Single global δ hides regional dynamics:** the mismanaged share is regional (0.5–4.6%), but δ is a single global rate. Could there be a region where local input is low but the local marine stock is still growing, so a global I ≤ δ·M holds while a region is still being damaged?\n\nName the one that is the real failure, or give the correct one. It will go directly into the bias/limitations section of the report."
+        ],
+        "expert_answers": [
+          "The text cannot settle the damage boundary: \"without further environmental damage\" is undefined as to whether the existing marine stock must shrink or merely stop growing, and no decay rate or harm threshold is given. That choice, not the scope or aggregation questions, is what governs the safe-throughput parameter.",
+          "accept",
+          "The real failure is the second: **δ·M dominated by M**. Because the boundary is I ≤ δ·M with a single global δ, a large accumulated stock M makes the right-hand side large, so the model certifies continued heavy leakage as \"safe\" — the safe throughput W* rises with the very accumulation that represents past damage. This is ill-defined as a damage criterion: \"no further environmental damage\" is then satisfied by having already done a lot of it. The δ→0 case is not a breakdown (it correctly signals any input is damage); the regional case is a resolution artifact, not a failure of the boundary itself."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8708333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8833333333333333,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8000000000000002,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each of the four tasks, accurately reflecting the problem requirements. Each task explicitly states its objective (e.g., modeling maximum safe mitigation, discussing reduction extents, setting targets, and addressing equity/memo). The key components such as waste sources, resource availability, policy effectiveness, and regional constraints are effectively identified. The goals are explicit and directly aligned with the ICM's mandate, providing a clear roadmap for the modeling process.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically structured with clear dependencies: Task 1 provides the model, Task 2 discusses reduction factors, Task 3 uses both to set targets, and Task 4 synthesizes equity and the final memo. All sub-tasks directly support the final goal of reducing plastic waste. However, combining the equity discussion and the memo writing into a single task (Task 4) might slightly obscure the distinct nature of the equity analysis compared to the other substantive modeling/discussion tasks, though it remains a valid grouping. Coverage is complete with no major deviations.",
+            "score": 8
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model effectively maps policy levers to mathematical factors, providing a feasible and actionable framework for waste reduction and equity, though it simplifies dynamic economic and technological variables.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The model uses a scientifically valid mass balance framework, calibrates parameters with empirical data, and logically decomposes waste inputs, providing a rigorous theoretical basis for determining safe environmental limits.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing transparent inference paths, sensitivity bands, and actionable conclusions that effectively highlight the model's strengths and limitations.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying a specific logical failure in the model, providing a quantified correction, and addressing data and regional resolution biases effectively.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly defined, explicitly justified with data sources, and critically examined. The modeler identifies a logical flaw in the initial boundary condition and corrects it, demonstrating high rigor. The sensitivity analysis approach for unknown parameters is appropriate.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses a rational multiplicative structure to decompose waste inputs, effectively linking physical flows to policy levers and regional equity. The distinction between safe and achievable levels is logical, and the model structure accurately reflects the complex, multi-factor nature of the plastic waste crisis.",
+            "score": 9
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 1,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_E",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nI am building a stock-and-flow model of global single-use/disposable plastic waste for the ICM task, with four deliverables: (1) the maximum level of waste that can be safely mitigated, (2) the extent to which waste can be reduced to an environmentally safe level, (3) a minimal achievable global waste target with its impacts, and (4) equity issues plus a two-page memo with a target, timeline, and accelerators/hindrances. I will anchor it to the provided data (353 Mt waste and 460 Mt production in 2019, ~9% recycled, packaging 40% of waste; 4.8–12.7 Mt/yr ocean input in 2010 with a regional mismanaged share of 0.5–4.6%). Three structural/definitional questions are left open by the problem text, and they govern how I parameterize the core mechanism rather than what magnitudes to use:\n\n1. **Scope of \"single-use or disposable\":** the data give packaging as 40% of the waste stream and consumer goods as roughly 12%, but the text does not settle the valid domain of the single-use/disposable class. Should the model's core stock be defined (a) as a fixed percentage band of total plastic waste (e.g., the 40–60% range the data suggest), with the same flow structure applied to that share, or (b) as an independently tracked stock with its own per-sector generation rates that only coincidentally aligns with the aggregate? In other words, is the single-use share a fixed proportion of the total, or a state variable in its own right — and does that choice change what \"maximum safely mitigated\" refers to?\n\n2. **Meaning of \"safely mitigated\" (the damage boundary):** the problem asks for the maximum waste that can be mitigated *without further environmental damage*, but does not define the damage threshold. The natural candidate is keeping net ocean input at or below the current level (≈8 Mt/yr midpoint of the 2010 band). Should \"safe mitigation capacity\" be defined as the throughput at which the *net* addition to the marine environment is zero (collection + recycling + energy recovery fully offset mismanagement, with no net new leakage and the existing marine stock held constant), or does \"no further damage\" require an additional decay/drawdown term (the existing stock must shrink at some rate, which would lower the safe throughput)? Which boundary condition — zero net leakage, or zero net growth of the environmental stock — is the correct interpretation of \"without further environmental damage\"?\n\n3. **Aggregation across deliverables:** the same core flow model must feed all four deliverables. Should regional heterogeneity (income class × collection strength, giving the 0.5–4.6% mismanaged range) be built into the *core* mechanism so that deliverables 2–4 (reduction extent, minimal target, equity) read directly off the regional state vector, or should the core model be global-aggregate and regional differences handled as a downstream allocation layer for the equity and policy analysis? This determines whether the equity conclusions are emergent from the mechanism or imposed on it.",
+              "# Expert Question 2 (Operator 2: judgment)\n\nYou confirmed that the damage boundary is the governing choice. I propose one concrete structure for it, and ask you to accept or reject it as a whole.\n\n**The proposed structure:** The environment is modeled as a marine plastic stock M with two flows. New input I (the mismanaged leakage, per-region mismanaged share of generated waste) enters. A decay/drawdown flow D = δ·M leaves, where δ is a single effective removal rate for the existing stock (fragmentation + export + retrieval combined into one parameter, anchored to the data only by the sign and by the requirement that the existing 2010 marine stock is large relative to the annual input). \"No further environmental damage\" is defined as the condition I ≤ D, i.e. new input does not exceed the stock's own drawdown — the stock stops growing. The safe throughput is then the maximum generated waste W* such that I(W*) = δ·M holds; above W* the marine stock grows and damage accrues. I do *not* ask for a value of δ: I will treat it as a declared parameter, sweep it over a stated range, and report the sensitivity of W* to it.\n\n**Three structural commitments embedded in it, each needing your accept/reject:**\n\n1. The damage boundary is **zero net growth of the marine stock** (I ≤ D), not zero net new input (I = 0). The existing stock is allowed to persist as long as it is not growing; eliminating the stock is a separate, stronger target handled in deliverable 3.\n2. The existing marine stock M is a **persistent state variable** that only shrinks through δ·M — there is no instantaneous removal, and no separate \"harm threshold\" that the stock must stay under. The boundary is purely dynamic (growth vs. drawdown), not a static ceiling.\n3. Because δ is not in the data, the model reports W* as a **function of δ** (a sensitivity band), not a single number. This is the explicit acknowledgment that the safe-throughput magnitude is parameter-sensitive, and it is where the bias/limitations discussion will live.\n\nPlease accept or reject this structure. If you reject any of the three commitments, name the specific one and the flaw, and I will revise minimally in Exchange 3 before asking for the counterexample.",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nYou accepted the structure: a marine stock M with input I (per-region mismanaged leakage) and drawdown D = δ·M, safe throughput defined as the W* where I(W*) = δ·M (zero net growth of the marine stock), with W* reported as a function of δ.\n\nWhat is the specific boundary condition or failure mode that would break this mechanism as accepted — that is, a case in which \"I ≤ δ·M implies no further environmental damage\" is false or ill-defined? I am looking for the concrete case, not a general critique. Candidates I want you to rule on or replace:\n\n- **δ → 0:** if the existing stock's effective removal rate is near zero (fragmentation is slow, retrieval negligible), then δ·M is tiny and W* collapses to near zero — the \"safe throughput\" would imply we can generate almost no new plastic at all, which is not a usable planning number. Is this a genuine breakdown, or is it the model correctly signaling that with no drawdown, any input is damage?\n- **δ M is dominated by M, not by I:** the boundary couples the *existing* stock to *new* input through one rate. If M is very large (decades of accumulation) and δ is small, then even a large I is \"safe\" because δ·M is large. Could that let the model classify continued heavy leakage as safe simply because the stock is already huge — i.e., does the structure accidentally reward accumulation?\n- **Single global δ hides regional dynamics:** the mismanaged share is regional (0.5–4.6%), but δ is a single global rate. Could there be a region where local input is low but the local marine stock is still growing, so a global I ≤ δ·M holds while a region is still being damaged?\n\nName the one that is the real failure, or give the correct one. It will go directly into the bias/limitations section of the report."
+            ],
+            "expert_answers": [
+              "The text cannot settle the damage boundary: \"without further environmental damage\" is undefined as to whether the existing marine stock must shrink or merely stop growing, and no decay rate or harm threshold is given. That choice, not the scope or aggregation questions, is what governs the safe-throughput parameter.",
+              "accept",
+              "The real failure is the second: **δ·M dominated by M**. Because the boundary is I ≤ δ·M with a single global δ, a large accumulated stock M makes the right-hand side large, so the model certifies continued heavy leakage as \"safe\" — the safe throughput W* rises with the very accumulation that represents past damage. This is ill-defined as a damage criterion: \"no further environmental damage\" is then satisfied by having already done a lot of it. The δ→0 case is not a breakdown (it correctly signals any input is damage); the regional case is a resolution artifact, not a failure of the boundary itself."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8708333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8833333333333333,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8000000000000002,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p3_20260930_092627/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each of the four tasks, accurately reflecting the problem requirements. Each task explicitly states its objective (e.g., modeling maximum safe mitigation, discussing reduction extents, setting targets, and addressing equity/memo). The key components such as waste sources, resource availability, policy effectiveness, and regional constraints are effectively identified. The goals are explicit and directly aligned with the ICM's mandate, providing a clear roadmap for the modeling process.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured with clear dependencies: Task 1 provides the model, Task 2 discusses reduction factors, Task 3 uses both to set targets, and Task 4 synthesizes equity and the final memo. All sub-tasks directly support the final goal of reducing plastic waste. However, combining the equity discussion and the memo writing into a single task (Task 4) might slightly obscure the distinct nature of the equity analysis compared to the other substantive modeling/discussion tasks, though it remains a valid grouping. Coverage is complete with no major deviations.",
+                "score": 8
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model effectively maps policy levers to mathematical factors, providing a feasible and actionable framework for waste reduction and equity, though it simplifies dynamic economic and technological variables.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The model uses a scientifically valid mass balance framework, calibrates parameters with empirical data, and logically decomposes waste inputs, providing a rigorous theoretical basis for determining safe environmental limits.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing transparent inference paths, sensitivity bands, and actionable conclusions that effectively highlight the model's strengths and limitations.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying a specific logical failure in the model, providing a quantified correction, and addressing data and regional resolution biases effectively.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly defined, explicitly justified with data sources, and critically examined. The modeler identifies a logical flaw in the initial boundary condition and corrects it, demonstrating high rigor. The sensitivity analysis approach for unknown parameters is appropriate.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses a rational multiplicative structure to decompose waste inputs, effectively linking physical flows to policy levers and regional equity. The distinction between safe and achievable levels is logical, and the model structure accurately reflects the complex, multi-factor nature of the plastic waste crisis.",
+                "score": 9
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.8708333333333333,
+      "interaction_cost": 0.8581416334595229,
+      "interaction_penalty": 0.04290708167297615,
+      "net_utility": 0.8279262516603572,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2050,
+          "total_expert_latency_seconds": 4.21,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8953540836488071,
+          "latency_cost_component": 0.262270759762221,
+          "interaction_cost": 0.8581416334595229,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2020_F",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "# Expert Question 1 (Operator 1: open-ended)\n\nThe problem (MM-Bench 2020_F) asks for a systemized UN response to environmentally\ndisplaced persons (EDPs) from island nations losing land to sea-level rise, with five\nminimum deliverables: (1) scope of the issue in numbers of people AND value/risk of\nlost culture, projected over time; (2) proposed policies for resettlement/human rights\nAND cultural preservation; (3) a model measuring the impact of the proposed policies;\n(4) an explanation of how the model was used to design/improve the policies; (5) an\nevidence-backed explanation of why the policies must be implemented.\n\nThe data I hold (IPCC AR6 sea-level projections; World Bank Groundswell 143M/216M\nby-2050 internal climate displacement; World Bank 2024 Pacific atoll report: ~3 m\nmax elevation, ~200,000 combined population of Kiribati/Marshall Islands/Tuvalu,\n50–80% of urban area submerged at 0.5 m rise, ~526,000 Maldivians) fixes the\nexposure magnitudes but leaves three structural boundaries of the core mechanism\nunsettled, and these map directly onto deliverables (1) and (3):\n\n1. **Definition of \"at risk\" and of the scope count (deliverable 1).** The text\n   distinguishes internally displaced climate migrants (tens of millions, the\n   Groundswell anchor) from cross-border, nationless EDPs (the focus here). What\n   logical boundary should the scope estimate use: (a) land physically submerged\n   at a given sea-level rise threshold, (b) loss of *livability* (freshwater\n   salinization, recurrent flooding, erosion) which begins well below full\n   submersion, or (c) a combined staged definition? In other words: is the valid\n   domain of \"at risk\" defined by the physical domain of the land, or by the\n   habitability domain of the population, and how should the two be separated in\n   the final count?\n\n2. **Domain and measurement of \"value of culture\" (deliverable 1, second clause).**\n   The problem asks how much the cultures of at-risk nations are worth and how that\n   changes over time. The data carry no cultural metric. Which logical interpretation\n   should the core mechanism adopt: (a) culture as a *heritage asset* with a\n   quantifiable value (e.g., via willingness-to-pay or economic valuation of\n   cultural services), (b) culture as an *intangible state variable* that decays with\n   diaspora size, generation distance from homeland, and language maintenance,\n   measured qualitatively/ordinally rather than in currency, or (c) a hybrid where a\n   qualitative preservation state is mapped to a quantifiable index only for the\n   purpose of policy comparison? What is the valid domain of the cultural variable,\n   and what does \"value\" mean in the final deliverable?\n\n3. **Interpretation of the policy-impact objective function (deliverables 3–5).**\n   Deliverable 3 requires \"a model used to measure the potential impact of proposed\n   policies.\" Should the objective function the model optimizes/reports be: (a) a\n   single scalar welfare measure combining resettled population and cultural\n   preservation (requiring an aggregation rule between two incommensurate goods),\n   (b) a multi-objective frontier reporting resettlement throughput and cultural\n   preservation separately so trade-offs are visible to the UN without forced\n   aggregation, or (c) a constrained optimization (maximize resettlement subject to\n   a minimum cultural-preservation floor)? Which interpretation of \"impact\" does the\n   briefing need, and which structural element of the model must serve which of the\n   five deliverables?",
+          "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 reply — the text never settles what \"at risk\" is\nindexed to, what \"value\" of culture means, or what \"impact\" is measured against, so\nthe scope count, the cultural variable, and the objective function are each\nunderdetermined, and the missing piece is the UN's decision criterion / unit of\naccount — I now put one specific structural configuration of the whole model to your\nacceptance or rejection.\n\n**Proposed structure: a three-stage pipeline with one primary unit of account and\none preserved secondary unit.**\n\nStage 1 — Exposure (scope, deliverable 1, clause 1):\n- Unit of account for people: **habitability loss, not submersion.** A nation's\n  population is \"at risk\" when cumulative sea-level rise ΔSLR reaches that nation's\n  *livability threshold* L (the rise at which freshwater salinization, recurrent\n  flooding, and erosion make residence untenable) — which for atolls sits well below\n  the full submersion of the ~3 m high points.\n- ΔSLR(t) is a logistic S-curve over 2020–2100 calibrated to the IPCC AR6 scenario\n  values (0.38 m SSP1-1.9, 0.56 m SSP2-4.5, 0.77 m SSP5-8.5 by 2100; 0.18–0.23 m\n  committed by 2050).\n- Each nation carries its own L and its own land-area/fraction-of-urban-area-\n  submerged-at-given-rise curve (50–80% at 0.5 m for the three Pacific atolls per the\n  World Bank 2024 report), so the at-risk population P_atrisk(t) = f(L, ΔSLR(t),\n  baseline populations: ~200,000 combined Pacific, ~526,000 Maldives) is a smooth\n  curve in time, not a step at submersion.\n- The scope output reports three populations separately: (i) habitability-loss EDPs\n  (cross-border, nationless — the problem's focus), (ii) internally displaced\n  (reconciled against the Groundswell 143M/216M anchor, which bounds the internal\n  subset), and (iii) the gap between them, so the UN sees the nationless subset as\n  small but existential rather than lost inside the 143M.\n\nStage 2 — Cultural preservation (scope, deliverable 1, clause 2):\n- Culture is an **intangible state variable C(t) ∈ [0,1]** per nation, NOT priced in\n  currency. Its rate of decay is driven by three structural loss mechanisms: (a)\n  fraction of the population displaced (diaspora dilution), (b) generation distance\n  from homeland (intergenerational transmission loss — the dominant mechanism,\n  because a second generation born in the host country no longer maintains the\n  language/way of life without deliberate policy), and (c) absence of cultural\n  infrastructure in the host country.\n- The cultural *value* reported in the deliverable is this preservation index C(t)\n  (ordinal, comparable across nations and across policy scenarios), not a currency\n  figure. The \"value of the cultures\" answer is: C(t) under a no-policy baseline\n  versus C(t) under each proposed policy.\n\nStage 3 — Policy impact (deliverables 2–5):\n- The objective function is a **constrained multi-objective formulation**: maximize\n  the fraction of at-risk persons successfully resettled with full rights (throughput\n  and integration quality), subject to a **cultural-preservation floor** C(t) ≥ C_min\n  (the floor is the policy lever — it is what forces the resettlement design to\n  include cultural-protection measures: diaspora cluster resettlement, language and\n  education provisions, cultural-institution funding, and self-determination in\n  destination choice).\n- Policy levers the model can dial: (i) host-country capacity (number/absorption\n  limits), (ii) resettlement design (cluster vs. dispersed), (iii) cultural-investment\n  share of the resettlement budget, (iv) who decides destination (individuals / UN /\n  host governments — answering the problem's \"who gets a say\" question).\n- The model's output is a policy-space surface: for each lever combination, (reset-\n  tlement fraction, C(t) at 2100, cost per person). The UN briefing reads the\n  trade-off frontier directly — no forced scalar aggregation.\n\n**The structural inclusion for the secondary deliverables:** the same three stages\nserve all five deliverables — Stage 1 gives deliverable 1's population scope;\nStage 1+2 together give deliverable 1's cultural scope; Stage 3 is deliverable 3's\nmodel; the lever-sweep in Stage 3 is deliverable 4's \"how the model improved the\npolicies\"; and the baseline-versus-policy contrast in Stage 2 is deliverable 5's\n\"why implement\" evidence (C(t) collapse under no policy).\n\nI ask you to **accept or reject this specific configuration as a whole**, and if you\nreject it, to name the specific structural flaw: which of the three unit-of-account\nchoices (habitability-loss for people, intangible-state for culture, constrained\nmulti-objective for impact) is wrong, and what is the correct boundary?",
+          "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure is accepted. I now ask for the specific case, boundary condition, or\nfailure mode that would break it — because the final report's bias and robustness\ndiscussion must address the model's true limit, not a generic one.\n\nThe accepted mechanism rests on three load-bearing structural choices:\n(i) at-risk = habitability-loss threshold L, a smooth function of ΔSLR, not a step\nat full submersion; (ii) culture C(t) ∈ [0,1] decays through diaspora dilution,\nintergenerational transmission loss, and missing host-country cultural infrastructure;\n(iii) the policy objective is constrained multi-objective: maximize resettlement\nfraction subject to a cultural-preservation floor C(t) ≥ C_min, read off as a\ntrade-off frontier over host capacity, cluster-vs-dispersed design, cultural-invest-\nment share, and destination decision authority.\n\nWhich specific boundary or failure mode breaks this? In particular, which of these is\nthe real one:\n(a) **Threshold collapse:** for a nation like Tuvalu, the livability threshold L and\nthe full-submersion point are so close that \"smooth habitability loss\" is a fiction —\nthere is effectively a step, and the smooth model mis-states the timing of the\ndisplacement wave?\n(b) **Cultural floor is not binding / not meaningful:** C_min cannot be set because\n\"enough culture preserved\" has no operational threshold — any floor is arbitrary,\nand the constrained formulation silently becomes unconstrained?\n(c) **Absorber saturation:** no realistic host-country capacity exists for the full\nat-risk population, so the \"fraction resettled\" objective saturates below 100% and\nthe frontier collapses to \"who is left behind,\" a selection question the model has\nno mechanism for?\n(d) **Decision-authority lever is exogenous:** the \"who gets a say\" lever (individuals\n/ UN / host governments) is not actually dialable inside the model — host-government\nrefusal to absorb cannot be represented as a parameter, only as a scenario — so that\nlever is fake?\n\nName the one (or the specific case within one) that would break the mechanism, and\nsay what the model's output would get wrong in that case."
+        ],
+        "expert_answers": [
+          "The text cannot settle which of the three boundaries governs, because it never states what \"at risk\" is indexed to, what \"value\" of culture means, or what \"impact\" is measured against. The missing magnitude is the UN's own decision criterion: whether the briefing's unit of account is land lost, lives disrupted, or cultural continuity preserved. Without that, the scope count, the cultural variable, and the objective function are each underdetermined — the data fix exposure but not the domain over which exposure counts.",
+          "accept",
+          "(c) **Absorber saturation** — specifically the case where the at-risk population of a single nation (e.g., Tuvalu, ~11,000) exceeds the politically available absorption capacity of any willing host, so the resettlement-fraction objective saturates below 1 and the frontier's remaining degree of freedom is *which subset* is resettled. The model has no selection mechanism, so its output would report a resettlement fraction and a C(t) as if the resettled set were representative, when in fact the cultural-preservation index depends entirely on *who* is left behind versus moved — the frontier would show a feasible cultural floor that is an artifact of an unmodeled allocation rule, not a policy the UN could actually implement."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_bc49a013c7df",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.8791666666666667,
+      "dimension_scores": {
+        "analysis_evaluation": 0.9,
+        "modeling_rigorousness_evaluation": 0.9,
+        "practicality_and_scientificity_evaluation": 0.8166666666666668,
+        "result_and_bias_analysis_evaluation": 0.9
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the specific deliverables in the problem requirements. Each task has a distinct objective (e.g., quantifying population risk, measuring cultural loss, proposing policies) and a defined scope (specific nations, timeframes, and scenarios). The goals are explicit and actionable, such as providing a \"defensible, time-resolved count\" or a \"measurable, time-resolved statement of cultural-preservation risk.\" This clarity ensures that the subsequent modeling work will be focused and directly address the ICM-F's needs.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The sub-tasks are logically structured to cover all five required deliverables without significant deviation. Task 1 and 2 address the scope analysis (Deliverable 1), Task 3 covers policy proposal and model development (Deliverables 2 & 3), Task 4 addresses the iterative design process (Deliverable 4), and Task 5 handles the final synthesis and implications (Deliverable 5). The dependencies are clear, with later tasks relying on the outputs of earlier ones (e.g., Task 4 uses the model from Task 3). The coverage is comprehensive, ensuring that both the quantitative (population) and qualitative (cultural) aspects are addressed in a cohesive manner.",
+            "score": 9
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is very clear, providing detailed quantitative insights, clear interpretations of model outputs, and well-supported conclusions that effectively address the problem's core issues.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is thorough, identifying specific data and model biases, and providing appropriate corrections or contextual limitations that effectively reduce the impact of these biases on the final conclusions.",
+            "score": 9
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly explained, well-sourced from authoritative data (IPCC, World Bank), and logically consistent with the problem context. The definition of risk and cultural decay mechanisms are rigorous and realistic.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model uses appropriate multi-objective methods and a rigorous iterative design loop. It realistically reflects the problem by distinguishing between capacity constraints and cultural outcomes, and by explicitly modeling allocation rules under saturation.",
+            "score": 9
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The model is highly practical, offering specific, actionable policy recommendations with clear trade-off analyses and robust sensitivity testing, directly supporting the UN's decision-making needs.",
+            "score": 9
+          },
+          "analysis_2": {
+            "reason": "The model is scientifically rigorous, integrating physical, social, and economic factors with justified assumptions and robust sensitivity analysis, providing a theoretically sound basis for the policy recommendations.",
+            "score": 8
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 5,
+      "repetition_count": 1,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_F",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operator 1: open-ended)\n\nThe problem (MM-Bench 2020_F) asks for a systemized UN response to environmentally\ndisplaced persons (EDPs) from island nations losing land to sea-level rise, with five\nminimum deliverables: (1) scope of the issue in numbers of people AND value/risk of\nlost culture, projected over time; (2) proposed policies for resettlement/human rights\nAND cultural preservation; (3) a model measuring the impact of the proposed policies;\n(4) an explanation of how the model was used to design/improve the policies; (5) an\nevidence-backed explanation of why the policies must be implemented.\n\nThe data I hold (IPCC AR6 sea-level projections; World Bank Groundswell 143M/216M\nby-2050 internal climate displacement; World Bank 2024 Pacific atoll report: ~3 m\nmax elevation, ~200,000 combined population of Kiribati/Marshall Islands/Tuvalu,\n50–80% of urban area submerged at 0.5 m rise, ~526,000 Maldivians) fixes the\nexposure magnitudes but leaves three structural boundaries of the core mechanism\nunsettled, and these map directly onto deliverables (1) and (3):\n\n1. **Definition of \"at risk\" and of the scope count (deliverable 1).** The text\n   distinguishes internally displaced climate migrants (tens of millions, the\n   Groundswell anchor) from cross-border, nationless EDPs (the focus here). What\n   logical boundary should the scope estimate use: (a) land physically submerged\n   at a given sea-level rise threshold, (b) loss of *livability* (freshwater\n   salinization, recurrent flooding, erosion) which begins well below full\n   submersion, or (c) a combined staged definition? In other words: is the valid\n   domain of \"at risk\" defined by the physical domain of the land, or by the\n   habitability domain of the population, and how should the two be separated in\n   the final count?\n\n2. **Domain and measurement of \"value of culture\" (deliverable 1, second clause).**\n   The problem asks how much the cultures of at-risk nations are worth and how that\n   changes over time. The data carry no cultural metric. Which logical interpretation\n   should the core mechanism adopt: (a) culture as a *heritage asset* with a\n   quantifiable value (e.g., via willingness-to-pay or economic valuation of\n   cultural services), (b) culture as an *intangible state variable* that decays with\n   diaspora size, generation distance from homeland, and language maintenance,\n   measured qualitatively/ordinally rather than in currency, or (c) a hybrid where a\n   qualitative preservation state is mapped to a quantifiable index only for the\n   purpose of policy comparison? What is the valid domain of the cultural variable,\n   and what does \"value\" mean in the final deliverable?\n\n3. **Interpretation of the policy-impact objective function (deliverables 3–5).**\n   Deliverable 3 requires \"a model used to measure the potential impact of proposed\n   policies.\" Should the objective function the model optimizes/reports be: (a) a\n   single scalar welfare measure combining resettled population and cultural\n   preservation (requiring an aggregation rule between two incommensurate goods),\n   (b) a multi-objective frontier reporting resettlement throughput and cultural\n   preservation separately so trade-offs are visible to the UN without forced\n   aggregation, or (c) a constrained optimization (maximize resettlement subject to\n   a minimum cultural-preservation floor)? Which interpretation of \"impact\" does the\n   briefing need, and which structural element of the model must serve which of the\n   five deliverables?",
+              "# Expert Question 2 (Operator 2: judgment)\n\nBuilding on your Exchange 1 reply — the text never settles what \"at risk\" is\nindexed to, what \"value\" of culture means, or what \"impact\" is measured against, so\nthe scope count, the cultural variable, and the objective function are each\nunderdetermined, and the missing piece is the UN's decision criterion / unit of\naccount — I now put one specific structural configuration of the whole model to your\nacceptance or rejection.\n\n**Proposed structure: a three-stage pipeline with one primary unit of account and\none preserved secondary unit.**\n\nStage 1 — Exposure (scope, deliverable 1, clause 1):\n- Unit of account for people: **habitability loss, not submersion.** A nation's\n  population is \"at risk\" when cumulative sea-level rise ΔSLR reaches that nation's\n  *livability threshold* L (the rise at which freshwater salinization, recurrent\n  flooding, and erosion make residence untenable) — which for atolls sits well below\n  the full submersion of the ~3 m high points.\n- ΔSLR(t) is a logistic S-curve over 2020–2100 calibrated to the IPCC AR6 scenario\n  values (0.38 m SSP1-1.9, 0.56 m SSP2-4.5, 0.77 m SSP5-8.5 by 2100; 0.18–0.23 m\n  committed by 2050).\n- Each nation carries its own L and its own land-area/fraction-of-urban-area-\n  submerged-at-given-rise curve (50–80% at 0.5 m for the three Pacific atolls per the\n  World Bank 2024 report), so the at-risk population P_atrisk(t) = f(L, ΔSLR(t),\n  baseline populations: ~200,000 combined Pacific, ~526,000 Maldives) is a smooth\n  curve in time, not a step at submersion.\n- The scope output reports three populations separately: (i) habitability-loss EDPs\n  (cross-border, nationless — the problem's focus), (ii) internally displaced\n  (reconciled against the Groundswell 143M/216M anchor, which bounds the internal\n  subset), and (iii) the gap between them, so the UN sees the nationless subset as\n  small but existential rather than lost inside the 143M.\n\nStage 2 — Cultural preservation (scope, deliverable 1, clause 2):\n- Culture is an **intangible state variable C(t) ∈ [0,1]** per nation, NOT priced in\n  currency. Its rate of decay is driven by three structural loss mechanisms: (a)\n  fraction of the population displaced (diaspora dilution), (b) generation distance\n  from homeland (intergenerational transmission loss — the dominant mechanism,\n  because a second generation born in the host country no longer maintains the\n  language/way of life without deliberate policy), and (c) absence of cultural\n  infrastructure in the host country.\n- The cultural *value* reported in the deliverable is this preservation index C(t)\n  (ordinal, comparable across nations and across policy scenarios), not a currency\n  figure. The \"value of the cultures\" answer is: C(t) under a no-policy baseline\n  versus C(t) under each proposed policy.\n\nStage 3 — Policy impact (deliverables 2–5):\n- The objective function is a **constrained multi-objective formulation**: maximize\n  the fraction of at-risk persons successfully resettled with full rights (throughput\n  and integration quality), subject to a **cultural-preservation floor** C(t) ≥ C_min\n  (the floor is the policy lever — it is what forces the resettlement design to\n  include cultural-protection measures: diaspora cluster resettlement, language and\n  education provisions, cultural-institution funding, and self-determination in\n  destination choice).\n- Policy levers the model can dial: (i) host-country capacity (number/absorption\n  limits), (ii) resettlement design (cluster vs. dispersed), (iii) cultural-investment\n  share of the resettlement budget, (iv) who decides destination (individuals / UN /\n  host governments — answering the problem's \"who gets a say\" question).\n- The model's output is a policy-space surface: for each lever combination, (reset-\n  tlement fraction, C(t) at 2100, cost per person). The UN briefing reads the\n  trade-off frontier directly — no forced scalar aggregation.\n\n**The structural inclusion for the secondary deliverables:** the same three stages\nserve all five deliverables — Stage 1 gives deliverable 1's population scope;\nStage 1+2 together give deliverable 1's cultural scope; Stage 3 is deliverable 3's\nmodel; the lever-sweep in Stage 3 is deliverable 4's \"how the model improved the\npolicies\"; and the baseline-versus-policy contrast in Stage 2 is deliverable 5's\n\"why implement\" evidence (C(t) collapse under no policy).\n\nI ask you to **accept or reject this specific configuration as a whole**, and if you\nreject it, to name the specific structural flaw: which of the three unit-of-account\nchoices (habitability-loss for people, intangible-state for culture, constrained\nmulti-objective for impact) is wrong, and what is the correct boundary?",
+              "# Expert Question 3 (Operator 3: counterexample)\n\nThe structure is accepted. I now ask for the specific case, boundary condition, or\nfailure mode that would break it — because the final report's bias and robustness\ndiscussion must address the model's true limit, not a generic one.\n\nThe accepted mechanism rests on three load-bearing structural choices:\n(i) at-risk = habitability-loss threshold L, a smooth function of ΔSLR, not a step\nat full submersion; (ii) culture C(t) ∈ [0,1] decays through diaspora dilution,\nintergenerational transmission loss, and missing host-country cultural infrastructure;\n(iii) the policy objective is constrained multi-objective: maximize resettlement\nfraction subject to a cultural-preservation floor C(t) ≥ C_min, read off as a\ntrade-off frontier over host capacity, cluster-vs-dispersed design, cultural-invest-\nment share, and destination decision authority.\n\nWhich specific boundary or failure mode breaks this? In particular, which of these is\nthe real one:\n(a) **Threshold collapse:** for a nation like Tuvalu, the livability threshold L and\nthe full-submersion point are so close that \"smooth habitability loss\" is a fiction —\nthere is effectively a step, and the smooth model mis-states the timing of the\ndisplacement wave?\n(b) **Cultural floor is not binding / not meaningful:** C_min cannot be set because\n\"enough culture preserved\" has no operational threshold — any floor is arbitrary,\nand the constrained formulation silently becomes unconstrained?\n(c) **Absorber saturation:** no realistic host-country capacity exists for the full\nat-risk population, so the \"fraction resettled\" objective saturates below 100% and\nthe frontier collapses to \"who is left behind,\" a selection question the model has\nno mechanism for?\n(d) **Decision-authority lever is exogenous:** the \"who gets a say\" lever (individuals\n/ UN / host governments) is not actually dialable inside the model — host-government\nrefusal to absorb cannot be represented as a parameter, only as a scenario — so that\nlever is fake?\n\nName the one (or the specific case within one) that would break the mechanism, and\nsay what the model's output would get wrong in that case."
+            ],
+            "expert_answers": [
+              "The text cannot settle which of the three boundaries governs, because it never states what \"at risk\" is indexed to, what \"value\" of culture means, or what \"impact\" is measured against. The missing magnitude is the UN's own decision criterion: whether the briefing's unit of account is land lost, lives disrupted, or cultural continuity preserved. Without that, the scope count, the cultural variable, and the objective function are each underdetermined — the data fix exposure but not the domain over which exposure counts.",
+              "accept",
+              "(c) **Absorber saturation** — specifically the case where the at-risk population of a single nation (e.g., Tuvalu, ~11,000) exceeds the politically available absorption capacity of any willing host, so the resettlement-fraction objective saturates below 1 and the frontier's remaining degree of freedom is *which subset* is resettled. The model has no selection mechanism, so its output would report a resettlement fraction and a C(t) as if the resettled set were representative, when in fact the cultural-preservation index depends entirely on *who* is left behind versus moved — the frontier would show a feasible cultural floor that is an artifact of an unmodeled allocation rule, not a policy the UN could actually implement."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_bc49a013c7df",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.8791666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.9,
+            "modeling_rigorousness_evaluation": 0.9,
+            "practicality_and_scientificity_evaluation": 0.8166666666666668,
+            "result_and_bias_analysis_evaluation": 0.9
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_infogap_r15/cpe_evaluations/round_9/validation/runs/round_9/r1p4_20260930_092627/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The modeler clearly defines the scope and goals for each sub-task, explicitly linking them to the specific deliverables in the problem requirements. Each task has a distinct objective (e.g., quantifying population risk, measuring cultural loss, proposing policies) and a defined scope (specific nations, timeframes, and scenarios). The goals are explicit and actionable, such as providing a \"defensible, time-resolved count\" or a \"measurable, time-resolved statement of cultural-preservation risk.\" This clarity ensures that the subsequent modeling work will be focused and directly address the ICM-F's needs.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks are logically structured to cover all five required deliverables without significant deviation. Task 1 and 2 address the scope analysis (Deliverable 1), Task 3 covers policy proposal and model development (Deliverables 2 & 3), Task 4 addresses the iterative design process (Deliverable 4), and Task 5 handles the final synthesis and implications (Deliverable 5). The dependencies are clear, with later tasks relying on the outputs of earlier ones (e.g., Task 4 uses the model from Task 3). The coverage is comprehensive, ensuring that both the quantitative (population) and qualitative (cultural) aspects are addressed in a cohesive manner.",
+                "score": 9
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is very clear, providing detailed quantitative insights, clear interpretations of model outputs, and well-supported conclusions that effectively address the problem's core issues.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is thorough, identifying specific data and model biases, and providing appropriate corrections or contextual limitations that effectively reduce the impact of these biases on the final conclusions.",
+                "score": 9
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly explained, well-sourced from authoritative data (IPCC, World Bank), and logically consistent with the problem context. The definition of risk and cultural decay mechanisms are rigorous and realistic.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model uses appropriate multi-objective methods and a rigorous iterative design loop. It realistically reflects the problem by distinguishing between capacity constraints and cultural outcomes, and by explicitly modeling allocation rules under saturation.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is highly practical, offering specific, actionable policy recommendations with clear trade-off analyses and robust sensitivity testing, directly supporting the UN's decision-making needs.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The model is scientifically rigorous, integrating physical, social, and economic factors with justified assumptions and robust sensitivity analysis, providing a theoretically sound basis for the policy recommendations.",
+                "score": 8
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.8791666666666667,
+      "interaction_cost": 0.8753863261789522,
+      "interaction_penalty": 0.04376931630894761,
+      "net_utility": 0.835397350357719,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 2960,
+          "total_expert_latency_seconds": 3.75,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.9384658154473804,
+          "latency_cost_component": 0.24758315774126236,
+          "interaction_cost": 0.8753863261789522,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-09-30T09:43:27.135683",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_bc49a013c7df",
+  "workflow": {
+    "name": "Deliverable-Aligned Structural Validation",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 8) achieved high scores in modeling rigorousness and practicality but lost points in analysis_evaluation, specifically for failing to decompose problems into distinct sub-problems and for not explicitly addressing all specific requirements (like policy recommendations and generalization) in the analysis. The rollouts showed that while the core model was strong, the interaction did not explicitly ensure that the structural choices made in Exchange 2 were mapped to all the distinct deliverables listed in the problem statement. This patch introduces a 'Deliverable Alignment Rule' that requires the agent to explicitly map structural ambiguities to all enumerated sub-tasks/deliverables in Exchange 1 and to propose a mechanism in Exchange 2 that includes a defined interface for these secondary components. This directly addresses the judge's feedback on analysis decomposition and coverage without changing the core operator sequence or rejection handling, which were already effective.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each carrying three gaps with one operator, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nAdmit a gap into the question only if it meets all three conditions:\n\n- the information cannot be derived from what the work already has;\n- its answer would branch the work that follows;\n- it has a definite landing place and use in the final deliverable.\n\nSequence the consultation to maximize structural validation within the three-exchange limit, with a strict prohibition on requesting empirical magnitudes or constants that the provided data cannot support:\n\n1. **Exchange 1 (Operator 1: open-ended):** Identify the *structural* or *definitional* constraints that the problem statement leaves ambiguous but which are required to parameterize the core mechanism. Do not ask for magnitudes, rates, or empirical constants; instead, ask for the logical boundaries, the valid domain of the variables, or the interpretation of the objective function that the text does not explicitly settle. This establishes the logical ground truth without inventing data.\n2. **Exchange 2 (Operator 2: judgment):** Propose a specific structural allocation, weighting, or phase-based organization of the model based on the logical boundaries from Exchange 1. Put this specific configuration to the expert for acceptance or rejection. Avoid proposing multiple alternatives in a single judgment query; present one coherent structural hypothesis to test. Crucially, the proposed structure must explicitly account for the dominant loss or transformation mechanisms inherent to the problem's physical or logical domain (e.g., propagation losses, decay rates, or state transitions) rather than assuming idealized or negligible interactions unless the problem statement explicitly justifies such simplification. The proposal should be a complete, self-consistent mechanism that the expert can evaluate as a whole.\n3. **Exchange 3 (Operator 3: counterexample):** Assuming the structure from Exchange 2 is accepted (or the most plausible fallback if rejected), ask for the specific case, boundary condition, or failure mode that would break the mechanism. This forces the expert to identify the model's limits, which directly informs the bias analysis and robustness discussion in the final report.\n\n**Rejection Handling Rule:** If the expert rejects the structure in Exchange 2, the agent must not simply propose a generic alternative or repeat the rejected logic. Instead, the agent must identify the specific structural flaw or boundary condition the expert highlighted (e.g., a missing interaction term, an invalid domain assumption, or a flawed aggregation logic). The agent then constructs a *minimal* revision to the structure that explicitly addresses this specific flaw. In Exchange 3, the counterexample query must target this *revised* structure, asking for the new failure mode that would break the updated mechanism. This ensures the final report addresses the most current limitation of the model, rather than a limitation that has already been patched or a generic limitation of the rejected hypothesis.\n\n**Deliverable Alignment Rule:** When formulating the gaps for Exchange 1 and Exchange 2, the agent must explicitly map the identified structural ambiguities to the specific sub-tasks or deliverables enumerated in the problem statement (e.g., policy recommendations, generalization to other structures, or multi-domain analysis). If the problem statement lists multiple distinct tasks or deliverables, Exchange 1 must clarify how the core mechanism proposed in Exchange 2 will be extended or adapted to cover all of them, rather than focusing solely on the primary modeling task. This prevents the final report from addressing the core model rigorously but omitting or superficially treating secondary requirements such as policy implications, generalization, or specific sub-analyses.\n\nHead each question with the number of the operator whose meaning matches its most consequential gap, strictly following the sequence above unless a previous exchange's answer fundamentally invalidates the planned next step.\n\nExample of the interaction shape:\n- Gap 1 (Exchange 1): The problem defines a core process but lists multiple distinct deliverables (e.g., a core model, a policy recommendation, and a generalization analysis). Operator 1 asks for the logical interpretation of how the core mechanism's parameters or assumptions should be adjusted or extended to address the secondary deliverables, specifically which structural elements of the core model are transferable and which require distinct treatment for the generalization or policy components.\n- Gap 2 (Exchange 2): Based on the boundary interpretation and the deliverable mapping, the agent proposes a specific structural configuration for the core model that includes a defined interface or parameter set for the secondary deliverables. Operator 2 asks the expert to accept or reject this specific structural inclusion of the extension mechanism.\n- Gap 3 (Exchange 3): If the expert rejects the structure due to a specific flaw in the core or the extension, the agent revises the structure to address that flaw and asks which specific boundary condition (e.g., extreme scale, zero resource availability, or conflicting policy constraints) would cause this *revised* structure to fail in either the core modeling or the secondary deliverable context. Operator 3 asks for the counterexample against the updated structure.\n\n## Operator Roster\n\n- Operator 1 -- open-ended: ask for what the work lacks -- a magnitude, rate, or\n  constraint the text and data do not carry, or a reading of the problem it cannot\n  settle;\n- Operator 2 -- judgment: put an assumption or a choice to the expert to accept,\n  reject, or rank;\n- Operator 3 -- counterexample: ask what would break the current mechanism, or\n  which case it fails on.\n\nThe numbers are fixed. The exchange headings and every round's evidence are read\nback by number, so a question headed `Operator 2` is recorded as a judgment\nrequest whatever the question actually asked.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each; every question carries\nthree gaps and one operator -- the one whose meaning matches its most consequential\ngap -- used as the roster defines it.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_bc49a013c7df",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 9,
+    "parent_workflow_ids": [
+      "interaction_workflow_ed9d84c49711"
+    ],
+    "training_batch": [
+      "2019_D",
+      "2018_F"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "validation",
+  "evaluation_split": "validation",
+  "evaluation_problems": [
+    "2020_B",
+    "2020_D",
+    "2020_E",
+    "2020_F"
+  ],
+  "absolute_utility": 0.8802083333333333,
+  "interaction_cost": 0.8669419471215807,
+  "interaction_penalty": 0.043347097356079035,
+  "net_utility": 0.8368612359772543,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "rubric_id": "interaction_initial_substantive_v1",
+  "interaction_stage": 2,
+  "questions_asked": [
+    "The athlete roster only starts in 1992. Do earlier Olympic athletes genuinely not have their names recorded, or is that data simply unavailable in this set?",
+    "Does a country's usual strength in a sport tend to carry forward to the next Olympics, or do medal results commonly swing wildly from one Games to the next?",
+    "For an Olympic medal forecast, how large a range would you need to see before you decided the number was unreliable?"
+  ],
+  "expert_answers": [
+    "The names are simply not in this dataset — it is a coverage limitation, not a historical fact.\n\nThe provided `summerOly_athletes.csv` begins in 1992 because that is the scope of the source it was drawn from (individual competitor-level records), not because pre-1992 Olympians are unnamed. Athlete names for earlier Games (1896–1988) are well documented in official IOC records and other sources; they are just outside this file's coverage.\n\nPractical consequence for modeling: any athlete-level analysis (sport participation, \"great coach\" effects, per-athlete medal attribution) can only be done for 1992 onward. Country-level medal counts, however, are complete back to 1896 via `summerOly_medal_counts.csv`, so historical country trends remain usable.",
+    "Country-level sport strength is strongly persistent, not wildly swinging — but with meaningful noise.\n\nAt the country–sport level, the correlation between one Games and the next is typically high (roughly 0.7–0.9 for established powers in their core sports), because the underlying drivers — talent pipelines, coaching systems, funding, and event availability — change slowly. Swimming, gymnastics, diving, weightlifting, wrestling, and table tennis show the most stable country dominance; a handful of nations reliably take most medals in their specialties across multiple cycles.\n\nSwings do occur, but they are usually modest and attributable to identifiable causes: host-country boosts, event program changes (added/removed disciplines), a single generational athlete retiring, or a country's political/economic disruption. Genuine \"wild\" swings are rare and mostly confined to small-medal countries, where one or two medals is a large percentage change.\n\nPractical implication: a model should treat prior sport-specific performance as a strong predictor, with uncertainty widening for smaller programs and for sports whose event counts change between Games.",
+    "For a country-level Olympic medal forecast, I'd treat a range as unreliable once it's wide enough that the interval spans a meaningful change in standing — roughly when the prediction interval width exceeds about ±30–40% of the point estimate, or when it crosses more than a few medal positions in the table.\n\nConcretely: for a top power like the US (~120 total medals), a ±10–15 medal interval is normal and still useful; beyond ±40–50 it stops discriminating. For a mid-tier country (~10–20 medals), an interval wider than about ±5–7 medals is weak. For small or first-medal countries (0–2 medals), any interval spanning 0 to 3+ is essentially uninformative — which is the norm there.\n\nRule of thumb: if the interval is wide enough that you can't say whether the country will improve, hold steady, or decline, the number is unreliable for decision-making. That threshold is relative, not absolute — it scales with the country's medal base."
+  ],
+  "exchange_count": 3,
+  "evidence_file": "results/interaction_evidence.md",
+  "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+  "interaction_complete": true,
+  "generated_by": "python_controller",
+  "workflow_id": "interaction_workflow_0e8d5eee31f9",
+  "workflow_max_exchanges": 3
+}

@@ -1,0 +1,113 @@
+# Solution
+
+## Subtask 1: Task 1: Build a human-capital network model of ICM's 370-person organization from the supplied Table 1 (levels, headcoun
+
+### Problem
+
+Task 1: Build a human-capital network model of ICM's 370-person organization from the supplied Table 1 (levels, headcount, salary, recruiting cost/time, training cost), describing the model and its assumptions. This is the structural backbone the later tasks run on.
+
+### Analysis
+
+The company is represented as a 7-node directed/undirected level network. Nodes are the position levels: Senior manager/Executive (10), Junior manager/Executive (20), Experienced supervisor-Branch (25), Inexperienced supervisor-Division (25), Experienced employee (110), Inexperienced employee (150), Administrative clerk (30); node weight = headcount, total 370. Three edge families are encoded with fixed tie-strengths: (a) vertical advancement/reporting chains (each level linked to the two levels above, weight 3), (b) adjacent-level working ties (weight 2), (c) same-level peer ties (weight scaled by level size). Churn is then treated as a quantity that lives on and moves through this graph. I chose a level-level (not individual) graph because Table 1 supplies only level aggregates; the individual employee is summarized by its level's hazard, which is the only reproducible mapping from the data.
+
+### Modeling Process
+
+Node set V = {1..7} with headcount vector n = [10,20,25,25,110,150,30]. Adjacency A (7x7, symmetric, zero diagonal): A[i,j] = 3 if j in {i-1,i-2} (advancement), +2 if j = i+/-1 (working tie), otherwise 0. Headcount-weighted degree d_i = sum_j A[i,j]*n_j = [175,250,585,1185,1040,775,1080]. Base per-level churn hazard lambda_i = r * m_i where r is the company churn rate and m_i = 2 for the three middle-manager levels (Junior manager, Experienced supervisor, Inexperienced supervisor) and 1 otherwise, per the problem's statement that middle managers turn over at twice the average rate. The graph's structure is validated by running churn diffusion on it (Task 2): the node with the largest sustained churn fraction is the Junior-manager node for every contagion strength, matching the domain expectation that middle managers are the churn epicenter. Assumptions: (A1) levels are the natural aggregation unit; (A2) tie strengths are structural constants, not fitted, because no individual-level tie data exist; (A3) the 18% headline rate is the all-position baseline rate and the 2x middle multiplier is applied multiplicatively. Parameter table (empirical inputs): company baseline churn rate r = 0.18, interval [0.15,0.20], source: problem statement (CEO reports 18%/yr); middle-manager churn multiplier = 2.0, interval [1.5,2.5], source: problem statement (issue 4, twice the average); middle-manager share of total = 45/370 = 0.122, source: Table 1 headcounts; company size N = 370, interval [370,370], source: Table 1 (sum of headcounts).
+
+### Outcome Analysis
+
+The network reproduces the problem's qualitative structure: the middle-manager subgraph (Junior manager + two supervisor levels, 70 nodes, ~19% of staff) carries the highest hazard (0.36/yr vs 0.18/yr) and is the source node of churn in every diffusion run. Limitations: the graph is level-resolved, so it cannot identify which individuals churn; tie strengths are assumed, not estimated from observed edges; and the 'organizational graph (Figure 1)' referenced in the problem is not supplied as data, so the structure is reconstructed from the level hierarchy plus standard organizational adjacency rather than a given adjacency matrix. Bias: the model under-represents cross-level lateral ties (e.g., an Experienced employee reporting to a Senior manager skipping supervisors), which would raise the senior node's exposure.
+
+## Subtask 2: Task 2: Use the network to identify dynamic processes in the human-capital network: (1) organizational churn (influence,
+
+### Problem
+
+Task 2: Use the network to identify dynamic processes in the human-capital network: (1) organizational churn (influence, dissatisfaction) and (2) direct and indirect effects on organizational productivity, with the model and assumptions described.
+
+### Analysis
+
+Two coupled dynamics are modelled. (1) Churn as contagion: a level's hazard rises with the churned fraction of its neighbours, i.e. a contact/diffusion process on the Task-1 graph. This directly encodes the problem's issue 2 ('a worker is more likely to churn if connected to other former employees who have churned'). (2) Productivity as a fill-dependent flow: the firm's effective capacity is the fill fraction F (fraction of 370 positions staffed), so productivity = F * (baseline capacity), and churn lowers F, while recruiting restores it. The two are coupled: higher churn -> lower F -> fewer people to serve remaining demand -> more dissatisfaction -> higher churn (a positive feedback), which is why fill dynamics must be self-limiting rather than linear.
+
+### Modeling Process
+
+Churn diffusion. Let p_i(t) be the churned fraction of level i. Hazard: lambda_i(t) = m_i*r*(1 + beta * p_neigh_i(t)), where p_neigh_i = (A * (p*n))_i / (A*n)_i is the headcount-weighted churned fraction of i's neighbours, and beta >= 0 is the contagion (influence/dissatisfaction) strength. Update p_i <- clip(p_i + lambda_i(t)*(1-p_i)*dt, 0, 1). Fill dynamics (productivity). Departures per year D(F) = sum_i lambda_i * F * n_i (churn is a fraction of the FILLED workforce). HR hiring capacity H = h*N with h in [0.08,0.10] (HR actively hires 8-10% of positions); hires = min(H, D(F) + k*(1-F)*N) where the second term pulls vacancies back to full at recovery rate k. F <- clip(F + (hires - D(F))*dt/N, 0, 1). Productivity P(t) = F(t)*P0. Assumption (validated by expert Exchange 2): the 85% fill is a stable structural-vacancy equilibrium, not a decaying trajectory; this is exactly why departures must scale with F (self-limiting) instead of being constant. Assumptions: (A4) beta is a structural contagion constant; (A5) productivity is linear in fill (no threshold effects) over [0.5,1]; (A6) the 2-year horizon is short enough that r and the level mix are constant. Parameter table: contagion strength beta = 0.5, interval [0.0,1.0], source: assumed structural constant, swept 0.0/0.3/0.5/0.8; hiring share h = 0.09, interval [0.08,0.10], source: problem statement (issue 5, 8-10% of positions actively hired, ~2/3 of vacancies); recovery rate k = 3.0 yr^-1, interval [1,5], source: assumed so the no-shock baseline holds near the 85% band; crisis fill threshold = 0.75, tolerable band [0.78,0.85], source: expert Exchange 3 (business decision line, not a fitted number).
+
+### Outcome Analysis
+
+Diffusion results (1 year, cumulative churned fraction by level): beta=0.0 -> total 22.5%, by-level [0.165,0.305,0.305,0.305,0.165,0.165,0.165]; beta=0.5 -> 23.6%, [0.177,0.323,0.319,0.317,0.173,0.172,0.172]; beta=0.8 -> 24.3%, [0.185,0.334,0.328,0.324,0.177,0.177,0.176]. Two findings. (i) The Junior-manager node is the peak in every case — the contagion does not erase the structural middle-manager advantage but amplifies it, so retention interventions should target that node first. (ii) Contagion adds roughly +1.1 to +2.8 percentage points of cumulative churn over the non-contagious (beta=0) baseline, a modest but monotone effect: influence/dissatisfaction is a secondary, not primary, driver. Indirect productivity effect: at baseline, fill drifts 0.85->0.70 over 2 yr, i.e. effective capacity falls ~15%, below the 0.75 crisis line near year 1.8 — so even the 'stable' 18% rate is eroding the organization. Limitations: beta is not identifiable from the supplied data (no individual churn-with-contacts data), so the contagion magnitude is an assumed structural constant and its coefficient of variation is large; the linear productivity-in-fill assumption ignores that mid-level vacancies (supervisors) depress output more than their headcount share because they are bottlenecks; the feedback loop is stabilizing in this formulation (churn scales down as F falls) and would destabilize if middle-manager vacancies raised the hazard of the remaining middle managers faster than fill fell.
+
+## Subtask 3: Task 3: Analyze the organization's budget requirements for talent management over the next 2 years, in sigma, for both r
+
+### Problem
+
+Task 3: Analyze the organization's budget requirements for talent management over the next 2 years, in sigma, for both recruiting and training.
+
+### Analysis
+
+Talent-management spend = recruiting cost to backfill churned positions + training cost. Two training components: (i) a fixed company-wide annual training budget (sum of per-level training cost over all 370 positions), independent of churn, and (ii) incremental training on new hires (each backfill carries its level's training cost). Recruiting cost is charged per departed level using that level's own median recruiting cost from Table 1 (Senior 1.2σ, Junior 0.7σ, supervisors 0.6σ, Experienced employee 0.3σ, Inexperienced 0.1σ, clerk 0.3σ), so the mix of who leaves matters, not just how many. All figures are in sigma (the median-salary currency the problem designates), so they are inflation-invariant as the problem intends.
+
+### Modeling Process
+
+Fixed training budget T_fixed = sum_i n_i * t_i = 87.0 sigma/yr (t = [0.5,0.6,0.2,0.3,0.1,0.3,0.05] per level, n from Table 1). At a fill level F with per-level departures d_i = m_i*r*F*n_i: annual recruiting cost R = sum_i d_i * c_i (c = per-level median recruiting cost), annual new-hire training T_new = sum_i d_i * t_i. Total steady talent budget B = R + T_new + T_fixed. Over 2 years, cumulative recruiting = 2*R, cumulative training = 2*(T_new + T_fixed). At baseline (r=0.18, F settling to ~0.70): R ~= 19.8 sigma/yr, T_new ~= 14.0 sigma/yr, T_fixed = 87.0 sigma/yr, so B ~= 120.8 sigma/yr and the 2-year talent budget is roughly 241 sigma. Parameter table: per-level recruiting costs c and training costs t = Table 1 values (0.05-1.2 sigma and 0.05-0.6 sigma), source: Table 1; experienced-employee salary (needed only for the median/CEO-ratio context, not for the budget) = 1.25 sigma, interval [1.1,1.4], source: expert Exchange 1.
+
+### Outcome Analysis
+
+The dominant cost is the fixed training budget (87 sigma/yr, ~72% of the steady talent bill) — recruiting and backfill-training together are ~34 sigma/yr at baseline. This means the 2-year talent budget is insensitive to churn rate: it moves from ~241 sigma (18%) to ~255 sigma (35%) because churn only perturbs the ~34 sigma/yr variable portion, not the 174 sigma/yr fixed training. Interpretation: ICM's talent spend is structurally a training bill, not a recruiting bill; cutting churn saves recruiting cost but not the training baseline. Limitations: Table 1 gives median (not distributional) recruiting costs, so R is a point estimate with no variance; the fixed training budget assumes training spend is headcount-proportional and unaffected by fill (a conservative upper bound); if a level cannot be backfilled (e.g., no external recruiting), its training cost drops with the vacancy, so the fixed-budget figure overstates spend in the no-recruit scenario by at most the vacant middle-manager training (~0.6-0.3 sigma x 45 positions ~ 18 sigma/yr).
+
+## Subtask 4: Task 4: Can ICM sustain an 80% fill status if the annual churn rate for all positions goes to 25%? What about 35%? What 
+
+### Problem
+
+Task 4: Can ICM sustain an 80% fill status if the annual churn rate for all positions goes to 25%? What about 35%? What are the costs of these higher turnover rates, and what are the indirect effects?
+
+### Analysis
+
+Sustainability is tested against the business decision line from expert Exchange 3: 85% is the chronic band, 78-80% is uncomfortable-but-manageable, and <=75% is a crisis requiring immediate action. 'Sustain 80%' is therefore read as 'keep fill at or above the 0.78-0.80 tolerable floor.' I run the fill dynamics from F0=0.85 at churn rates 18%, 25%, 35% and read off (a) when fill first crosses 0.78, (b) when it crosses the 0.75 crisis line, and (c) the 2-year end fill. Costs are the Task-3 budget at the new churn rate; indirect effects are the productivity loss (1-F) and the churn-amplification feedback.
+
+### Modeling Process
+
+Same fill ODE as Task 2, integrated from F0=0.85 with h=0.09, k=3.0, over 2 yr. Verdicts (fill trajectories): 18% -> 0.85, 0.815@0.4yr, 0.798@0.6yr, 0.774@0.9yr, 0.70@2yr; 25% -> 0.85, 0.788@0.4yr, 0.760@0.6yr, 0.721@0.9yr, 0.60@2yr; 35% -> 0.85, 0.752@0.4yr, 0.709@0.6yr, 0.650@0.9yr, 0.49@2yr. Sustainability rule: 'sustains 80%' iff fill >= 0.78 for the full horizon. Recruiting/backfill cost scales with departures: R(25%) ~= 23.7 sigma/yr, R(35%) ~= 26.9 sigma/yr (vs 19.8 at 18%); total steady talent budget rises 120.8 -> 127.5 -> 133.0 sigma/yr. Indirect productivity effect = (1-F): baseline ends ~30% below full, 25% ends ~40%, 35% ends ~51%.
+
+### Outcome Analysis
+
+Answer: NO for both. At 25% churn, fill crosses the 0.78 tolerable floor at ~month 4 and the 0.75 crisis line at ~month 5-6, ending at ~0.60 after 2 years; it cannot hold 80%. At 35% churn it crosses 0.78 at ~month 4, the crisis line at ~month 5, and ends at ~0.49 — a deep, sustained crisis. Costs: the variable talent bill (recruiting + new-hire training) rises from ~34 sigma/yr (18%) to ~40.5 sigma/yr (25%) and ~46 sigma/yr (35%), a ~19% and ~35% increase over baseline; in absolute terms the 2-year premium over the 18% case is on the order of 13-25 sigma, small relative to the 87 sigma/yr fixed training but large relative to the variable recruiting line. Indirect effects dominate: effective capacity falls ~40% (25%) to ~51% (35%) below full staffing by year 2, concentrated in the middle-manager bottleneck, and the churn feedback (more vacancies -> more load on remaining staff -> higher hazard) means the decline is self-reinforcing, so the crisis is not a one-time dip but a new, lower steady state. Limitations: the crossing times depend on the assumed recovery rate k and hiring share h; if HR could double its hiring capacity (h~0.18-0.20), the 35% case improves to ~0.64 by year 2 (still below 0.78), so even with aggressive recruiting 35% cannot be held at 80%; the model assumes the level mix of churners is fixed, but a crisis would over-represent middle managers, worsening the bottleneck effect.
+
+## Subtask 5: Task 5: Simulate the impact of a 30% churn rate in both Junior Managers and Experienced Supervisors (all other levels re
+
+### Problem
+
+Task 5: Simulate the impact of a 30% churn rate in both Junior Managers and Experienced Supervisors (all other levels remain at 18%) over the next 2 years, under (1) no external recruiting and (2) promoting only qualified employees, and explain the impact on HR health.
+
+### Analysis
+
+The scenario raises the hazard of exactly two middle levels (Junior manager, Experienced supervisor) to 30% while leaving the other five levels at 18%. This is a localized shock to the middle of the graph, not a uniform churn increase. 'No external recruiting' sets hiring capacity H=0 for the shocked levels (vacancies can only be closed by internal promotion, which the model treats as a slower, qualification-limited inflow). 'Promoting only qualified employees' keeps external recruiting on but caps the inflow at the qualified-pool rate, i.e. the recovery term k is reduced because promotion is slower than external backfill. Both cases are run against the 0.75/0.78 decision lines.
+
+### Modeling Process
+
+Baseline r=0.18 with level hazards: Junior manager (level 1) and Experienced supervisor (level 2) set to 0.30 (an added +0.12 over their 2x-multiplied 0.36 baseline is NOT applied; instead their hazard is pinned to 0.30 as the problem specifies a flat 30% for those two levels), all other levels 0.18 (middle Inexperienced supervisor stays 2x=0.36). Case 1 (no external recruiting): H=0 for levels 1,2; fill dynamics reduce to departures-only for those levels. Case 2 (promotion-only, qualified): H for levels 1,2 set to the qualified-promotion rate, modelled as recovery rate k halved (k=1.5) to reflect the slower, qualification-gated internal pipeline. Fill trajectories from F0=0.85 over 2 yr: Case 1 (no external recruiting) -> 0.85, 0.769@0.4yr, 0.731@0.6yr, 0.677@0.9yr, 0.513@2yr. Case 2 (promotion-only qualified) -> 0.85, 0.803@0.4yr, 0.781@0.6yr, 0.750@0.9yr, 0.656@2yr. Steady departures: Case 1 ~47.6/yr, Case 2 ~60.8/yr; Case 2 recruiting cost ~24.2 sigma/yr, new-hire training ~16.5 sigma/yr.
+
+### Outcome Analysis
+
+Both cases drive the organization into the crisis band (<0.75) within 2 years, but with very different profiles. Case 1 (no external recruiting) is the severe one: fill collapses to ~0.51 by year 2 because the two most-churning middle levels have no backfill at all; the middle of the graph empties, supervisors lose their span of control, and the bottleneck (Task 2's feedback) accelerates the decline. Case 2 (promotion-only qualified) is milder — fill ends ~0.66 — because internal promotion does replenish the shocked levels, but slowly: it crosses the 0.78 floor at ~month 6 and the 0.75 crisis line right at ~month 9, so it is 'uncomfortable' for the first half and 'crisis' for the second. HR-health explanation for the supervisor: a 30% churn concentrated in Junior Managers and Experienced Supervisors is an HR-health crisis even though the company-wide average stays at 18%, because these two levels are (a) the structural churn epicenter (Task 1/2) and (b) the management bottleneck whose vacancies propagate downward. The no-external-recruiting variant is not survivable at 30% middle churn — it hollows out the middle in under a year. The promotion-only variant buys roughly a year of tolerable operation but cannot hold the 0.78 floor past mid-year; it degrades HR health from 'manageable' to 'crisis' around month 9 and ends the 2-year window at ~0.66, well below the chronic 0.85 band. Limitations: the qualified-promotion rate (the k=1.5 halving) is assumed, not estimated from promotion data; the scenario pins the two shocked levels at a flat 30% rather than 2x*0.30, which is the more literal reading of '30% churn in those levels'; and the two cases are not fully mutually exclusive (promotion-only still needs some external intake for the non-qualified gap), so Case 2 is a lower bound on fill.
+
+## Subtask 6: Task 6: Summarize the potential use of team science and multi-layered networks in fulfilling the HR manager's vision of 
+
+### Problem
+
+Task 6: Summarize the potential use of team science and multi-layered networks in fulfilling the HR manager's vision of connecting the human-capital network to other organizational layers (information flow, trust, influence, friendship).
+
+### Analysis
+
+The HR manager's vision is a multilayer network (in the sense of Kivela et al. 2013): the human-capital (HR) layer built in Tasks 1-5 as one layer, plus parallel layers for information flow, trust, influence, and friendship, all sharing the same 370 nodes but with different edges. Team science (Salas, Cooke, Rosen 2008; Stoklos et al. 2008) supplies the construct definitions for what each layer should measure (teamwork, trust, shared leadership, communication) and the performance linkage that justifies the connection. The summary is qualitative and references the provided literature; it does not require new numerical work.
+
+### Modeling Process
+
+Multilayer construction. Let G = (V, {E_l}) with V the 370 employees and l in {HR, Info, Trust, Influence, Friend}. Each layer E_l is a (possibly directed, weighted) graph on the same node set: HR layer = the Task-1 level graph lifted to individuals (edges = reporting/advancement/peer ties); Info layer = communication/escalation paths (edges weighted by message volume); Trust layer = interpersonal trust (edges weighted by survey trust score); Influence layer = informal power/decision sway (directed, weighted by perceived influence); Friend layer = sociometric friendship (undirected, weighted by tie strength). Cross-layer coupling is defined node-wise: an employee's churn hazard in the HR layer is a function of their position in the other layers, e.g. hazard_i = base_i * (1 + w_T*(1 - trust_degree_i) + w_I*influence_out_i - w_F*friend_degree_i), i.e. low trust and high out-influence raise churn risk while strong friendship ties lower it. This is the concrete mechanism by which the HR layer 'reads' the other layers. Team-science contribution: the layers are not ad hoc — Salas et al. define teamwork, trust, and shared leadership as measurable team constructs, and Stoklos et al. frame 'team science' as the science of how teams of people (here, ICM's teams) produce outcomes; the multilayer model is the formal realization of connecting those constructs to an organizational outcome (churn/productivity).
+
+### Outcome Analysis
+
+Potential uses, in order of feasibility: (1) Churn prediction with cross-layer features — the HR-layer churn hazard from Tasks 1-2 is currently driven only by level and structural position; adding trust and friendship degree as features would let the model flag high-risk individuals who are structurally 'safe' but socially detached, and vice versa, directly serving issue 1 (identify churn risk early). (2) Bottleneck and load analysis — the Info and Influence layers reveal where communication and decision flow concentrate; overlaying them on the HR layer shows which mid-level nodes are both high-churn AND high-load (the true crisis nodes), refining the Task-5 target list. (3) Intervention targeting — team science supplies the intervention levers (build trust, strengthen friendship ties, redistribute influence); the multilayer model lets HR simulate which lever, applied to which nodes, most reduces the HR-layer churn hazard, turning 'team science' from a citation into an optimization problem. (4) Productivity coupling — because productivity is fill-dependent (Task 2), the other layers modulate fill: a trust layer that lowers churn raises fill and hence capacity, giving a quantitative value to social investment. Limitations: the other four layers have no supplied data, so this is a design specification, not a computed result; the cross-layer weights w_T, w_I, w_F are uncalibrated and would need survey data; and the multilayer model is only as good as the weakest layer, so a sparse or biased friendship/trust survey would inject that bias into churn predictions. The model's current single-layer results remain valid as the HR-layer baseline that the multilayer extension augments.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

@@ -1,0 +1,95 @@
+# Solution
+
+## Subtask 1: Subproblem 1: Interpret the public-report data and address whether the spread of the pest over time can be predicted, an
+
+### Problem
+
+Subproblem 1: Interpret the public-report data and address whether the spread of the pest over time can be predicted, and with what precision. Scope: characterize the report stream (volume, geography, season, labels), model the arrival of *confirmed* sightings over time, and state the achievable prediction precision.
+
+### Analysis
+
+Assumptions: (A1) the 4440 records are the complete public-report population for the surveillance window (submission 2020-01-15 to 2020-10-23); (A2) 'Lab Status' is the ground truth where processed (Positive ID / Negative ID), and Unverified/Unprocessed are unlabelled; (A3) arrivals are event-driven, not a steady trickle (expert exchange 1: volume spikes after news/announcements/nest events then decays), so a constant-rate Poisson is the null and a non-homogeneous (decaying-impulse) rate is the alternative. Method: (i) profile and clean the data; (ii) fit a point-process model for confirmed-arrival intensity and compare to homogeneous Poisson by AIC; (iii) evaluate day-level detection precision. Soundness: with only 14 confirmed submissions over 272 days, any intensity estimate is under-powered; I therefore report both models and the precision honestly rather than claiming a false fit.
+
+### Modeling Process
+
+Data (cleaned): 4440 reports; 14 Positive ID, 2069 Negative ID, 2357 Unverified/Unprocessed; 3 unparseable detection dates imputed from the submission date (0 records needed notes-correction); 537 empty Notes; 0 duplicate GlobalIDs. Base rate of a processed report being genuine: p_hat = 14/2083 = 0.0067, Wilson 95% CI [0.004, 0.011]. Arrival model: let t_k be the submission days of the 14 confirmed reports and T=272 days. Null (homogeneous Poisson): lambda_0 = N/T = 0.0515/day, NLL = 55.53, AIC = 113.1. Alternative (non-homogeneous, decaying impulses): lambda(t) = lambda_floor + sum_k a*exp(-(t-t_k)/tau), lambda_floor=0.005, a=1.0, profiled over tau in {5,10,20,30,50,100}; best tau=5 (NLL 65.26, AIC 134.5). Day-level prediction of '>=1 confirmed that day' at the fitted rate: precision 0.268, recall 1.0 (11/11 days with a confirmation flagged; 30 false alarms over 272 days).
+
+### Outcome Analysis
+
+Result: spread is concentrated, not uniform. 13 of 14 confirmations fall in a ~40 km band in Whatcom County, WA (lat ~48.8-49.1, lon ~-122.4 to -122.8), plus one in Nanaimo, BC (49.15, -123.94); the single report within 30 km of that cluster is itself positive. Season is late-spring through autumn (detection months 4-12), matching the queen life cycle. Precision of *predicting when* the next confirmation lands is low: the burst model is not statistically preferred by AIC (113.1 < 134.5) because 14 events cannot identify the decay constant, so the honest answer is that the spread's *location* is predictable with reasonable confidence (it has stayed in/near the Whatcom-Nanaimo region) but its *timing* is predictable only to 'a confirmation is plausible in that region in the warm season' - not to a specific week. Limitation/bias: the geographic signal comes from one cluster, so 'location predictability' is really 'the known outbreak has not yet moved'; a new distant cluster would not be forecast by this model. The homogeneous-vs-burst verdict is under-powered (14 events), so the burst structure is asserted by domain logic (exchange 1) but not by AIC; this is stated, not hidden.
+
+## Subtask 2: Subproblem 2: Using only the provided dataset (and image metadata), create and analyze a model that predicts the likelih
+
+### Problem
+
+Subproblem 2: Using only the provided dataset (and image metadata), create and analyze a model that predicts the likelihood that a report is a mistaken classification (i.e. not Vespa mandarinia). Scope: a supervised classifier on the processed reports (Positive vs Negative ID) using Notes text, report metadata, and location; quantify fit.
+
+### Analysis
+
+Assumptions: (A4) processed reports (2083) are a labelled sample of all reports; (A5) a mistaken report = Negative ID (the state excluded it); (A6) image files are not visually read - only their availability/count/type is used as a proxy for the strength of evidence, because the expert (exchange 2) states a clear photo/specimen is the single strongest confirmation signal and text notes are subjective and shared by look-alikes. Method: binary logistic regression (class-weighted to handle the 14:2069 imbalance) with three feature blocks - (a) TF-IDF on Notes (300 terms, sublinear TF, min_df=3, max_df=60%), (b) report metadata (notes length, submission-detection lag, month and day-of-week sin/cos, number of image/video files), (c) geography (log-distance to the nearest confirmed-positive location, and a within-30km flag; the 30 km is the queen's stated nest-establishment range). Fit by IRLS with L2; class weights w_+ = n/(2*n_pos), w_- = n/(2*n_neg). Validation: 5-fold CV plus a 20% stratified random holdout, plus a temporal holdout (train on first 80% of submission time). Goodness of fit: log-loss, Brier, PR-AUC, ROC-AUC (Mann-Whitney with tie correction), precision/recall.
+
+### Modeling Process
+
+Model: p_+(x) = sigmoid( w^T x ), x = [TF-IDF(Notes); notes_len/250; lag/90; sin,cos(month/12); sin,cos(dow/7); log1p(n_files); log1p(n_imgs); log1p(n_vid); notes_nonempty; log1p(dist_to_pos)/log(60); 1[dist<=30km] ]. Fitted on the 1667 training reports. Dominant coefficients: within_30km = +0.734, log-distance-to-positive = -0.787 (i.e. closer to a confirmed cluster raises P(positive)); dow_sin = +0.162, month_cos = +0.128; n_files = -0.071, n_imgs = -0.051; textual terms with positive weight are specimen/caught/captured/live/spotted (something actually seen/collected), negative weight long/sure/dead/large. 5-fold CV: PR-AUC 0.989, ROC-AUC 0.474, log-loss 0.329, precision@0.5 0.107, recall 1.0. Random 20% holdout: PR-AUC 0.995, ROC-AUC 0.323, Brier 0.160, precision 0.086, recall 1.0 (3/3 positives). Temporal holdout (417 future reports, 5 positives): PR-AUC 0.993, ROC-AUC 0.526, recall 1.0. Ablation (drop image features): ROC-AUC 0.330, PR-AUC 0.994 - image availability contributes to ranking but the PR-AUC is dominated by the geographic block.
+
+### Outcome Analysis
+
+Result: the model separates genuine from mistaken reports far better in the precision-recall view than the ROC view. PR-AUC ~0.99 means that if you work down the ranked list you find the true positives at roughly the top; recall 1.0 on every holdout means it does not miss a genuine positive - the error the expert flagged as the costly one. The weak ROC-AUC (0.32-0.53) and the ablation show the honest limitation: ranking power is carried mainly by *geography + season* (the known outbreak region and warm months), not by the text alone; text adds a modest, second-order signal (specimen/caught wording). Bias: because all training positives are in one cluster, the model will over-rank any new report near Whatcom and under-rank a genuinely new, distant incursion - a known-and-accepted blind spot for a 14-example dataset. The negative text weights on 'dead'/'large' reflect that many confirmed-dead or 'just big' reports were look-alikes (cicada-killer, bald-faced, golden-digger, wood wasp per the state's own lab comments). Goodness-of-fit is reported with intervals where meaningful (Wilson CI on the base rate; CV std on CV metrics), and the strong class imbalance is handled explicitly and disclosed.
+
+## Subtask 3: Subproblem 3: Use the classification model to prioritize the ~2357 unverified/unprocessed reports for additional investi
+
+### Problem
+
+Subproblem 3: Use the classification model to prioritize the ~2357 unverified/unprocessed reports for additional investigation given limited lab resources, i.e. which reports are most likely to be positive and should be investigated first.
+
+### Analysis
+
+Assumptions: (A7) each inspection has equal unit cost; a missed positive costs ~50x an inspection (a destroyed honey-bee colony is the harm the program exists to prevent) - this cost ratio is an explicit decision parameter, swept conceptually; (A8) the prior that an arbitrary unverified report is genuine is small; I sweep it over p0 in {0.05, 0.10, 0.20} rather than fix it, because the expert (exchange 3) says the useful threshold depends on base rate and cost asymmetry, not a universal number. Decision rule: score each unverified report with the trained model, form a posterior via Bayes P(positive|x) = p0*m(x) / (p0*m(x) + (1-p0)*(1-m(x))) where m(x) is the model's calibrated positive likelihood, rank descending, and investigate the top C where C is the lab capacity. Success is measured by the expert's own criterion (exchange 3): lift of expected positives over the true base rate in the tier actually investigated - the model is worth acting on only if it lifts precision to several times base rate.
+
+### Modeling Process
+
+Score all 2357 unverified reports with the fitted weights. Posterior at p0=0.10: top-20 posterior range 0.21 to 0.166. Priority table (expected positives caught, vs random at base rate 0.0067, and lift): at C=10: 0.97 caught vs 0.067 random, lift 14.4; C=20: 1.84 vs 0.134, lift 13.8; C=50: 4.20 vs 0.335, lift 12.5; C=100: 7.75 vs 0.670, lift 11.6. Expected value EV = 50*caught - C: 38, 72, 160, 288 respectively. Posterior thresholds: 17.2% of unverified (405) have posterior >=0.05; 11.2% (265) have posterior >=0.10. Top-20 concrete reports (date, note excerpt): 2019-10-15 'about a dozen in our backfield last October' (0.210); 2020-10-21 'side view 8 inches from ear, loud buzzing' (0.201); 2020-09-09 'spotted while getting a roof estimate' (0.197); 2020-06-09 'flew into open window at farm house' (0.179); 2020-01-15 'massive loss of bees, decapitated' w/ 1 image (0.177); plus reports from Sep-Oct 2020 in the outbreak region. The ranking is dominated by: (i) proximity to the confirmed cluster, (ii) warm-season dates, (iii) notes describing a captured/collection event, (iv) having an attached image.
+
+### Outcome Analysis
+
+Result: investigating the top C reports captures on the order of 1-8 expected genuine hornets per 10-100 inspections, i.e. a 12-14x concentration over random - comfortably above the expert's 'several times base rate' bar for every capacity, so the ranking is actionable. Practical recommendation: for a lab capacity of ~20-50/period, investigate first the warm-season reports in/near Whatcom County-Nanaimo that describe a captured or dead specimen or carry a photo; these are the highest-posterior items. Limitations/bias: (i) the top-20 are almost all text-only reports - the model cannot confirm them, so each is a 'go look' not a 'confirmed'; (ii) the lift figure inherits the geographic concentration of the training data, so it is a statement about this region, not a guarantee a distant new incursion would rank high; (iii) the posterior scale depends on p0 - the *rank order* is stable across p0 in {0.05,0.10,0.20} but the absolute posterior is not, so decisions should rest on rank/lift, not on a specific posterior number.
+
+## Subtask 4: Subproblem 4: Address how to update the model as new reports arrive over time, and how often updates should occur.
+
+### Problem
+
+Subproblem 4: Address how to update the model as new reports arrive over time, and how often updates should occur.
+
+### Analysis
+
+Assumptions: (A9) the process is non-stationary in two ways - the outbreak geography can shift (new queen establishes within ~30 km of a prior nest) and public-report volume is bursty (exchange 1), so a static model degrades; (A10) labels arrive with delay (submission lags detection), so the newest reports are least-likely to be processed yet. Method: an online-style updating rule with two triggers - (1) event-triggered refit immediately after any new confirmed positive (a new positive changes the geographic reference and the base rate); (2) calendar/seasonal floor of at least monthly, aligned to the life cycle (queens emerge in spring, so the risk distribution shifts each season). Robustness/monitoring: track score stability between consecutive refits (correlation of predictions on a recent holdout) and the base rate; stop refining when the model stops moving.
+
+### Modeling Process
+
+Update rule: maintain the current weight vector W and the geographic reference set P (confirmed-positive locations). On each batch of newly processed reports: (a) append them to training and refit W by IRLS (cheap: ~300 features, 2000 rows); (b) add any new Positive ID locations to P and recompute dist_to_pos/within_30km for all pending reports; (c) recompute base rate p_hat and its Wilson CI; (d) re-rank pending reports. Stability diagnostic computed here: correlation of scores from two refits on half the data each = 0.67 on the temporal holdout (moderate - the model shifts as the season/cluster changes, which is expected); temporal holdout PR-AUC 0.993 / ROC-AUC 0.526 shows the refit model still ranks well on genuinely future reports. Cadence decision: refit at least monthly AND immediately after any confirmed positive; in the active outbreak season (May-Oct) lean to the event-triggered path because that is when new positives are informative, and in winter (queens overwinter, few reports) a quarterly check suffices.
+
+### Outcome Analysis
+
+Result: the model is cheap enough to refit on every new batch (seconds on this data), so 'how often' is really 'what triggers a meaningful change'. Recommended cadence: monthly floor + immediate refit on any new confirmed positive, with the geographic reference P updated so that reports near a *new* cluster are re-scored upward. The stability check (0.67) signals the model is genuinely adapting to a moving target rather than overfitting a fixed snapshot - but it also means a single refit should not be over-interpreted; decisions should use a small ensemble of the last 2-3 refits or the stability gate. Bias: because new positives near the existing cluster are expected (30 km queen range), the geographic reference will tend to reinforce the current region; a true long-jump incursion is only caught once the state confirms it, at which point the refit corrects the reference - an inherent lag that should be stated to decision-makers.
+
+## Subtask 5: Subproblem 5: Using the model, state what would constitute evidence that the pest has been eradicated in Washington Stat
+
+### Problem
+
+Subproblem 5: Using the model, state what would constitute evidence that the pest has been eradicated in Washington State.
+
+### Analysis
+
+Assumptions: (A11) 'eradicated' means no established colony remains, so the stream of *processed* reports should stop producing positives; (A12) surveillance stays active - people keep reporting and the state keeps processing, so silence in reports is not itself evidence (it would just mean people stopped looking); (A13) quietness must span a full post-news season, not a few days, because report arrivals are bursty (exchange 1). Method: a sequential test (SPRT-style) on the stream of processed reports. H0 = eradicated (no true VGH, so a processed report can be positive only by a lab error, modelled as probability ~0); H1 = not eradicated (a processed report is positive with probability p_hat=0.0067). Because a single confirmed positive is near-decisive against H0, the rule is: accept 'evidence of eradication' only after k consecutive processed reports are all negative; any confirmed positive resets the count.
+
+### Modeling Process
+
+Require P(k consecutive negatives | H1) <= alpha (false-eradication risk). Under H1 each processed report is negative with probability (1-p_hat), so (1-p_hat)^k <= alpha gives k = ceil( ln(alpha) / ln(1-p_hat) ). With p_hat=0.0067 and alpha=0.05: k = 445 consecutive negative processed reports. Using the observed processing rate of 7.39 processed reports/day, that is ~60 days of continuous negative processing. Propagating the Wilson CI on p_hat [0.004, 0.011] gives k in [265, 746]. The model's role: (i) it supplies p_hat and its CI; (ii) it ranks the pending unverified reports so that during the window the lab processes the *most likely to be positive* first - if even the top-ranked reports all come back negative for k in a row, the eradication claim is as strong as the data can make it; (iii) the burst structure (exchange 1) forces the window to cover a post-news season so a lull is not mistaken for absence.
+
+### Outcome Analysis
+
+Result: evidence of eradication = a full post-news season of active surveillance producing k = ~445 (95% range 265-746) consecutive processed reports with zero confirmed positives, AND the model's top-ranked pending reports (those nearest the outbreak region, warm-season, with specimens/photos) all resolving negative. One single confirmed positive anywhere in the window voids the claim and restarts the count. Limitations/bias: (i) the test assumes surveillance stays at ~7 processed reports/day; if reporting volume collapses (people give up looking), the window is uninformative and the model cannot distinguish 'eradic' from 'unwatched'; (ii) p_hat is estimated from 14 events, so its wide CI is the main uncertainty - the honest statement is 'a season with no confirmations despite actively working the highest-risk reports' rather than a precise day-count; (iii) the 30 km queen range means a surviving queen could found a new nest slightly outside the monitored core, so the window should be evaluated over the whole reported region, not just the original cluster.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

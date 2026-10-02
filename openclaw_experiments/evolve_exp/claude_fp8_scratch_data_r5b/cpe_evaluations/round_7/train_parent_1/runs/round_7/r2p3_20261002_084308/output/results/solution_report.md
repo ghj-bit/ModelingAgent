@@ -1,0 +1,113 @@
+# Solution
+
+## Subtask 1: Task 1: Build a Human Capital network model of ICM's 370-person organization from the supplied data. Scope: define the n
+
+### Problem
+
+Task 1: Build a Human Capital network model of ICM's 370-person organization from the supplied data. Scope: define the network, its nodes/edges, and the assumptions that make the model reproducible, using table1.csv (7 position levels, salaries, headcounts, recruitment time/cost, training cost) with sigma as the unit of account.
+
+### Analysis
+
+ICM is modelled as a two-layer structure. Layer 1 (formal hierarchy) is a directed 7-level ladder with capacities equal to the 370 authorized positions: L Senior Manager (10), J Junior Manager (20), E Experienced Supervisor (25), I Inexperienced Supervisor (25), X Experienced Employee (110), N Inexperienced Employee (150), A Administrative Clerk (30). The three middle levels {J,E,I} are the high-turnover band. Layer 2 (informal tie network) is a random-regular friendship/advice graph on the 370 nodes in which each employee has ~4 close colleagues; this layer is what lets churn 'diffuse' (Issue 2). Data was cleaned first: every monetary cell in table1.csv was garbled in the source as a two-byte sequence that the Read tool rendered as 'γ'; it was repaired in-place to the sigma symbol, and the one blank salary cell (Experienced Employee) was set to 1.0 sigma, consistent with the company median income being defined as sigma. Assumptions: (a) sigma = the company median salary, so all costs/salaries are relative and track inflation; (b) the org currently runs at ~85% of 370 (~315 filled, ~55 vacant), the '8-10% actively hiring (about 2/3 of vacancies)' being a snapshot of in-flight jobs (370*0.085 ≈ 31 ≈ 2/3 of 55) rather than the refill policy; (c) a level's capacity is its number of authorized positions and it is held, on average, to the 85% status; (d) promotion moves an individual up exactly one level after a fixed tenure.
+
+### Modeling Process
+
+Nodes: i = 1..370 people, level ℓ(i) ∈ {L,J,E,I,X,N,A}, capacity C_ℓ. Edges: formal promotion ladder (directed, up one level) plus an undirected tie graph G with mean degree k≈4 (friendship/advice). State per year: h_ℓ = filled seats at level ℓ. Data table (recruit months, recruit cost, capacity, salary, training cost; all $ in sigma): L(7,1.2,10,8.0,0.5); J(6,0.7,20,4.0,0.6); E(5,0.6,25,2.0,0.2); I(4,0.6,25,1.5,0.3); X(3,0.3,110,1.0,0.1); N(1,0.1,150,0.9,0.3); A(2,0.3,30,0.9,0.05). A per-level exposure counter e_ℓ counts seats with a recently-churned direct neighbour (the network layer). Baseline status: h_ℓ(0) = 0.85·C_ℓ. This structure is the container for Tasks 2-5.
+
+### Outcome Analysis
+
+The model is sound because every monetary input comes from the dataset, the only added empirical structure (the tie network, the promotion tenure) is stated as an explicit assumption with a range, and the 85% status plus the 2/3 in-flight figure are reconciled rather than double-counted. Limitations: the tie network is random-regular rather than the real org chart (Figure 1 is not supplied as data), so tie structure is representative, not observed; the X salary cell was missing and set to 1.0 sigma. The network layer is the part of the model that cannot be verified from the data alone and is the main source of model bias in the churn-diffusion results.
+
+## Subtask 2: Task 2: Identify and incorporate the dynamic processes in the Human Capital network: (1) organizational churn (influence
+
+### Problem
+
+Task 2: Identify and incorporate the dynamic processes in the Human Capital network: (1) organizational churn (influence, dissatisfaction) and (2) direct and indirect effects on organizational productivity.
+
+### Analysis
+
+Two coupled dynamic processes are modelled. Churn process: each seat has a baseline annual quit probability r_ℓ that is higher in the middle band (mid = 2× the company average, per Issue 4), and a turnover-contagion term driven by the tie network — a seat whose direct neighbour left in the prior year quits at a higher hazard. This is the 'churn diffuses employee to employee' mechanism (Issue 2). Productivity process: organizational output is proportional to filled capacity times efficiency, where every externally-replaced seat works at reduced (ramp) efficiency in its first year, and persistent vacancies directly reduce output.
+
+### Modeling Process
+
+Baseline quit rate: r_ℓ = 0.36 for ℓ ∈ {J,E,I} (middle, 2× average), r_ℓ = 0.18 otherwise (company average, Issue 7). Contagion (network layer): let e_ℓ be the number of level-ℓ seats with a churned direct neighbour last year (saturated at h_ℓ, since ties overlap). Departures: D_ℓ = e_ℓ·r_ℓ·(1+κ) + (h_ℓ−e_ℓ)·r_ℓ, capped at 0.9·h_ℓ. Exposure update: e_ℓ ← min(h_ℓ, k·D_ℓ + e_ℓ·δ), i.e. each leaver exposes ~k direct neighbours next year and second-order exposure decays by δ. Productivity: P = (H − (1−ρ)·N_new)/C where H = Σ_ℓ h_ℓ, C = 370, N_new = seats filled by external hire, ρ = first-year efficiency of a replacement. Parameter table (empirical inputs, value, interval, source): BASE_CHURN = 0.18, [0.15,0.20], task CEO '18% per year'; MID_CHURN = 0.36, [0.30,0.40], task 'mid-level twice the average'; CONTAGION κ = 0.30, [0.10,0.50], expert exchange 1 (relative hazard, tens of percent); DECAY δ = 0.50, [0.30,0.70], expert exchange 1 (decays with social distance); TIES k = 4, [3,6], assumption (typical close-colleague degree); RAMP ρ = 0.50, [0.40,0.60], assumption (first-year efficiency of a replacement). The discrete-time (annual) recurrence above is solved numerically in code/hr_model.py.
+
+### Outcome Analysis
+
+The dynamics are the model's key finding. (1) Churn is not a set of independent events: with κ>0, quits in one year expose neighbours, which raises next year's quit rate, so a churn shock is self-reinforcing. Baseline (κ=0.30) final fill is 77.2%; a sweep over κ shows 81.3%→74.5% as κ goes 0→0.5 — a moderate, decision-relevant effect, matching the 'real but moderate' expert judgment. (2) The indirect productivity effect is large and is the reason fill-rate, not just cost, is the right metric: at 35% churn fill falls to 64.4% and productivity to ~49%, so the indirect (vacancy + ramp) effect dominates the direct recruitment cost. Limitations: κ and δ are calibrated to the expert's qualitative magnitude rather than to ICM's own longitudinal data (none supplied); the random-regular tie network overstates/understates clustering versus the true org chart, which is the main bias in the contagion magnitude.
+
+## Subtask 3: Task 3: Analyse the budget requirements for talent management over the next 2 years, in units of sigma, for both recruit
+
+### Problem
+
+Task 3: Analyse the budget requirements for talent management over the next 2 years, in units of sigma, for both recruiting and training.
+
+### Analysis
+
+Budget is split into (a) recruiting cost = (seats filled by external hire) × (median recruitment cost by level), and (b) training cost = ongoing training of the whole workforce plus one-time onboarding training of new hires, both from the dataset. Because ICM sustains ~85% fill by backfilling nearly every vacancy within the year, the steady-state annual outlay is the correct 'requirements' figure; the dynamic simulation adds the ramp-efficiency loss as the productivity cost that the budget must fund.
+
+### Modeling Process
+
+Steady-state annual outlay per level (leaves/yr × cost): recruiting Σ_ℓ D_ℓ·rc_ℓ ≈ 28.3 σ/yr; training Σ_ℓ [D_ℓ·tr_ℓ + h_ℓ·tr_ℓ] ≈ 107.1 σ/yr. Over 2 years (no headcount growth) this is ≈ 56.5 σ recruiting + ≈ 214.1 σ training ≈ 270.7 σ total. The dynamic simulation (code/hr_model.py, baseline) gives 2-yr recruiting ≈ 38.8 σ (year-1 15.75, year-2 23.06 as backfill catches up) and training ≈ 163 σ, plus a ramp-efficiency loss ≈ 87 σ. Per-level annual recruiting cost (σ): L 2.16, J 5.04, E 5.40, I 5.40, X 5.94, N 2.70, A 1.62. Per-level annual training (new + ongoing, σ): L 5.90, J 16.32, E 6.80, I 10.20, X 12.98, N 53.10, A 1.77. The middle band is the budget driver on the recruiting side (J,E,I ≈ 15.8 σ of the 28.3), while Inexperienced Employees dominate the training side (53.1 σ) because of their large headcount.
+
+### Outcome Analysis
+
+Recommendation: budget ≈ 38–57 σ/yr for recruiting and ≈ 107 σ/yr for ongoing training (plus onboarding of new hires), i.e. on the order of 1.4–1.7× the median salary per new hire plus ongoing training. The 2-yr requirement is ≈ 270 σ total, dominated by training (≈ 79%). Sensitivity: the figure scales roughly linearly with the refill fraction, so if ICM deliberately let vacancies persist (recruit 2/3 of the year's vacancies rather than nearly all), recruiting falls but fill decays to ~60% steady-state and the indirect productivity loss grows — the budget and the fill rate are a trade-off, not independent. Limitation: training 'requirements' are taken as the dataset's average annual training costs; ICM does not budget training by performance rating (Issue 3), so this is a floor, and tying training to the currently-unused annual evaluation would change the level split.
+
+## Subtask 4: Task 4: Can ICM sustain its ~80% full status if the annual churn rate for all positions goes to 25%? How about 35%? What
+
+### Problem
+
+Task 4: Can ICM sustain its ~80% full status if the annual churn rate for all positions goes to 25%? How about 35%? What are the costs of these higher turnover rates and their indirect effects?
+
+### Analysis
+
+Test the model at two elevated, uniform churn levels: base 25% (mid 36%) and base 35% (mid 50%), keeping the recruitment policy that sustains ~85% today. 'Sustain 80%' is interpreted with the expert's decision threshold: sustained fill below ~80% is genuine risk and below ~75% is crisis (expert exchange 3), so I report fill each year and classify ok/risk/crisis.
+
+### Modeling Process
+
+Same recurrence as Task 2 with base churn 0.25 (mid 0.36) and base churn 0.35 (mid 0.50); decision rule: status = ok if fill ≥ 0.80, risk if 0.75 ≤ fill < 0.80, crisis if fill < 0.75 (RISK_FILL 0.80 [0.78,0.85], CRISIS_FILL 0.75 [0.72,0.80], both from expert exchange 3). Results (code/hr_model.py): 25% churn — yr1 fill 75.5% (crisis-edge), yr2 71.2% (crisis); 2-yr recruiting 42.5 σ, training 158 σ, ramp loss 96.6 σ; final/min fill 71.2%. 35% churn — yr1 fill 66.3%, yr2 64.4%; 2-yr recruiting 52.4 σ, training 151 σ, ramp loss 118.9 σ; final/min fill 64.4%.
+
+### Outcome Analysis
+
+ICM cannot sustain 80% at either level. At 25% churn it slips into the risk band the first year (75.5%) and then, because the contagion term makes the shock self-reinforcing, it settles near 71% — below the 75% crisis line — rather than recovering to 80–85%. At 35% churn it never recovers, bottoming at ~64%. Direct costs rise only mildly (recruiting 42.5→52.4 σ) but the indirect costs are the story: ramp-efficiency loss grows from 96.6 to 118.9 σ and, more importantly, sustained output (fill × efficiency) falls to ~60–65% of full capacity — a 15–20 point productivity hole that persists, because each cohort of replacements works at ~half efficiency in year one and vacancies stay open long enough to break the promotion pipeline (Issues 4, 6). Indirect effect: high churn is self-reinforcing (exposed seats quit faster) and erodes the middle-management pipeline, so the damage compounds over the 2 years instead of averaging out. Limitation: 'sustain 80%' is a threshold judgment, not a hard physical floor; the exact year the status flips depends on the κ/δ calibration.
+
+## Subtask 5: Task 5: Simulate the impact of 30% churn in junior managers and experienced supervisors (mid-level), with (1) no externa
+
+### Problem
+
+Task 5: Simulate the impact of 30% churn in junior managers and experienced supervisors (mid-level), with (1) no external recruiting and (2) promoting only qualified employees, for the next two years; other churn stays 18%. Explain the impact on HR health.
+
+### Analysis
+
+Two stress scenarios on the middle band {J,E} set to 30% churn while all other levels stay at 18%: (1) no_external — external recruiting is shut off entirely, so departures are only ever filled by promotion; (2) qualify_only — external recruiting continues but promotions into the middle band are restricted to seats that have accrued the required tenure (PROMO_LAG = 3, QUALIFIED = 0.5, from expert exchange 2). Both isolate how fragile the middle-management pipeline (Issues 4, 6) is.
+
+### Modeling Process
+
+Same recurrence with churn(J)=churn(E)=0.30, others 0.18. No-external: newhires_ℓ = 0 for all ℓ, so h_ℓ only ever declines by churn (no backfill). Qualify-only: promotions move only qualified_pool_ℓ candidates up one level into existing vacancies (qualified_pool = 0.5·h_ℓ, promo_lag 3 yrs), and only the residual vacancy is externally backfilled at 0.9. Results: (1) No external recruiting — yr1 fill 67.9%, yr2 fill 50.6%, zero recruiting cost, training 100.5 σ over 2 yrs, final/min fill 50.6% (crisis). (2) Qualify-only — yr1 fill 74.7%, yr2 fill 71.3%, 2-yr recruiting 23.0 σ, training 145.7 σ, ramp loss 61.1 σ, final/min fill 71.3% (crisis).
+
+### Outcome Analysis
+
+Explain to the HR supervisor: shutting off external recruiting is catastrophic. With no outside inflow the only inflow is promotion, which is far too slow to replace 30% annual middle churn, so the whole organization bleeds down to ~51% filled in two years — a crisis in the first year, well below the 75% crisis line, and the pipeline breaks (there is no one left to supervise or train). Promoting only qualified employees is far less damaging but still unsustainable: it holds fill near ~71–75%, i.e. permanently in the risk/crisis band, because the qualified pool is thin (only ~half a level has the required 3-year tenure) and cannot keep pace with 30% churn in the two hot levels. The structural gap the expert identified (exchange 2) is exactly this: the qualification/tenure requirement caps how fast the middle pipeline refills, so the shortfall is persistent, not a one-year dip. Both scenarios confirm that the middle band is ICM's single point of failure. Limitation: these are two-year horizons; the no-external case would keep falling past year 2, and the qualify-only case would asymptote to a chronic ~70% fill. The real org chart (Figure 1) would let us test whether the middle band is the actual choke point in the tie network, which the random-regular model assumes rather than shows.
+
+## Subtask 6: Task 6: Summarize the potential use of team science and multi-layered networks in fulfilling the HR manager's vision of 
+
+### Problem
+
+Task 6: Summarize the potential use of team science and multi-layered networks in fulfilling the HR manager's vision of connecting the Human Capital network to other organizational network layers (information flow, trust, influence, friendship).
+
+### Analysis
+
+The HR manager wants the Human Capital network (built in Task 1) to be one layer of a multi-layer organizational network, drawing on the supplied team-science (Salas et al. 2008; Stokols et al. 2008) and multilayer-network (Kivelä et al. 2013) references. The question is how the churn/productivity model built above generalizes to that connected, multi-layer object.
+
+### Modeling Process
+
+Formalize ICM as a multilayer network with node set {1..370} shared across M layers: layer 1 = the formal HR/hierarchy layer (this model); layer 2 = information-flow layer (who learns what, from whom); layer 3 = trust layer; layer 4 = influence layer; layer 5 = friendship/tie layer (the G already used for contagion). In Kivelä et al.'s notation each layer m is a graph G^m = (V, E^m); intra-layer edges are same-layer ties and inter-layer edges (coupling) are same-person links across layers. The HR model's dynamics generalize by letting the quit hazard at node i depend on its state in other layers: P_i^quit = r_ℓ(i)·(1 + κ_f·[friendship-neighbour left] + κ_t·(1 − trust_i) + κ_inf·influence_exposure_i + κ_info·information_isolation_i), where the κ's are layer-specific contagion weights. Team science (Salas; Stokols) supplies the measurement side: it defines how to operationalize trust, shared mental models, and cross-functional teamwork so that layers 2-4 have real edges rather than being postulated; the multilayer framework (Kivelä) supplies the mathematics for coupling them (node/edge multilayer, intra/inter-layer centrality) and for detecting that churn is a layer-1 process driven by layer-5/4 exposure. Concretely: (a) run the HR flow model on layer 1 as now; (b) overlay layer 5 (friendship) to localize where contagion actually originates instead of assuming random-regular; (c) use layers 3-4 (trust/influence) to build early-warning churn indicators — a node losing trust or influence exposure is a churn-risk flag before it quits, which is exactly the early-stage churn-risk identification ICM wants (Issue 1); (d) use inter-layer coupling to see that firing a person (a layer-1 event) also removes an information-flow edge and a trust node, giving the indirect organizational effects a network basis.
+
+### Outcome Analysis
+
+The potential: (1) the HR layer becomes a special case of a multilayer model, so one set of equations and one code base (generalizing code/hr_model.py) handles churn plus the other layers; (2) the friendship layer turns the assumed random-regular network into an observed one, directly improving the contagion magnitude that is now the model's biggest uncertainty; (3) the trust/influence/information layers convert churn prediction from a rate-based estimate into an early-warning system keyed to network position, fulfilling Issue 1; (4) inter-layer coupling makes 'indirect effects on productivity' (Task 2) traceable to specific removed edges rather than an aggregate ramp factor, strengthening the indirect-effect analysis. Limitations: multilayer models are far harder to parameterize — the κ per layer and the inter-layer coupling need real tie/influence data the other ICM offices are only now building, so near-term use is to structure the data collection and to give the HR model a principled extension path, not to run a fully-coupled 5-layer simulation yet.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

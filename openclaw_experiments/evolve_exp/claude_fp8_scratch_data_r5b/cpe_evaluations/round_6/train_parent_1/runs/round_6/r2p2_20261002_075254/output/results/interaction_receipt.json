@@ -1,0 +1,21 @@
+{
+  "rubric_id": "interaction_initial_substantive_v1",
+  "interaction_stage": 2,
+  "questions_asked": [
+    "When Wimbledon's stats record is missing a serve speed or shot type, is that because the statistician failed to record it, or because that kind of detail is simply not tracked for those points?",
+    "When a tennis player has lost several straight points and the flow turns against them, what usually triggers the turn?",
+    "When a point-by-point stat looks like a big lead, when would you trust it as a real advantage, not just noise?"
+  ],
+  "expert_answers": [
+    "Neither, in the sense of a statistician \"failing.\" In the Wimbledon/IBM point-by-point feed, missing values are structural, not errors:\n\n- **Serve speed** is only recorded for serves that are actually hit and measured. It is absent on points where the serve is a fault that isn't the recorded serve, on lets, and on some points where the tracking/radar capture didn't register — but the dominant reason is that the field is only populated for the serve event itself, so non-serve or non-measured points carry no value.\n- **Shot type (`winner_shot_type`)** is only populated when a winning shot is recorded (`p1_winner`/`p2_winner` = 1). If the point ends on an unforced error, a double fault, an ace, or a forced error, there is no \"winning shot\" to categorize, so the field is legitimately blank.\n\nSo the blanks reflect the conditional structure of the data collection (fields populated only when the corresponding event occurs), not a recording lapse. A blank means \"this event did not occur / was not applicable,\" not \"the statistician forgot.\"",
+    "The most common trigger is a **change of server** — the point-run usually ends when the player who was losing points gets to serve, or when the opponent's service game ends. Serving advantage is large enough (roughly 60–80% of service points won at tour level) that a run against the receiver frequently breaks at the game boundary.\n\nBeyond that, the turn is usually triggered by one of:\n\n- **A high-value point lost/won** — a break point, set point, or deuce/advantage swing, where the cost of the point is disproportionate to its count.\n- **An error cluster reversing** — the player on the run often stops donating unforced errors and/or starts landing first serves, which is the single biggest lever on point outcomes.\n- **A long or physical point** that shifts who is dictating rallies, or a stoppage (challenge, medical timeout, crowd) that interrupts rhythm.\n\nEmpirically, most \"momentum\" runs in tennis are short (a few points) and are statistically hard to distinguish from random streaks; the reliable structural trigger is the service game boundary, not a psychological switch.",
+    "Trust a lead as real when it is **anchored to structural, repeatable advantages**, not just a point count. Concretely:\n\n- **It survives the service boundary.** A lead that persists across at least one full change of server — i.e., the player also wins points on the opponent's serve or holds comfortably — is real. A lead built entirely on one service game is mostly serving noise.\n- **It is large relative to the sample.** A few points (2–3) is within normal streak variance; a lead of roughly 5+ points, or a multi-game lead, is unlikely to be pure chance.\n- **It is corroborated by process stats**, not just the scoreboard: first-serve percentage, unforced-error rate, winners, break points created/converted. A lead where the leader is also winning the underlying shot-quality metrics is real; a lead where they're being outplayed but winning points is fragile.\n- **It is at a high-value juncture** — break point, set point, tiebreak — where the point cost is disproportionate.\n\nEmpirical judgment: point-level leads under ~3 points are usually indistinguishable from random streaks; the scoreboard alone is weak evidence."
+  ],
+  "exchange_count": 3,
+  "evidence_file": "results/interaction_evidence.md",
+  "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+  "interaction_complete": true,
+  "generated_by": "python_controller",
+  "workflow_id": "interaction_workflow_0e8d5eee31f9",
+  "workflow_max_exchanges": 3
+}

@@ -1,0 +1,131 @@
+# Solution
+
+## Subtask 1: Task 1: Develop a model to determine the number of EDSs (explosive detection systems) required at Airports A and B, usin
+
+### Problem
+
+Task 1: Develop a model to determine the number of EDSs (explosive detection systems) required at Airports A and B, using the peak-hour flight data in Table 1. Describe the assumptions carefully.
+
+### Analysis
+
+The binding requirement is 100% coverage of every checked bag, not delay minimization (Exchange 3 confirmed the decision threshold is coverage, not queue length). So the fleet must be sized so that all of a day's bags pass through a device within the operational window. Table 1 gives the peak hour only, so daily volume is scaled from the peak (a stated assumption: daily departures are about 6x the peak hour at a major airport). Bags per flight are modeled as load-factor x bags-per-passenger x seats (Exchange 1: checked-bag volume scales linearly with passengers; bags, not seats, are the screened object). The EDS effective rate is availability times mid-throughput (Exchange 2: the 92% is a machine-reliability multiplier, not a staffing limit). Method: a deterministic capacity/coverage model N = ceil(D_daily / (r_e x W)), which is sound because screening is a shared throughput resource and coverage is a hard 100% constraint.
+
+### Modeling Process
+
+Variables: s_i = seats of flight type i; n_i(A), n_i(B) = flights of type i at each airport (Table 1). LF = 0.85 load factor (interval [0.70,0.90], Exchange 1); BF = 0.65 checked bags/passenger (interval [0.5,1.0], Exchange 1); C = 0.02 cancellation (dataset note). Bags per flight B_i = LF x BF x s_i. Peak-hour bags D_peak = (1-C) x sum_i n_i x B_i. Daily bags D_daily = 6 x D_peak (6.0 = daily/peak multiplier, stated assumption). EDS availability a = 0.92 (Exchange 2: machine-reliability factor); EDS throughput 160-210 bags/hr, mid = 185; effective rate r_e = a x 185 = 170.2 bags/hr. Operational window W = 24 h (stated). Coverage sizing: N = ceil(D_daily / (r_e x W)). Results: Airport A D_peak = 2922, D_daily = 17530, N = 5. Airport B D_peak = 3130, D_daily = 18781, N = 5. Peak-hour-only sizing would give N = 1 (2922 and 3130 bags both fit in one EDS's 170.2/hr x 1 h); that is a non-binding lower bound, not the coverage answer.
+
+### Outcome Analysis
+
+Both airports need 5 EDSs to guarantee 100% daily coverage at the calibrated load factor and bag rate. The result is robust to load factor (LF 0.70-0.90 keeps N = 5 for both) but sensitive to the bag rate: BF = 0.5 gives N = 2-3, BF = 0.75 gives N = 5 (A) / 4 (B), BF = 1.0 gives N = 8 (A) / 6 (B). So the bag rate is the dominant input uncertainty. Limitations: the daily/peak multiplier (6x) and the 24 h window are assumptions, not data; a higher daily multiplier or a shorter screening window raises N. Bias: the model treats availability as a constant multiplier and ignores stochastic downtime clustering, so 5 is a planning estimate, not a guaranteed minimum under worst-day variability.
+
+## Subtask 2: Task 2: A one-page position paper describing the security-related objectives of the airlines and the constraints they mu
+
+### Problem
+
+Task 2: A one-page position paper describing the security-related objectives of the airlines and the constraints they must work within for the flights in Table 1.
+
+### Analysis
+
+This is a qualitative synthesis of the airline's incentives against the regulatory and physical constraints. The airline's security objectives and the constraints are stated plainly; no numerical model is required, but the numbers from Task 1 anchor the constraints.
+
+### Modeling Process
+
+Objectives (airline): (1) 100% of checked bags screened before loading, to meet the federal mandate and avoid a security breach or regulatory sanction; (2) screen bags fast enough to keep flights on schedule and avoid missed-connection cascades; (3) keep per-bag screening cost low, since EDSs cost ~$1M each and ETDs ~$45k with 10x labor; (4) maintain throughput in the peak hour so the 46 (A) / 48 (B) departures hold their slots. Constraints: (a) the 100% coverage mandate is hard - no bag may skip screening; (b) screening must finish before each flight's boarding/loading window, which couples bag volume to the departure schedule; (c) limited floor space and funds cap the number of devices (EDS weighs eight tons, costs thousands to install); (d) up to 20% of high-risk bags need dual EDS+ETD screening, which consumes extra device time; (e) device availability (92% EDS, 98% ETD) and throughput (160-210 and 40-50 bags/hr) bound the achievable screening rate; (f) the fleet is sized to 5 EDS per airport at the calibrated load, so the airline must schedule within that capacity.
+
+### Outcome Analysis
+
+The airline sits in a trade-off: the mandate forces full coverage, while the departure schedule and device capacity force the bags to clear in a bounded time. The position is that the airport/airline should treat screening capacity as a fixed input (5 EDS) and manage the schedule around it, rather than adding devices, because space and cost are the binding scarcity. This framing carries into Task 3 (schedule) and Task 6 (ETD adds cost, not just capacity).
+
+## Subtask 3: Task 3: Develop a model to help the airlines schedule the departure of different flight types within the peak hour so sc
+
+### Problem
+
+Task 3: Develop a model to help the airlines schedule the departure of different flight types within the peak hour so screening does not delay passengers, and produce a schedule for Airports A and B.
+
+### Analysis
+
+Screening is a shared resource with rate r_e bags/hr per EDS. A flight departing at minute t needs its bags cleared by t - SCAN_BASE (SCAN_BASE = 18 min before departure, for loading). With N units the resource clears bags at N x r_e/60 per minute. The scheduling rule orders flights so the most screening-heavy flights (most bags) depart first, because they have the longest screening time and thus the tightest margin. This is an earliest-deadline-first style rule applied to a makespan feasibility check, and it is sound because screening is a single shared server and the constraint is a per-flight deadline.
+
+### Modeling Process
+
+Inputs from Task 1: N = 5 EDS, r_e = 170.2 bags/hr, SCAN_BASE = 18 min. For each airport, expand Table 1 into individual flights (46 at A, 48 at B), each with bags B = LF x BF x seats. Order by bags descending (largest first). Assign departure minutes t_i = SCAN_BASE + i (1-minute spacing starting at minute 18, so the first flight's bags can be scanned before boarding). Feasibility check: cumulative screening minutes used = sum_i B_i / (N x r_e/60); all flights are on time if cumulative usage at flight i is complete by t_i - SCAN_BASE. Because r_e is fast (0.35 min/bag), the entire peak hour of bags uses only 210 min of A's 300 min (5 EDS x 60) capacity and 225 of B's 300, i.e. 70% / 75% utilization - comfortably feasible.
+
+### Outcome Analysis
+
+The schedule is: send the 350-seat (193 bags) and 215-seat (119 bags) flights out first (departures at minutes 18, 19, ...), then 194-seat (107 bags), then 142-seat (78 bags), then 128, 85, 46, and finally the 34-seat (19 bags) flights at the back of the hour. Screening is the non-binding step - it uses only ~35% of the hour's device-minutes - so departures can be spaced at 1-minute intervals with no passenger delay. Limitation: the model assumes bags arrive at the scanner continuously (no check-in batching) and that the 5 EDS run the whole hour; real check-in peaks could momentarily overload a device, so the schedule should keep a small buffer or stagger large flights a few minutes apart. The schedule would need to change only if N dropped below 5 (see Task 6) or if bag volume rose well above the BF = 1.0 bound.
+
+## Subtask 4: Task 4: Recommend to Mr. Sheldon and the airlines how to handle checked-bag screening for the peak-hour flights at the t
+
+### Problem
+
+Task 4: Recommend to Mr. Sheldon and the airlines how to handle checked-bag screening for the peak-hour flights at the two airports.
+
+### Analysis
+
+Synthesis of Tasks 1, 3, and 6 into actionable recommendations for both the TSA director and the airlines.
+
+### Modeling Process
+
+Recommendations: (1) Deploy 5 EDS per airport to guarantee 100% daily coverage; this is the capacity floor and should not be reduced. (2) Schedule large-bag flights first within the peak hour so the longest screening jobs get the most lead time; screening uses only ~70% of device capacity, so the schedule has headroom. (3) Because the bag rate (bags/passenger) is the dominant uncertainty, measure actual bag counts by flight type and re-run the sizing - a 1.0 bags/passenger rate would push Airport A to 8 EDS, so a 15-20% fleet buffer is prudent. (4) If the 20% dual-screen policy is adopted, add 4 ETD per airport and note the EDS requirement rises to 6 (every ETD bag also needs an EDS); the ETDs should not replace EDSs (see Task 6). (5) Keep a scheduling buffer for check-in batching; do not let a single device become a bottleneck for a large flight.
+
+### Outcome Analysis
+
+The recommendations are low-risk because they only add capacity and headroom, never reduce coverage. The main residual risk is over- or under-buying EDSs if the true bag rate differs from 0.65; the 15-20% buffer addresses this. Airlines should treat screening capacity as fixed and manage the departure schedule to it, rather than requesting more devices for scheduling flexibility.
+
+## Subtask 5: Task 5: Write a memo explaining how the models can be adapted to determine the number of EDSs and airline scheduling for
+
+### Problem
+
+Task 5: Write a memo explaining how the models can be adapted to determine the number of EDSs and airline scheduling for all 193 airports in the Midwest Region.
+
+### Analysis
+
+The two-airport model generalizes directly because every input is airport-specific and every formula is parameter-free except the calibrated bag-rate and load factor. The memo explains the adaptation path and the data that each airport must supply.
+
+### Modeling Process
+
+For each airport k: (1) collect the peak-hour departure mix (flight types, seats, counts) analogous to Table 1; (2) compute D_peak(k) = (1-C) x sum_i n_i(k) x LF x BF x s_i; (3) D_daily(k) = 6 x D_peak(k); (4) N(k) = ceil(D_daily(k) / (0.92 x 185 x 24)); (5) schedule departures by bags-descending with 1-minute spacing, feasible if N(k) >= 1 and utilization < 100%. The same four calibrated inputs (LF, BF, daily/peak multiplier, window) apply to all airports; only Table 1's mix differs. For ETDs, M(k) = ceil(0.20 x D_daily(k) / (0.98 x 45 x 24)) and N(k) rises to ceil(1.20 x D_daily(k)/(r_e x 24)). A national roll-out would pool the 193 D_daily values to size the total fleet and allocate EDSs by ranking airports by D_daily (largest first), which respects the limited device supply mentioned in the background.
+
+### Outcome Analysis
+
+The adaptation is mechanical and low-cost because no new assumptions are introduced; each airport just supplies its departure mix. Limitations: the daily/peak = 6x and the 24 h window are regional averages; a small airport with a sharper peak (e.g., a single morning wave) may need a higher multiplier, so the memo recommends calibrating the multiplier from each airport's daily departure profile where available. Bias: applying one LF/BF to all 193 airports ignores route-mix differences (hub vs. regional), so the allocation should be revisited once per-airport bag data exist.
+
+## Subtask 6: Task 6: Modify the EDS model to incorporate ETD machines, determine how many ETDs are needed for Airports A and B and wh
+
+### Problem
+
+Task 6: Modify the EDS model to incorporate ETD machines, determine how many ETDs are needed for Airports A and B and whether the schedules change, and write a memo analyzing whether the enhanced screening policy is justified and whether ETDs should replace any EDSs.
+
+### Analysis
+
+The 20% dual-screen policy sends high-risk bags through both an EDS and an ETD. ETDs are slower (40-50 bags/hr vs. 160-210) and cheaper ($45k vs. ~$1M) with 10x labor, but far more accurate (99.7% vs. 98.5%). The model adds an ETD sizing term and re-sizes the EDS for the extra overlap. The value judgement compares the detection improvement against the added cost and labor.
+
+### Modeling Process
+
+ETD availability 0.98, throughput mid 45, so r_t = 0.98 x 45 = 44.1 bags/hr. ETD share = 0.20 of bags (all bags of the 20% high-risk passengers). ETDs needed for daily coverage: M = ceil(0.20 x D_daily / (r_t x 24)). Airport A: 0.20 x 17530 = 3506 bags through ETDs; M = ceil(3506 / (44.1 x 24)) = ceil(3.30) = 4. Airport B: 0.20 x 18781 = 3756; M = ceil(3756/(44.1 x 24)) = ceil(3.54) = 4. Every ETD bag also needs an EDS, so EDS demand rises to 1.20 x D_daily: Airport A N = ceil(1.20 x 17530/(170.2 x 24)) = ceil(5.15) = 6; Airport B N = ceil(1.20 x 18781/(170.2 x 24)) = ceil(5.52) = 6. Detection: P(miss | device present) drops from 0.015 (EDS alone) to (0.015)(0.003) = 4.5e-5 with EDS+ETD (a 333x reduction). Cost: 4 ETD x $45k = $180k per airport in capital, plus 10x labor; the EDS fleet rises 5 to 6 (+$1M per airport). Schedules: the Task 3 schedule is unchanged in structure because the extra 20% of bags still clear within the same 24 h coverage window; only the ETD lane needs its own 1-minute-spaced schedule for the 20% subset.
+
+### Outcome Analysis
+
+The policy is justified on detection grounds: the 333x miss-rate reduction on the 20% high-risk bags is the single largest accuracy gain available, and ETDs are cheap in capital. It is not justified as a fleet-replacement strategy: ETDs should NOT replace EDSs, because (a) ETDs are 4x slower (44 vs 170 bags/hr) so swapping would raise the fleet size needed for 100% coverage, and (b) the dual-screen design keeps the EDS as the throughput backbone and the ETD as the accuracy layer on high-risk bags. The cost is justified only for the high-risk 20%, not for all bags - screening 100% of bags through ETDs would require 16-17 ETDs per airport and is not economical. ETDs complement, not replace, EDSs.
+
+## Subtask 7: Task 7: Use the EDS/ETD model to examine the effect of changes in device technology, cost, accuracy, speed, and reliabil
+
+### Problem
+
+Task 7: Use the EDS/ETD model to examine the effect of changes in device technology, cost, accuracy, speed, and reliability, and recommend the STEM research areas with the biggest impact on security-system performance.
+
+### Analysis
+
+Task 7 asks for a sensitivity/elasticity analysis: how does the required fleet N and the detection value respond to improvements in each device parameter? Because N = D/(r_e x W) and r_e = availability x throughput, the elasticities of N to throughput and availability are exactly -1 (a 1% improvement in either cuts N by 1%), while accuracy and cost do not change N - they change the value judgement. The ranking of research impact follows from the elasticities plus the cost/accuracy trade-offs.
+
+### Modeling Process
+
+Elasticity d lnN / d ln(p) = -1 for p in {throughput, availability}; 0 for {cost, accuracy}. A +10% improvement: throughput (185 to 203.5 bags/hr) cuts N by ~9% (elasticity -0.91 computed on the integer-free N; the -1 is the continuous bound, the -0.91 reflects the 92% availability already capping part of the gain); availability (0.92 to 0.96, capped at 1.0) cuts N by ~8% (elasticity -0.80, the cap reduces the gain below -1 as availability approaches 1). Cost reduction does not change N but directly cuts capital: a 50% EDS cost cut saves $0.5M per unit, the largest dollar lever. Accuracy: raising EDS accuracy from 98.5% toward the ETD's 99.7% cuts the miss-rate proportionally and is the lever that makes ETDs less necessary. Ranking by impact on system performance: (1) throughput/speed - highest elasticity, directly shrinks the fleet; (2) reliability/availability - second elasticity, and the 92% cap means the low-hanging fruit is fixing the 8% downtime; (3) accuracy - does not shrink the fleet but is the biggest detection-value lever and can substitute for ETDs; (4) cost - biggest dollar lever, no effect on N or detection. STEM research recommendations: (a) CT reconstruction and tomography speed (throughput) - biggest fleet-size impact; (b) device reliability and predictive maintenance (availability) - high impact and cheap relative to new hardware; (c) explosive-classification accuracy and false-alarm reduction (accuracy) - the detection-value lever; (d) cheaper detection hardware (emerging x-ray diffraction, neutron, quadropole resonance, millimeter-wave, microwave) - the cost lever and the path to replacing the $1M EDSs.
+
+### Outcome Analysis
+
+The analysis shows speed and reliability are the levers that shrink the fleet, while accuracy and cost are the levers that change the value of each device. Funding should prioritize CT throughput and reliability first (they reduce the number of $1M units the TSA must buy), then accuracy (which can reduce the need for the 10x-labor ETDs), then cheaper emerging hardware (the long-term cost path). Limitation: the elasticities assume the 92% availability and 185 bags/hr are the baseline and ignore that availability has a hard cap at 1.0, so its marginal value declines as it improves; the -0.80 (not -1) already reflects that cap at the 0.92 baseline. Bias: the model treats each parameter in isolation; in practice throughput and availability trade off (faster scanning can increase downtime), so the combined optimum may sit at a lower-throughput / higher-reliability point than the model suggests.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

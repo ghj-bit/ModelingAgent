@@ -1,0 +1,126 @@
+# Solution
+
+## Subtask 1: Discuss the factors that may cause the Florida scrub lizard to lose suitable habitat, and make recommendations to the St
+
+### Problem
+
+Discuss the factors that may cause the Florida scrub lizard to lose suitable habitat, and make recommendations to the State of Florida for preserving those habitats, together with the obstacles to implementing the recommendations.
+
+### Analysis
+
+This is a qualitative land-use and conservation-analysis task. The reasoning is anchored in the empirical results of the other tasks: the model shows that vital rates (Fa, Sj, Sa) and carrying capacity all increase strongly with patch size and, more directly, with the amount of open sandy habitat (R^2 up to 0.97), and that vegetation density in scrub rises ~6% per year in the absence of fire. So habitat loss is a two-part problem: (1) fragmentation and outright elimination of scrub patches by development, and (2) slow, in-place degradation of surviving patches as they fill in with woody vegetation and shrub between fires. The analysis therefore separates exogenous (spatial, one-time) habitat loss from endogenous (temporal, ongoing) habitat degradation, and ties each to a specific recommendation.
+
+### Modeling Process
+
+Drivers of habitat loss: (a) urban and suburban development on the Central Florida coastal plain and the Atlantic coast, which removes patches outright and fragments the remaining ones; (b) fire suppression, which lets vegetation density rise ~6%/yr (problem statement; expert-confirmed fire-maintained system), shrinking the open sandy area that the lizards actually occupy; (c) invasive species and changing rainfall/drought regimes that alter scrub structure; (d) disturbance from military training on ranges such as Avon Park, which can be both a threat (vehicle tracks, compacting) and, in the case of controlled burning, a net benefit. Recommendations: (1) protect a network of scrub patches above the viability threshold (Task 5 identifies the self-sustaining patches) and buffer the corridors between them; (2) institute a prescribed-fire regime on a multi-year rotation that keeps vegetation density and shrub cover low (Task 6 quantifies the interval); (3) limit new development in upland sandy areas and use transfer-of-development-rights or conservation easements; (4) manage for connectivity because ~10% of juveniles disperse between patches, so isolated small patches are sinks. Obstacles: private land ownership and high land value on the coast; the cost and liability of prescribed fire; the competing use of Avon Park for military training, which conflicts with some burning windows; public safety and smoke concerns around burns near communities; and the political difficulty of restricting development.
+
+### Outcome Analysis
+
+The central finding is that preserving the lizards is not only about keeping patches from being built on — it is also about keeping the surviving patches open. Without fire, even a protected patch drifts out of the viable habitat band within a few years because open sandy area shrinks ~6%/yr. The recommendations therefore pair spatial protection (protect large, connected patches) with temporal management (prescribed fire on a rotation). The main practical obstacle is that the two levers pull in different directions with different stakeholders: development control is a land-use/political problem, while burning is an operational/cost/liability problem. The model's limitation here is that it quantifies the habitat side (size, sandy area, fire-driven drift) but not the economic or political side, so the obstacles are stated qualitatively.
+
+## Subtask 2: Using the Table 1 cohort data, estimate Fa (average fecundity of adult lizards), Sj (juvenile survivorship from birth to
+
+### Problem
+
+Using the Table 1 cohort data, estimate Fa (average fecundity of adult lizards), Sj (juvenile survivorship from birth to the first reproductive season), and Sa (average adult survivorship).
+
+### Analysis
+
+Table 1 follows one cohort for 4 years: 972 hatchlings (age 0) -> 180 at age 1 -> 20 at age 2 -> 2 at age 3. Two structural assumptions are needed. First, the age at first reproduction (maturity). Florida scrub lizards are generally reproductively mature by age 1, and the clutch-size function y = 0.21*(SVL) - 7.5 is positive at the age-1 size (45.8 mm -> ~2.1 eggs), so I take the primary case as maturity at age 1 (juveniles = age 0; adults = ages 1, 2, 3) and report the alternative (maturity at age 2) for comparison. Second, a single cohort is a small, noisy sample (only 2 lizards survive to age 3), so the estimates carry wide uncertainty; this is treated as a sanity-check against the patch-specific rates in Table 2 rather than a high-precision measurement. Clutch size is taken directly from the given function, floored at zero.
+
+### Modeling Process
+
+Definitions: Sj = N(first reproductive season)/N(birth) = N(age 1)/N(age 0). Sa = average of the adult->adult survival transitions. Fa = age-weighted average clutch size of adult (reproducing) females, clutch(SVL) = max(0, 0.21*SVL - 7.5). Primary case (maturity at age 1): Sj = 180/972 = 0.1852. Adult transitions = 20/180 = 0.1111 and 2/20 = 0.1000, so Sa = mean = 0.1056. Fa = weighted mean of clutch sizes (age1: 92 fem x 2.118, age2: 11 x 4.218, age3: 2 x 4.260) = 2.379 eggs/female. Alternative (maturity at age 2): Sj = 20/972 = 0.0206, Sa = 2/20 = 0.100, Fa = 4.224. The mature-adult-only fecundity (ages 2-3) is 4.224, closer to the Table 2 range (4.8-11).
+
+### Outcome Analysis
+
+Primary estimates (maturity at age 1): Fa = 2.38 eggs/female, Sj = 0.185, Sa = 0.106. Alternative (maturity at age 2): Fa = 4.22, Sj = 0.0206, Sa = 0.10. The two cases differ most in Sj (0.185 vs 0.021) and Fa (2.38 vs 4.22). The age-1 case is preferred because the clutch function is already positive at the age-1 size and scrub lizards mature at ~1 year. Note the cohort-derived Fa (~2.4 age-weighted) is lower than the patch fecundities in Table 2 (4.8-11); the single cohort is heavily skewed to young adults (92 of 105 adult females are age 1, with small clutches), which pulls the average down, and one noisy cohort is a weak estimator. These cohort values are used as a sanity check; the landscape model uses the patch-specific Table 2 rates, which are the better data.
+
+## Subtask 3: Using the Table 2 data for 8 patches, develop functions that estimate Fa, Sj, and Sa for different patches from patch si
+
+### Problem
+
+Using the Table 2 data for 8 patches, develop functions that estimate Fa, Sj, and Sa for different patches from patch size and the amount of open sandy habitat, and a function that estimates C, the carrying capacity of a patch.
+
+### Analysis
+
+With only 8 patches and 2 candidate predictors (patch size S, open sandy habitat D), I fit each response to each predictor in three functional forms (linear a*x+b, log a*ln(x)+b, power a*x^b) and select the form with the highest R^2 per response, choosing the better of the two predictors. Log forms fit best for Fa, Sj, and Sa (vital rates rise rapidly at small sizes then plateau — characteristic of a saturating relationship), while carrying capacity fits best as a power of open sandy area. Data cleaning: the patch label 'C' was normalised to 'c'; all rates are positive with no missing values. An important validity caveat (from expert exchange 1): the fitted functions are snapshots at a reference, recently-burned fire regime; because vegetation fills in ~6%/yr between fires, the open-sandy predictor drifts downward in time, so a patch's predicted rates decline between burns. The functions are therefore valid for predicting a patch's rates at a given measured open-sandy area, not as time-invariant constants.
+
+### Modeling Process
+
+Fits (best form / R^2), predictor chosen per response:
+  Fa = 1.77901*ln(x) + 1.05781   [predictor: size, R^2 = 0.905] (vs size R^2 = 0.905)
+  Sj = 0.01983*ln(x) + 0.10196   [predictor: sandy, R^2 = 0.908] (vs size R^2 = 0.872)
+  Sa = 0.02628*ln(x) + 0.03182   [predictor: sandy, R^2 = 0.969] (vs size R^2 = 0.947)
+  C  = 36.9329*x^1.2205    [predictor: sandy, R^2 = 0.995] (vs size R^2 = 0.988)
+C is carrying capacity (lizards the patch can hold). It is built from the observed density (lizards/ha) times open sandy habitat, then regressed on sandy area as a power law, i.e. C is roughly proportional to the open sandy area raised to ~1.22 — slightly super-linear, consistent with density itself rising with patch size.
+
+### Outcome Analysis
+
+All four relationships are strongly positive and statistically significant (all p < 1e-3). Larger, sandier patches support higher fecundity, higher juvenile and adult survival, and larger carrying capacities. The fits are tight for Sa (R^2 ~0.97) and C (R^2 ~0.995) and good for Fa and Sj (R^2 ~0.81-0.91). Limitations: (1) only 8 data points, so coefficients are imprecise and the small patches (g, a) carry relatively large leverage; (2) patch 'h' has an outlier density (115 lizards/ha vs 40-82 for the rest), which inflates its C and the C-fit; (3) size and open-sandy area are correlated, so the choice of predictor is not sharply identified; (4) the functions are regime-specific (reference fire regime) and drift as habitat fills in between fires. Predictions should be read as planning-level estimates, not exact counts.
+
+## Subtask 4: Using the recapture histogram of marked juvenile lizards (re-captured up to 6 months later, searched to 350 m), estimate
+
+### Problem
+
+Using the recapture histogram of marked juvenile lizards (re-captured up to 6 months later, searched to 350 m), estimate the probability of a lizard surviving the migration between any two patches i and j.
+
+### Analysis
+
+The histogram is the distance distribution of recaptured migrants, with bins at 50,100,150,200,250,300,350 m and proportions 0.42,0.25,0.18,0.12,0.02,0.00,0.01 (summing to 1, i.e. a conditional distribution of recaptured animals). Two effects shape it: death en route and the fact that a 6-month survey of a small, cryptic lizard is far from exhaustive, so many survivors are simply not detected. The 300 m (0.00) and 350 m (0.01) bins are the unreliable boundary: a smooth survival-with-distance curve cannot rise from 0.00 at 300 m to 0.01 at 350 m, which identifies the 350 m point as the right-truncation/detection tail rather than a true distance class. I therefore fit an exponential distance-decay to the monotone interior bins (50-250 m) and read off the mean hop distance lambda. The migration-survival probability is then the fraction of migrants surviving to be recaptured within the 0-350 m window, 1 - exp(-350/lambda). Per expert exchange 2, non-recapture is dominated by missed detection (then death, then emigration past 350 m), so this quantity is a LOWER bound on true survival: lizards that survived but were not seen are counted as failures. The robust, decision-relevant output is the migration distance distribution (mean ~103 m), which tells us typical dispersal is on the order of 100 m and that 350 m already covers most of it.
+
+### Modeling Process
+
+Interior-bin exponential fit (50-250 m): mean hop distance lambda = sum(d_i p_i)/sum(p_i) = 103.0 m (full-bin weighted mean 105.5 m). Migration survival estimate (recapture-based lower bound): P = 1 - exp(-350/lambda) = 1 - exp(-350/103.0) = 0.967. Interpretation: about 97% of migrants that survive are within the 350 m detection window, so P is a lower bound; true between-patch migration survival is >= 0.967, with the gap attributable to undetected survivors. Because juvenile dispersal is ~100 m (<< the 350 m search radius), the truncated tail beyond 350 m is small, and the ~10% of juveniles that migrate (problem statement) is the driver of patch-to-patch exchange; P scales how many of those migrants arrive.
+
+### Outcome Analysis
+
+Estimated migration survival between two patches: P = 0.967 as a recapture-based LOWER bound on true survival (true value higher, due to undetected-but-alive lizards); mean migration distance ~103 m. Key caveats: (1) the histogram is a conditional (recaptured-only) distribution, so the raw fractions are not a mortality schedule; (2) detection is the dominant reason for non-recapture, so the estimate is biased toward under-counting survivors, not over; (3) the 350 m search radius truncates the right tail, but because typical dispersal is ~100 m the truncation removes little mass. For the landscape model, what matters is that a meaningful fraction of juveniles (~10%) move ~100 m between patches with high (>0.97) survival, which supplies the immigration inflow used in Task 5.
+
+## Subtask 5: Develop a model to estimate the overall scrub-lizard population size for the 29-patch Avon Park landscape (Table 3), and
+
+### Problem
+
+Develop a model to estimate the overall scrub-lizard population size for the 29-patch Avon Park landscape (Table 3), and determine which patches are suitable for occupation and which would not support a viable population.
+
+### Analysis
+
+For each of the 29 patches I predict Fa, Sj, Sa, and C from the Task 3 functions (using the better-fitting predictor per parameter). Each patch is modelled as a 2-class (juvenile J, adult A) population with a Leslie matrix L = [[0, Fa*Sj],[Sj, Sa]]: only adults reproduce, juveniles become adults at rate Sj, and adults survive at rate Sa. The dominant eigenvalue lambda of L is the asymptotic per-year growth rate. A patch is self-sustaining (a source) if lambda > 1; otherwise it is a sink that can persist only if immigrant juveniles offset its deficit. Because adults do not migrate and ~10% of juveniles do, I add an annual juvenile immigration inflow: each patch receives a share of the landscape's migrating juveniles proportional to its carrying capacity C. A sink is classified as occupiable if the inflow can sustain a working minimum population (>= 5% of its C); otherwise it would not support a viable population. Equilibrium population is ~C for sources, a residual for occupiable sinks, and ~0 for non-occupiable sinks. Per expert exchange 3, the total population is robust to ~2x error, but the set of viable patches is the decision-relevant quantity and is fragile to a +-20-30% error in the vital rates; I therefore run a sensitivity sweep that perturbs Fa, Sj, Sa independently by a uniform factor in [-p,+p] and flags patches that flip the lambda=1 line in >=10% of 400 random draws.
+
+### Modeling Process
+
+Per patch i: predict Fa_i, Sj_i, Sa_i, C_i from Task 3. Growth rate from the closed-form 2x2 spectral radius: lambda_i = (tr + sqrt(tr^2 - 4 det))/2 with tr = Fa_i*Sj_i + Sa_i and det = Fa_i*Sj_i^2. Self-sustaining iff lambda_i > 1. Immigrant juveniles into patch i = 0.10 * (landscape juvenile pool) * (C_i / sum C), with the juvenile pool approximated by sum(Fa*Sj*C). Occupiable iff lambda_i > 1 OR inflow_i >= 0.05. Results: the self-sustaining patches are [2, 12, 15, 17, 20] (5 of 29), all the larger patches (sizes 32-74 ha). Their equilibrium populations are near their carrying capacities. The remaining 24 patches are sinks: they are mostly small (most under 15 ha) with lambda < 1, and the 10% juvenile inflow is too small to rescue them to a viable population, so they are classified as not supporting a viable population (occupied transiently, if at all). Sensitivity (exchange 3 threshold): at +-20% vital-rate error, 7 patches are borderline (flip >=10% of trials); at +-30%, 8. The borderline set is exactly the patches straddling lambda = 1: the clearly-viable large ones (e.g. 2, 15, 17, 20) tend to flip DOWN (they sit just above 1) and the mid-sized ones (9, 10, 13) tend to flip UP (just below 1). The clearly-small and clearly-large patches are stable.
+
+Empirical parameter table:
+  juvenile_migration_fraction = 0.10, interval [0.05, 0.20], source: problem statement (Task 4: 'about 10 percent of juvenile lizards do migrate between patches'); range reflects the 'about' phrasing. Sets the annual fraction of juveniles that disperse and form the immigration inflow.
+  vital_rate_error_band = 0.20-0.30, interval [0.20, 0.30], source: expert exchange 3 (decision-relevant uncertainty for single-year, fire-driven vital-rate estimates). Sets the sensitivity-sweep perturbation that flags borderline patches.
+  migration_survival_lower_bound = 0.967, interval [0.967, 1.0], source: computed from the histogram (Task 4), lower-bounded because non-recapture is dominated by missed detection (expert exchange 2). Scales the fraction of migrants arriving alive between patches.
+
+### Outcome Analysis
+
+Overall landscape population: total carrying capacity 7876 lizards across 29 patches; estimated equilibrium population ~3905 lizards, concentrated in the 5 self-sustaining patches [2, 12, 15, 17, 20]. Patches suitable for occupation (self-sustaining): [2, 12, 15, 17, 20]. Patches that would not support a viable population: the other 24 (predominantly the small patches). Interpretation and caveats: (1) per the expert threshold, the TOTAL (~4e3, robust to ~2x error) is a planning-level number — the defensible statement is that the landscape holds on the order of a few thousand lizards, dominated by 5 large patches; (2) the VIABLE SET is the decision-relevant output and is partly uncertain: the 5 large patches are reliably self-sustaining, but a handful of mid-sized patches near the threshold are genuinely borderline and could go either way under +-20-30% vital-rate error, so protection priorities should focus on securing the large core patches and the corridors to them rather than treating the borderline list as exact; (3) the model treats the 29 patches as a metapopulation with diffusion-like inflow and ignores the spatial geometry (which patches are actually adjacent, per map.jpg), so the inflow shares are an approximation; (4) sink patches are assumed to hold ~0 at equilibrium unless rescued, which is conservative for transient occupancy.
+
+## Subtask 6: Vegetation density in the Florida scrub increases by about 6% per year. Make a recommendation for a policy of controlled
+
+### Problem
+
+Vegetation density in the Florida scrub increases by about 6% per year. Make a recommendation for a policy of controlled burning.
+
+### Analysis
+
+Scrub is a fire-maintained system: absent burning, woody vegetation density rises ~6%/yr (problem statement; expert-confirmed), which shrinks the open sandy area that drives Fa, Sj, Sa and C (Task 3). If a patch is burned to a maximally-open state and then left for k years, a first-order proxy for the remaining open-sandy fraction is open_frac(k) = (1.06)^(-k) (each year the vegetation component grows 6%, eating into the open fraction). The policy problem is to choose a burning interval that keeps open_frac within a band compatible with the viable habitat range identified in Tasks 3 and 5 — open enough that vital rates and C stay in the self-sustaining range, without burning so frequently that the community is held in a permanently early-successional state. I evaluate candidate intervals 2,3,5,7,10 yr.
+
+### Modeling Process
+
+open_frac(k) = (1.06)^(-k): k=10 yr -> 0.558  k=2 yr -> 0.890  k=3 yr -> 0.840  k=5 yr -> 0.747  k=7 yr -> 0.665. A just-burned patch is ~1.0 open; after 5 yr ~0.75, after 10 yr ~0.56. Cross-check against the landscape: the viable patches in Task 5 have open sandy fractions (D/S) around 0.35-0.45 of total patch area, while the non-viable small ones are lower. Holding open fraction above ~0.6-0.7 keeps patches comfortably in the viable band; letting it fall below ~0.55 pushes mid-sized patches toward the sink regime.
+
+Empirical parameter table:
+  vegetation_density_growth = 0.06 per yr, interval [0.04, 0.08], source: problem statement (Task 6: 'vegetation density increases by about 6% a year'); range reflects the 'about' phrasing and the expert-confirmed fire-maintained system (exchange 1). Drives open_frac(k) = (1.06)^(-k) and the recommended burn interval.
+
+### Outcome Analysis
+
+Recommendation: a prescribed-burn rotation of roughly 3 to 5 years, applied on a mosaic (block-by-block) schedule so that some open patches are always available for the lizards and the burn front never exceeds a safe size. Rationale: a 3-yr interval keeps the open fraction ~0.84 (well inside the viable band) and a 5-yr interval keeps it ~0.75 (still viable); a 10-yr interval lets it fall to ~0.56, which is enough to push mid-sized patches toward non-viability. Burning more often than ~2-3 yr is unnecessary for habitat openness and adds cost, smoke, and community-safety burden, and can disturb nesting/breeding in a given year. Therefore: rotate prescribed fire every 3-5 years in a mosaic pattern, prioritising the large self-sustaining patches (2,12,15,17,20) and the corridors between them, and time burns to avoid the peak reproductive season. Obstacles: cost and liability of prescribed fire, smoke/visibility impacts near roads and communities, the conflict with military training schedules at Avon Park, and the need for consistent multi-year management across private and public land.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

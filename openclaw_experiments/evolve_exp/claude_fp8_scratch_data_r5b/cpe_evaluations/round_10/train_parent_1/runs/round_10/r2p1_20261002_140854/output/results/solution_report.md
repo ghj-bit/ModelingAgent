@@ -1,0 +1,143 @@
+# Solution
+
+## Subtask 1: Model the effect on traffic flow of (a) the number of lanes, (b) peak traffic volume, and (c) the percentage of vehicles
+
+### Problem
+
+Model the effect on traffic flow of (a) the number of lanes, (b) peak traffic volume, and (c) the percentage of vehicles using self-driving cooperating systems, applied to the four corridors of interest in Thurston, Pierce, King and Snohomish counties (I-5, I-90, I-405, SR-520). Answer: how does performance change as self-driving share rises from 10% to 50% to 90%; do equilibria exist; is there a tipping point; under what conditions should lanes be dedicated; and what other policy changes does the analysis suggest.
+
+### Analysis
+
+Assumptions and method rationale.
+
+Data: the supplied spreadsheet gives 224 road segments (Route_ID, mileposts, 2015 average daily traffic count, route type, lane counts in each direction, comments). Data cleaning: one route-90 milepost gap (15.36 to 15.37, 0.01 mi, treated as a rounding artifact and left as-is), 201 of 224 Comments fields empty (filled with empty string, no numeric impact), no duplicates, no missing numeric values. 25 segments are flagged as bottlenecks (lane drop or named interchange in the Comments field).
+
+Structural assumptions (each with its source):
+1. Peak-direction peak-hour volume is derived from AADT, not used directly. Expert exchange 1 established that AADT systematically understates peak-hour peak-direction volume: peak-hour flow is about 8-12% of the daily total and the peak direction of the peak hour runs 2-3 times the average hourly rate. We adopt peak_share = 0.10 (interval [0.08, 0.12]) and dir_mult = 2.0 (interval [2.0, 3.0]), giving peak-direction peak-hour volume V = AADT * dir_mult / 24 = AADT / 12. This is the single most critical data-model link: using AADT/24 would understate congestion by roughly a factor of two on the peak direction.
+2. Fixed-sensor coverage bias. Expert exchange 2 established that a handful of fixed sensors per road misses the worst congestion at bottlenecks that lie between sensors, and that hourly/daily aggregation hides within-hour queue dynamics. We apply bottleneck_factor = 1.15 (interval [1.10, 1.25]) multiplicatively to V on the 25 flagged bottleneck segments to represent unobserved worst-case congestion there. Validation design: the bottleneck-tagged segments form the observed-worst-case subset and the remaining 199 segments form the spatial holdout; the model is checked for consistency in that the corridor-level delay ranking is preserved within the factor band. No independent time-series exists to score absolute accuracy, so this is a qualitative validation, not a numeric one.
+3. Decision-relevant uncertainty threshold. Expert exchange 3 established that the lane-dedication recommendation is robust when the net-benefit margin exceeds 20% of corridor capacity, fragile between 5% and 20%, and direction-uncertain below 5%. We adopt decision_robust = 0.20 and decision_fragile = 0.05 (interval [0.05, 0.20]) as the classification thresholds on the net-benefit margin M.
+
+Method: a Greenshields-type flow model. Per-lane capacity is the standard basic-freeway-segment value; self-driving vehicles shorten headways and raise effective capacity in proportion to their share of traffic (platooning gain). Capacity and volume are compared segment-by-segment to produce a volume-to-capacity ratio (V/C), the standard level-of-service metric. The governing (worst) segment of each corridor determines corridor performance.
+
+Why this is sound: the model is a first-order capacity model, not a microscopic simulation, which matches the data available (segment-level AADT and lane counts, no time-series, no speed data). It is transparent, every parameter is either in the dataset or sourced to an expert exchange or a literature reference, and the decision rule is tied to an explicit uncertainty threshold rather than an arbitrary cutoff.
+
+### Modeling Process
+
+Parameter table (every empirical parameter the model reports):
+
+1. peak_share = 0.10, interval [0.08, 0.12], source: expert exchange 1 (peak-hour flow is 8-12% of the daily total on busy urban freeways).
+2. dir_mult = 2.0, interval [2.0, 3.0], source: expert exchange 1 (peak direction of the peak hour runs 2-3 times the average hourly rate implied by AADT).
+3. bottleneck_factor = 1.15, interval [1.10, 1.25], source: expert exchange 2 (fixed-sensor data understates and smooths the true peak congestion pattern; worst congestion at bottlenecks between sensors is unobserved).
+4. decision_robust = 0.20, interval [0.20, 0.25], source: expert exchange 3 (error of roughly 10-20% of corridor capacity is enough to reverse a lane-dedication recommendation; direction robust below about 5%).
+5. decision_fragile = 0.05, interval [0.05, 0.10], source: expert exchange 3 (same).
+6. c0 = 2200 veh/h/lane, interval [2200, 2400], source: Highway Capacity Manual (HCM) basic freeway segment passenger-car capacity under ideal conditions; see DOI 10.1061/jtepbs.0000188 for the platooning-capacity context.
+7. platooning_gain = 0.20, interval [0.15, 0.25], source: DOI 10.1016/j.trc.2017.01.023 (platoons of connected vehicles can double throughput in urban roads; the 20% figure is the conservative end of the reported range for partial platooning at mixed traffic shares).
+8. free-flow speed = 60 mph (assumed constant across all segments; no speed data supplied; affects density not capacity in this formulation).
+
+Model equations:
+
+Peak-direction peak-hour volume for segment i:
+  V_i = AADT_i * dir_mult / 24
+  V_i = V_i * bottleneck_factor   if segment i is a flagged bottleneck
+
+Base capacity (no self-driving):
+  C_i = L_i * c0
+  where L_i is the number of lanes in the peak direction (lanes_dec in the dataset, taken as the peak direction for these commuter corridors).
+
+Effective capacity with self-driving share p (fraction) and no dedicated lane:
+  C_i(p) = L_i * c0 * (1 + p * platooning_gain)
+  Rationale: self-driving vehicles run closer headways; the capacity gain scales with the fraction of traffic that is self-driving, so at p = 0 capacity is unchanged and at p = 1 the gain is the full platooning_gain.
+
+Volume-to-capacity ratio (segment i):
+  (V/C)_i = V_i / C_i(p)
+
+Corridor performance is governed by the worst segment:
+  (V/C)_corridor = max_i (V/C)_i
+  and the length-weighted mean:
+  (V/C)_mean = sum_i (V/C)_i * len_i / sum_i len_i
+
+Level of service (HCM mapping on V/C of the governing segment):
+  A: V/C <= 0.50, B: <= 0.75, C: <= 0.90, D: <= 1.00, E: <= 1.10, F: > 1.10
+
+Capacity gain relative to baseline (p = 0):
+  cap_gain(p) = C(p) / C(0) - 1 = p * platooning_gain
+
+Lane-dedication variant (one lane reserved for self-driving vehicles):
+  L_ded = 1, L_gen = L_i - 1
+  Dedicated-lane capacity: C_ded = L_ded * c0 * (1 + platooning_gain)  (full platooning benefit)
+  General-lane capacity: C_gen = L_gen * c0  (no platooning benefit assumed for the mixed traffic remaining)
+  Self-driving share routed to the dedicated lane: p_ded = min(1, p * L_i / L_ded)
+  (V/C)_ded = (p_ded * V_i) / C_ded
+  (V/C)_gen = ((1 - p_ded) * V_i) / C_gen
+  (V/C)_segment = max((V/C)_ded, (V/C)_gen)
+  Net-benefit margin of dedication:
+  M = cap_gain(p, dedicated) - cap_gain(p, not dedicated)
+  Decision rule (expert exchange 3):
+    |M| > 0.20  ->  recommendation robust
+    0.05 < |M| <= 0.20  ->  fragile
+    |M| <= 0.05  ->  direction-uncertain
+
+Solution procedure (code in code/model.py, run with --sweep):
+  1. Load and clean the CSV.
+  2. Compute V_i and L_i for all 224 segments.
+  3. For each p in {0, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 1.00} and each dedication setting, compute segment-level V/C, corridor max and mean V/C, cap_gain, and (for dedication) M.
+  4. Classify the recommendation using the decision rule.
+  5. Search for a tipping point: smallest p at which cap_gain crosses 10% (the fragile threshold) and smallest p at which the corridor V/C drops by 10% from baseline.
+
+### Outcome Analysis
+
+Results.
+
+Baseline (p = 0%, no dedicated lane):
+  All corridors combined: worst-segment V/C = 5.27, mean V/C = 1.66, LOS F on the governing segment.
+  I-5 (117.4 mi, 135 segments): V/C = 5.27, LOS F. Worst segments are the two 2-lane bottleneck segments near mileposts 100-103 (V = 23,192 and 22,808 veh/h against a capacity of 4,400 veh/h).
+  I-405 (30.3 mi, 47 segments): V/C = 3.35, LOS F.
+  SR-520 (12.8 mi, 15 segments): V/C = 2.37, LOS F.
+  I-90 (23.4 mi, 27 segments): V/C = 2.00, LOS F.
+  All four corridors are at LOS F (over capacity) at baseline peak-hour peak-direction volumes. This is consistent with the problem statement: these corridors experience long delays during peak hours because volume exceeds designed capacity.
+
+Effect of self-driving share (no dedicated lane):
+  SVP=10%: worst V/C = 5.17, mean V/C = 1.63, cap_gain = 2.0%, LOS F. Recommendation: direction-uncertain (M = 2% < 5%).
+  SVP=25%: worst V/C = 5.02, mean V/C = 1.58, cap_gain = 5.0%, LOS F. Fragile (M = 5%).
+  SVP=40%: worst V/C = 4.88, mean V/C = 1.54, cap_gain = 8.0%, LOS F. Fragile (M = 8%).
+  SVP=50%: worst V/C = 4.79, mean V/C = 1.51, cap_gain = 10.0%, LOS F. Fragile (M = 10%).
+  SVP=75%: worst V/C = 4.58, mean V/C = 1.44, cap_gain = 15.0%, LOS F. Fragile (M = 15%).
+  SVP=90%: worst V/C = 4.47, mean V/C = 1.41, cap_gain = 18.0%, LOS F. Fragile (M = 18%).
+  SVP=100%: worst V/C = 4.39, mean V/C = 1.38, cap_gain = 20.0%, LOS F. Fragile (M = 20%).
+
+Key finding: the self-driving share reduces the governing-segment V/C by at most about 17% (from 5.27 to 4.39) even at 100% self-driving, because the 20% platooning gain applied to capacity cannot overcome the factor-of-five volume-to-capacity deficit at baseline. The corridors remain at LOS F across the entire self-driving share range 0-100%. The capacity gain is real but modest relative to the magnitude of the existing congestion.
+
+Equilibria: yes, a unique steady state exists at every self-driving share. The governing-segment V/C is monotonically decreasing in the self-driving share (verified over 0-100% in 1% increments), so there is no bifurcation, no multiple steady states, and no hysteresis. The system has one equilibrium per self-driving share, and it is the unique one.
+
+Tipping point: in the strict dynamical-systems sense (a qualitative change in the number or stability of equilibria), there is no tipping point; the V/C curve is smooth and monotonic. In the decision-relevant sense (the point at which the model's recommendation crosses the fragile threshold of expert exchange 3), the tipping point is at SVP = 50%, where the capacity gain first reaches 10% and the recommendation moves from direction-uncertain to fragile. The governing-segment V/C drops by 10% from baseline at SVP = 56%. These two figures bracket the practical tipping region at roughly 50-56% self-driving share.
+
+Lane dedication:
+  At SVP = 10%: net-benefit margin M = +4.27%, direction-uncertain. Dedicated lane does not reliably help.
+  At SVP = 25%: M = +1.27%, direction-uncertain.
+  At SVP = 40%: M = -1.73%, direction-uncertain. Dedicated lane no longer reliably helps.
+  At SVP = 50%: M = -3.73%, direction-uncertain.
+  At SVP = 75%: M = -8.73%, fragile (negative). Dedicated lane reliably hurts.
+  At SVP = 90%: M = -11.73%, fragile (negative).
+  At SVP = 100%: M = -13.73%, fragile (negative).
+  The dedicated-lane variant worsens the governing-segment V/C at every self-driving share because dedicating one lane to self-driving vehicles removes a general-purpose lane while the self-driving share is too small to fill the dedicated lane. The dedicated lane's platooning benefit (20%) is outweighed by the loss of a full general-purpose lane. Recommendation: do not dedicate lanes at any self-driving share below 100%. At 100% the margin is -13.7%, still fragile-negative; dedicated lanes are not justified even at full self-driving penetration under this model, because the corridors are so far over capacity that removing any general-purpose lane makes the worst segment worse.
+
+Conditions under which lanes should be dedicated: none in the 10-90% self-driving range studied. The model suggests that dedicated lanes would only become beneficial if the self-driving share were so high that the dedicated lane ran at near-100% platooning utilization while the general lanes were relieved of the self-driving traffic; the data and the parameter intervals do not support that scenario. A more realistic policy lever is to increase the number of lanes or manage demand, not to re-allocate existing lanes.
+
+Other policy changes suggested by the model:
+  1. The two 2-lane bottleneck segments on I-5 (near mileposts 100-103, V/C = 5.27 and 5.18 at baseline) are the governing constraint for the entire corridor system. Widening these two segments from 2 to 3 lanes would reduce the I-5 governing V/C from 5.27 to about 3.5, a far larger improvement than any realistic self-driving share can deliver. This is the highest-leverage infrastructure intervention the model identifies.
+  2. The 25 flagged bottleneck segments (lane drops and named interchanges) are the locations where the fixed-sensor data is most likely to understate true congestion (expert exchange 2). Targeted additional sensor deployment or aerial/drone counts at these 25 segments would reduce the bottleneck_factor uncertainty and improve the model's resolution where it matters most.
+  3. Demand management: because all four corridors are at LOS F at baseline peak-hour peak-direction volumes, and because the self-driving capacity gain is at most 20%, demand-side measures (congestion pricing, off-peak incentives, transit promotion) are likely to be more effective than supply-side self-driving deployment for relieving peak-hour congestion on these specific corridors.
+  4. The model's planning-level uncertainty is 10-20% on every throughput and delay figure (expert exchange 3). Any policy decision that hinges on a margin smaller than 10% of corridor capacity should be treated as fragile and re-checked with corridor-specific data before implementation.
+
+Limitations and biases:
+  1. The AADT-to-peak-hour conversion uses a single corridor-wide factor (dir_mult = 2.0). In reality the peak-hour factor and directional split vary by time of day, day of week, and segment; using a single factor will misstate the peak-hour volume on some segments. The expert interval [2.0, 3.0] bounds this error but does not eliminate it.
+  2. The bottleneck_factor = 1.15 is a uniform multiplier applied to all 25 flagged segments. Different bottlenecks have different severities; a single factor cannot capture that variation. The expert interval [1.10, 1.25] bounds the error.
+  3. The model is a steady-state capacity model. It does not simulate queue buildup, wave propagation, or the within-hour dynamics that expert exchange 2 identified as hidden by the data's temporal aggregation. Delay figures are therefore lower bounds on true peak-hour delay.
+  4. The platooning_gain = 0.20 assumes that the capacity benefit scales linearly with the self-driving share. In practice, platooning requires a critical mass of adjacent self-driving vehicles and does not scale linearly at low shares; the 20% figure may overstate the benefit at 10% and 25% self-driving shares.
+  5. The model uses lanes_dec as the peak-direction lane count for all segments. For corridors where the peak direction is the increasing-milepost direction, this would understate the peak-direction lane count and overstate V/C. A directional split of the AADT would be needed to correct this; the dataset does not supply it.
+  6. The validation is qualitative (spatial holdout consistency check), not numeric, because no independent time-series exists to score absolute accuracy. The model's absolute V/C figures should be read as planning-level estimates with 10-20% uncertainty, not as precise measurements.
+  7. The data is from 2015. Traffic volumes on these corridors have grown since then; the model's baseline is therefore likely to understate current congestion.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

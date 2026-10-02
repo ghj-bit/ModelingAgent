@@ -1,0 +1,85 @@
+# Solution
+
+## Subtask 1: Part (a): Build a model of passenger flow through a US airport security checkpoint (Zones A-D: ID check, open screening 
+
+### Problem
+
+Part (a): Build a model of passenger flow through a US airport security checkpoint (Zones A-D: ID check, open screening line with X-ray belt + millimeter-wave scanner, belt retrieval, pat-down/extra search) and identify where the bottlenecks and problem areas are in the current process, using the supplied checkpoint log.
+
+### Analysis
+
+Assumptions: (1) The checkpoint is modeled as two parallel queueing pools - a regular pool and a Pre-Check pool - because the two streams have different arrival rates and different per-passenger service (Pre-Check skips shoes/belts/jackets/laptop removal). (2) The binding service step is the open screening belt (Zone B): a passenger's belongings ride the X-ray belt (mean 'time to get scanned' 28.6 s from the data) while the passenger concurrently goes through the millimeter-wave scanner, so the belt retrieval time sets the per-lane throughput. (3) The two ID-check officers and the two X-ray machines are not the bottleneck because their timestamps are sparse and they run concurrently with the belt; they are folded into the per-passenger service. (4) The supplied log is a partial, quiet-early-period sample (see data provenance below), so it calibrates service times and the arrival process structure, not the peak rate. Method: a per-lane-class M/M/c (Erlang-C) analytic model for steady-state utilization and mean wait, cross-checked with a discrete-event M/G/c simulation that carries a peak-shaped (non-homogeneous) arrival profile and a service-time distribution with a realistic coefficient of variation. The analytic model gives the utilization (the bottleneck indicator) and the simulation gives the upper-tail wait distribution, which is the decision-relevant quantity.
+
+### Modeling Process
+
+Parameters (one table; empirical values with source):
+- lambda_early_pre = 6.53 pax/min, interval [6.0,7.1], source: task dataset 2017_ICM_Problem_D_Data.csv (inter-arrival of 'TSA Pre-Check Arrival Times', n=58).
+- lambda_early_reg = 4.63 pax/min, interval [4.0,5.2], source: task dataset (inter-arrival of 'Regular Pax Arrival Times', n=47).
+- mu_belt (per regular lane) = 60/28.6 = 2.10 pax/min, interval [2.0,2.2], source: task dataset 'Time to get scanned property' mean 28.6 s (n=29).
+- mu_pre (per Pre-Check lane) = 2.10/0.70 = 3.00 pax/min, interval [2.7,3.3], source: Pre-Check expedites screening (problem statement: no shoes/belts/jackets/laptop removal); 0.70 is a 30% faster-handling assumption, a sensitivity parameter.
+- RHO_TARGET = 0.85, interval [0.80,0.90], source: congested-but-stable operating point consistent with the published post-9/11 checkpoint congestion anchor (avg-max wait ~21 min pre-reform, a 43% wait reduction = 9 min, DOI 10.69554/gxtq5425).
+- FAIL_LO_MIN = 30, interval [30,45], source: expert exchange 3 (upper-tail wait failure band).
+- svc_cv = 0.5, interval [0.4,0.9], source: staffed-belt service variability assumption (sensitivity).
+Model: for each class k in {reg,pre} with arrival rate lambda_k, per-lane rate mu_k, and c_k open lanes, offered load a_k = lambda_k/mu_k (Erlangs), utilization rho_k = lambda_k/(c_k*mu_k). Mean wait in queue Wq_k = (P0 * rho_k)/(c_k*mu_k*(1-rho_k)^2) via Erlang-C with P0 from the Erlang-B recursion; unstable (Wq=inf) when rho_k>=1. The peak rates are set by lambda_peak_reg = RHO_TARGET * c_reg * mu_belt and lambda_peak_pre = lambda_peak_reg * (lambda_early_pre/lambda_early_reg), i.e. the early pre:reg ratio is preserved and scaled to the congested utilization. Simulation: a 4-h window with a 45-min departure-bank surge at the peak rate (non-homogeneous arrivals, exchange 2), gamma-distributed service (cv=svc_cv), c servers, reporting the 50/95/99/max wait of the peak window per class.
+
+### Outcome Analysis
+
+At the calibrated peak the as-stated configuration (3 regular lanes : 1 Pre-Check lane) gives rho_reg = 0.85 (congested, mean wait ~0.8-30 min) but rho_pre = 2.5, which is above 1 and therefore unstable: the Pre-Check queue grows without bound and its simulated 95th-percentile wait is on the order of many hours. The bottleneck is the Pre-Check lane, not the regular lane - and this is surprising because the data show Pre-Check is the LARGER arrival stream (58 rows vs 47) yet it is allocated only one lane for every three regular lanes. Problem areas identified: (1) lane allocation is mismatched to the arrival mix (1:3 is inverted relative to the 6.53:4.63 arrival ratio); (2) the regular pool at rho=0.85 has almost no headroom, so any demand surge pushes it unstable; (3) the high variance in wait (the 95th- vs 50th-percentile gap) is the passenger-experience failure, consistent with the reported O'Hare-style long unexplained lines. Limitations: the analytic M/M/c wait is only valid below saturation and was not the primary metric; the peak rate is calibrated to a published congestion anchor because the data cover only the quiet period (exchange 1); the single checkpoint snapshot may not represent a full airport.
+
+## Subtask 2: Part (b): Develop two or more modifications to the current process that improve throughput and reduce the variance of wa
+
+### Problem
+
+Part (b): Develop two or more modifications to the current process that improve throughput and reduce the variance of wait time, and model each to show the impact on the process.
+
+### Analysis
+
+The modifications target the two levers the model identifies - lane count per class (utilization rho) and lane mix (matching lanes to the arrival stream). Because the failure is in the upper tail (exchange 3), the success metric is the worst-class 95th-percentile peak wait dropping below the ~30 min threshold, not the mean wait. Four configurations are modeled and compared: the as-stated baseline, adding regular lanes only, rebalancing lanes toward Pre-Check, and a combined increase-plus-rebalance that fully staffs Pre-Check. All hold the same peak demand and the same per-lane service, so the differences isolate the effect of the staffing policy.
+
+### Modeling Process
+
+Same M/M/c + M/G/c simulation as part (a), run per configuration with identical peak rates (lambda_reg=5.35, lambda_pre=7.54 pax/min) and mu_belt=2.10, mu_pre=3.00: BASELINE (3 reg,1 pre), A (+2 regular -> 5 reg,1 pre), B (rebalance -> 4 reg,3 pre), C (combined -> 6 reg,3 pre), D (staff Pre-Check -> 4 reg,4 pre). For each, rho_k = lambda_k/(c_k*mu_k), Wq_k (Erlang-C), and simulated p95/p99 of the peak window. A demand-sensitivity sweep scales both peak rates by a factor m in {1.0,1.1,1.25,1.5} to map the congestion cliff.
+
+### Outcome Analysis
+
+Results (worst-class 95th-percentile peak wait): BASELINE unstable (~hours, FAIL); A (add regular lanes) leaves Pre-Check unstable (rho_pre=2.5) - adding regular lanes does NOT fix the bottleneck; B (rebalance 4:3) stabilizes Pre-Check to rho=0.84 but p95 = ~58 min (still above threshold); C (6 reg,3 pre) same Pre-Check p95 ~58 min; D (4 reg,4 pre) brings rho_pre to 0.63 and the worst-class p95 down to ~30 min with p99 ~46 min (passes/marginal at the threshold). The demand sweep shows the variance cliff: at the baseline load the rebalanced p95 is ~30-58 min, at +25% demand it jumps to ~310-340 min, and at +50% demand it is unstable. Interpretation: (1) the single highest-impact modification is re-allocating lanes to Pre-Check (B/D), not simply adding regular lanes (A); (2) reducing wait-variance requires keeping every class below rho~0.85 with headroom, because the upper tail explodes as rho -> 1; (3) even the best single change (D) only reaches the threshold, so a robust fix pairs the rebalance with enough total lanes to hold rho under ~0.7 at the expected peak. Limitations: lane counts are the decision variable but real checkpoints have fixed physical belts, so 'adding a lane' means re-staffing an existing belt or running a second shift; the 30-min threshold is a per-trip judgment (exchange 3) and a stricter 20-min target would require more lanes.
+
+## Subtask 3: Part (c): Treat cultural norms / traveler styles as a sensitivity analysis. Model how differences in how passengers prep
+
+### Problem
+
+Part (c): Treat cultural norms / traveler styles as a sensitivity analysis. Model how differences in how passengers prepare, how orderly arrivals are, and tolerance for queue-jumping affect throughput and wait variance, and propose how the system can accommodate these differences to expedite throughput and reduce variance.
+
+### Analysis
+
+Cultural differences are represented as stylized traveler archetypes (permitted by the problem), each mapped to the two levers the model can act on: a per-passenger service-time multiplier (how long a traveler takes to remove and bin belongings - the 'slower/faster traveler' and individual-efficiency norms) and an arrival regularity parameter (inter-arrival-time coefficient of variation - the orderly/no-cutting vs door-bunching norms). The analysis measures how each style shifts the worst-class 95th-percentile peak wait and its spread, under both the as-stated and the staffed (D) configurations.
+
+### Modeling Process
+
+Same simulator with two style knobs: svc_mult scales the service mean (mu -> mu/svc_mult) and its cv (0.5*svc_mult), and iat_cv_mult scales the peak-surge inter-arrival cv (1.0 = Poisson/orderly, higher = more bursty/door-bunching). Archetypes run at config D (4 reg,4 pre) and at the as-stated (3 reg,1 pre): Baseline American (orderly, no-cut) svc=1.0 cv=1.0; Slower-prep traveler svc=1.4; Fast/individual-efficient traveler svc=0.85; Collective-efficiency (batched) cv=1.3; Bursty/door-bunching cv=1.6. Reported: worst-class p95, p99, and standard deviation of the peak-window wait.
+
+### Outcome Analysis
+
+Under the staffed config D: Baseline (orderly) p95=29 min, p99=43, sd=11; Slower-prep (svc=1.4) p95=202 min, p99=240, sd=63; Fast prep (svc=0.85) p95=9.7 min, p99=20, sd=4; Collective-efficiency/batched (cv=1.3) p95=34, p99=65, sd=14; Bursty/door-bunching (cv=1.6) p95=48, p99=89, sd=20. Three findings: (1) Preparation speed is the dominant lever - a 40% slower preparation style inflates the 95th-percentile wait ~7x, so any policy that pre-strips or pre-bins belongings (curbside pre-screening, Pre-Check-style lighter handling for everyone) has the largest variance-reduction payoff; (2) arrival orderliness is a real but second-order lever - the no-cutting/personal-space norm (orderly, cv=1.0) keeps p95 ~20-30 min lower than door-bunching (cv=1.6) and halves the tail spread, so queue discipline (clear lanes, anti-jumping, single-file) measurably reduces wait variance; (3) Under the as-stated misallocated config, NO traveler style rescues the checkpoint (all p95 > 3000 min) - cultural accommodation cannot compensate for a lane-allocation mismatch, so staffing fixes must come first. How the system can accommodate: (a) make the fast-prep path (lighter removal requirements) the default for more travelers to cut the dominant service-time variance; (b) enforce orderly single-file arrivals to suppress the arrival-cv variance; (c) for a given culture's known preparation style, set lane staffing so that rho stays under ~0.8 (i.e. staff more lanes where travelers prepare slowly). Limitations: the archetypes are stylized, not measured culture-specific parameters; service-speed and arrival-orderliness are the only two cultural channels the queue model can represent, so other norms (e.g. patience/willingness to use Pre-Check) are not captured.
+
+## Subtask 4: Part (d): Propose policy and procedural recommendations for security managers based on the model, which may be globally 
+
+### Problem
+
+Part (d): Propose policy and procedural recommendations for security managers based on the model, which may be globally applicable or tailored to specific cultures/traveler types; validate the model, assess its strengths and weaknesses, and propose future work.
+
+### Analysis
+
+Recommendations follow directly from the modeled levers (lane mix, total lanes, preparation speed, arrival orderliness) and the decision metric (upper-tail wait below ~30 min, exchange 3). Validation compares the model's structure and outputs against the data and the published congestion anchor; strengths and weaknesses are stated explicitly; future work lists what would make the model decision-grade.
+
+### Modeling Process
+
+Policy synthesis over the part (a)-(c) results. Global recommendations: (1) Allocate open screening lanes in proportion to the measured arrival mix (here Pre-Check:Regular ~ 6.5:4.6), not a fixed 1:3 ratio - i.e. run at least as many Pre-Check lanes as the Pre-Check share of demand requires to keep rho_pre < 0.85. (2) Staff to the expected PEAK (departure-bank) rate with headroom (target rho <= 0.7 at peak, 0.85 as a hard maximum), because the wait tail is extremely sensitive to rho near 1 (the +25% demand sweep quadrupled the 95th-percentile wait). (3) Reduce per-passenger preparation time as the primary variance lever: default to lighter removal requirements, provide pre-binning/pre-screening curbside, and train officers to parallelize (scan bags while the passenger clears the scanner). (4) Enforce orderly single-file arrivals (clear lane geometry, anti-cutting) to suppress arrival-burstiness, which the model shows raises the 95th-percentile wait from ~29 to ~48 min and doubles the tail spread. Culture/tailored recommendations: for a population that prepares slowly, staff ~30-40% more lanes (or widen the Pre-Check-style fast path) to offset the service-time multiplier; for a population that bunches at the door, prioritize queue-discipline infrastructure over extra lanes; for a fast/individual-efficient population, the same lanes give a ~3x lower wait tail, so the marginal value of added lanes is lower. Validation: (a) the belt service time (28.6 s) and both arrival rates come directly from the dataset; (b) the calibrated regular-pool mean wait at rho=0.85 (order 1-30 min over the peak) is consistent with the published post-9/11 congestion anchor (~21 min average maximum wait pre-reform, DOI 10.69554/gxtq5425); (c) the as-stated 1:3 config is shown unstable for the larger Pre-Check stream, an internally consistent and physically sensible result. Strengths: identifies the Pre-Check lane (not the regular lane) as the bottleneck, quantifies the upper-tail wait that drives passenger behavior, isolates the lane-mix effect from the lane-count effect, and gives a parameterized cultural sensitivity. Weaknesses: (1) the peak demand is calibrated to a published anchor because the data cover only the quiet early period (exchange 1) - a real day's departure-bank profile is not in the dataset; (2) M/M/c/Erlang-C assume exponential service and independent arrivals, which overstate the tail relative to a staffed belt (mitigated by the M/G/c simulation with cv<1); (3) the two ID officers and two X-ray machines are assumed non-binding, but if they were the bottleneck the lane-mix result would shift; (4) no abandonment/re-queueing or pat-down (Zone D) feedback loop is modeled. Future work: (a) collect a full-day, sensor-based log (all lanes, all officers) to replace the anchor-calibrated peak with measured departure-bank arrival rates; (b) add a Zone D (pat-down/extra-search) feedback loop where flagged bags and failed scanners re-enter an officer queue, which would raise effective service variance; (c) optimize lane staffing over the day as a function of the known flight-departure schedule (dynamic re-staffing) rather than a single peak configuration; (d) estimate the cost side (officer and equipment cost per lane) to turn the throughput/wait trade-off into a cost-minimization with a wait-tail constraint.
+
+### Outcome Analysis
+
+The model supports a clear, prioritized policy: fix the lane ALLOCATION to Pre-Check first (it is the unstable, larger stream), then add total lanes to hold utilization under ~0.8 at the calibrated peak, then cut preparation time and enforce orderly arrivals as the variance-reduction levers. Tailoring by traveler/culture style is most valuable where preparation is slow (staff up or widen the fast path) and where arrivals bunch (queue discipline). The model's central, defensible claim - that the 1:3 Pre-Check:regular lane ratio inverts the actual demand mix and makes Pre-Check the bottleneck, and that the passenger-visible failure is the upper-tail wait which explodes as utilization approaches 1 - is supported by both the analytic utilization and the simulation, and is consistent with the published congestion anchor. Remaining risk is concentrated in the peak-demand calibration (data gap, exchange 1) and the exponential-service tail assumption; both are flagged and bounded by the sensitivity sweeps.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

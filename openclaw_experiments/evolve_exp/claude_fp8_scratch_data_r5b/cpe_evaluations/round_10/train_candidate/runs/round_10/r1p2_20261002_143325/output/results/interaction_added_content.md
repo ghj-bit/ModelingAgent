@@ -1,0 +1,46 @@
+# Interaction-Attributed Content
+
+This arm starts from the problem statement alone, so there is
+nothing to diff against. The run's own record of the exchange is
+reproduced below; treat the reported change as its account of the
+work, not as a controller-computed diff.
+
+# Interaction Evidence — 2020_C
+
+## Exchange 1
+**Question (written to `logs/operator_feedback/expert_question_1.md`):**
+When customers judge an Amazon product's reputation over time, is it mainly the recent star-rating trend or the recent wave of helpful-voted reviews that tells them the product is improving or failing?
+
+**Reply (verbatim, from `logs/operator_feedback/expert_reply_1.json`):**
+"Neither dominates; they carry different information and are usually read together. The recent star-rating trend is the primary signal of product quality/reputation direction. It is what shoppers see first (the average and the distribution), it aggregates all buyers, and it moves only when actual satisfaction changes. A sustained drift down in recent stars is the clearest 'failing' indicator. The recent wave of helpful-voted reviews is a secondary, amplifying signal. Helpful votes reflect how visible and persuasive a review is, not whether the product is good. A cluster of highly-helpful negative reviews can shift perception disproportionately (negativity bias), and helpful-voted reviews often skew toward extremes and toward older, longer reviews, so they lag the star trend. Practical judgment: star-rating trend is the main reputation gauge; helpful-voted review volume/tone is a modifier that can accelerate or exaggerate the direction the stars already show. When they conflict, trust the star trend more, but treat a surge of helpful negative reviews as an early warning."
+
+**How the reply became work (Exchange 1 → parameter + equations):**
+- Operational definition established: "product reputation trend" is the primary quantity, measured by the *recent* star-rating trend; the helpfulness wave is an amplifier/modifier, not the gauge. This sets the input structure: the reputation index leads with a recency-weighted star mean and treats the recency-weighted helpfulness tone as a secondary multiplier.
+- Weighting derived from the reply's "trust the star trend more, but treat a surge of helpful negative reviews as an early warning": the reputation index is built as a star-dominated composite where the helpfulness term only modulates the star signal (a lagging amplifier), not as an equal-weight blend. Concretely, the reputation index R_t is the recency-weighted average star rating, and a separate early-warning flag fires when the recency-weighted helpful-negativity share surges. This is encoded in `code/reputation.py`.
+- Validity interval: this weighting holds for the review period in the supplied data (roughly 2014–2017 per dataset), where helpfulness votes lag the star trend; outside that window (e.g., a fresh listing with no helpfulness votes yet) the helpfulness amplifier is undefined and the index reduces to the star trend alone.
+
+## Exchange 2
+**Question (written to `logs/operator_feedback/expert_question_2.md`):**
+You said the recent star-rating trend is the main reputation gauge. In practice, what usually drives a product's recent stars to drift downward over a few months — a change in the product itself, or something else?
+
+**Reply (verbatim, from `logs/operator_feedback/expert_reply_2.json`):**
+"Most downward drift in recent stars over a few months is not caused by a change in the product itself. The product is usually unchanged; what changes is the mix and expectations of buyers and the visibility of problems. Main real-world drivers, roughly in order: Buyer-mix shift / audience expansion — as a product sells to a broader, less self-selected audience, ratings regress toward the category mean. Early buyers are enthusiasts; later buyers are ordinary and more critical. Expectation mismatch from listing/marketing — changed photos, claims, or bundling raise expectations without changing the item, producing disappointment. Accumulating defect or durability complaints — real quality problems show up, but typically as a slow rise in 'stopped working after N months' reviews, not an abrupt drop. Seller/fulfillment changes — a new seller, counterfeit or gray-market stock, or packaging/shipping changes can degrade the delivered experience. Seasonality and promotion effects — discount-driven volume brings deal-seekers and gift buyers who rate differently. Review dynamics — a few prominent negative reviews can pull the visible recent average down even when the underlying satisfaction distribution barely moved. So: a genuine product change is one possible cause, but mix shift, expectation mismatch, and seller/fulfillment changes explain most short-horizon drifts. This is an empirical judgment, not a fixed figure."
+
+**How the reply became work (Exchange 2 → equation change + constraint):**
+- Causal direction established: a falling recency-weighted star trend is NOT evidence of a product defect per se; it is a common-cause artifact dominated by buyer-mix shift (enthusiast early adopters → broader, more critical audience) and expectation/fulfillment changes. Therefore the reputation index must not be read as a defect detector.
+- Equation change in `code/reputation.py`: the reputation trend is reported *relative to the product's own category baseline*, not in absolute stars. I added a normalization that subtracts the category (product_category) time-average star mean, so a drift that merely tracks audience expansion (regression to category mean) reads as ~0 rather than "failing." The index is the recency-weighted star mean *minus the category recency-weighted baseline*.
+- Constraint added: the "failing product" classification (used for the success/failure question) requires the *category-adjusted* recent mean to fall below the category baseline by a margin AND the helpful-negativity share to be elevated — i.e., a star drop alone is insufficient because most short-horizon drifts are mix/expectation artifacts. This is the decision rule the model now uses.
+- Validity interval: holds for short-horizon (weeks-to-few-months) drift within the dataset period; a long-term multi-year decline where the product genuinely degrades is out of scope for this data and the rule should not be extrapolated there.
+
+## Exchange 3
+**Question (written to `logs/operator_feedback/expert_question_3.md`):**
+Since most short-horizon star drops are just buyer-mix or expectation effects, not real defects, how much of a sustained drop in recent stars would you need before you'd actually warn a company the product is genuinely failing?
+
+**Reply (verbatim, from `logs/operator_feedback/expert_reply_3.json`):**
+"There is no clean numeric threshold; it is a judgment call, and I would not treat any single magnitude as decisive. What matters is the combination of size, duration, and corroboration. Rough empirical guidance: A drop of ~0.2–0.3 stars in the recent average (e.g., trailing 3 months vs. prior 12) is within normal mix/expectation noise — note it, don't warn. ~0.4–0.5 stars sustained for 3+ months, with the decline still ongoing, is where I'd start flagging concern. ≥0.5–0.7 stars sustained over 6+ months, or a drop that keeps accelerating, is where I'd actually warn the company the product is genuinely failing. The magnitude alone is not enough. I would only escalate to a real warning if the drop is corroborated: a rising share of low-star reviews, defect/durability language appearing in the text, and the decline persisting after promotions or mix shifts are accounted for. A large drop that is flat afterward and concentrated in one buyer segment is more likely mix than failure. These are empirical judgments, not fixed figures."
+
+**How the reply became work (Exchange 3 → parameter + decision rule):**
+- Robustness threshold fixed. The "genuinely failing" decision rule (used for the success/failure subproblem and the letter's most-confident recommendation) now requires ALL of: (a) category-adjusted recent mean below baseline by δ_warn ≥ 0.5 stars (midpoint of the 0.5–0.7 warn band; the 0.4–0.5 band maps to a "concern" flag only, and ≤0.3 maps to noise); (b) the drop sustained over a 6+ month horizon (duration constraint); (c) corroboration — rising share of low-star (≤2) reviews AND defect/durability language in the text.
+- Parameter table line (source: Exchange 3): `δ_warn = 0.5 stars, interval [0.5, 0.7], source: expert_exchange_3 (robustness threshold for "genuinely failing"); δ_concern = 0.45, interval [0.4, 0.5]; δ_noise = 0.25, interval [0.2, 0.3]`.
+- Duration window encoded: recent = trailing 6 months vs. prior 12 months baseline (the reply's trailing-3-vs-prior-12 contrast extended to the 6-month warn horizon it cites).
+- Validity interval: the thresholds are empirical judgments valid for the supplied data's period and for products with a stable review base; for very new listings with too few reviews the rule is underpowered and should report "insufficient evidence" rather than a failure verdict.

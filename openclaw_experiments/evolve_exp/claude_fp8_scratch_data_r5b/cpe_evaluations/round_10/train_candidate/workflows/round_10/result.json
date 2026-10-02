@@ -1,0 +1,929 @@
+{
+  "round": 10,
+  "rubric_id": "interaction_initial_substantive_v1",
+  "rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "utility": 0.6268844543416517,
+  "average_dimension_scores": {
+    "analysis_evaluation": 0.8000000000000002,
+    "modeling_rigorousness_evaluation": 0.5777777777777778,
+    "practicality_and_scientificity_evaluation": 0.5694444444444445,
+    "result_and_bias_analysis_evaluation": 0.725
+  },
+  "problem_results": [
+    {
+      "problem_id": "2017_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "Exchange 1 — Operational definition of the daily traffic counts.\n\nThe data gives average daily traffic counts per road segment. On congested\nfreeways like I-405, do these counts measure the actual traffic demand wanting\nto cross that segment (so more than the road could pass in free flow), or only\nthe cars actually passing? In practice, what makes the recorded count fall\nshort of the true demand?",
+          "Exchange 2 — Causal mechanism of cooperating self-driving cars.\n\nYou know these roads. In your experience, when cars can cooperate — keeping\ncloser gaps, merging smoothly, and driving in platoons — is the capacity gain\nmainly from cars moving faster, or mainly from more cars fitting in the same\nspace? Roughly how large is the effect compared with today's traffic?",
+          "Exchange 3 — Robustness of the capacity-gain conclusion.\n\nI am estimating that cooperating self-driving traffic adds roughly a third\nof its share of lanes to each road, plus an all-lane bonus growing with the\nshare. Given the data only shows cars actually passing, under what conditions\nwould you treat my capacity-gain estimate as trustworthy, and what sign of\nsomething would make you think the gain is overstated?"
+        ],
+        "expert_answers": [
+          "Recorded average daily traffic (ADT) counts are **actual vehicles passing the count point**, not latent demand. They are measured volumes, so they are capped by what the road physically carried.\n\nOn a congested freeway like I-405, the count falls short of true demand because:\n\n- **Queuing and diversion**: when demand exceeds capacity, some trips are suppressed (people forgo, retime, or reroute), so those vehicles never cross the segment.\n- **Peak spreading**: demand that would have occurred in the peak is shifted to shoulders or other periods, and the daily total reflects the shifted pattern.\n- **Count location and method**: counts come from loop detectors or short-duration sampling expanded to a daily figure; they capture throughput at that point, not upstream trip intentions.\n- **Incidents and ramp metering**: metering and breakdowns throttle inflow, so the segment passes less than the demand seeking entry.\n\nSo ADT is a throughput measure. True demand is generally **higher** than the recorded count during congested periods, but the gap is not directly observable from the data and must be inferred or assumed.",
+          "The gain is mainly from **more cars fitting in the same space**, not from higher speed.\n\nMechanism: capacity = flow = density × speed. Cooperation shrinks the effective headway (time gap) between vehicles, so the same lane carries more vehicles per hour at a given speed. Platooning and smooth merging cut the spacing that human reaction time and unpredictability force today. Speed itself barely rises — freeways are already near free-flow speed except in the congested regime, and raising speed further is limited by geometry, curvature, and safety.\n\nRough magnitude (empirical judgment, not a precise figure): the dominant effect is a headway reduction of roughly 2–3× in the best case, translating to a capacity gain on the order of **+50% to +100%** for high self-driving penetration with good cooperation, and much less (single-digit to ~20%) at low penetration where self-driving cars are diluted among human drivers. Real-world gains are typically well below the idealized platooning numbers because of mixed traffic, entry/exit, and lane changes.",
+          "Treat the estimate as trustworthy only under these conditions:\n\n- The gain is applied to **capacity**, not to the observed ADT. Since the data are throughput, the model must compare new capacity against a demand level that is at or above the recorded count; if you calibrate the gain to reproduce today's counts, you will understate it.\n- The share is the **fleet share on that segment at that hour**, not a regional or daily average. Penetration in the peak is what matters, and it is usually higher than the daily figure.\n- The bonus is bounded: it should saturate, not grow without limit, because cooperation gains come from headway reduction that has a floor (vehicle length plus minimum safe gap).\n- The road is a **limited-access, uninterrupted-flow** facility. On SR 520 and similar routes with ramps, weaving, and signals, the merge/lane-change losses eat much of the theoretical gain.\n\nSigns the gain is **overstated**:\n\n- The implied capacity exceeds roughly 2× today's per-lane capacity — that is beyond what headway reduction can physically deliver.\n- The gain is claimed at low penetration (10%) where dilution among human drivers should keep it small.\n- The model reproduces observed ADT without any congestion or queuing term, meaning it is fitting throughput rather than capacity.\n- Segments with high ramp density or heavy truck share show the same gain as clean mainline segments.\n\nThat is an empirical judgment, not a precise figure."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_a42ea117176c",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.6145833333333334,
+      "dimension_scores": {
+        "analysis_evaluation": 0.7333333333333334,
+        "modeling_rigorousness_evaluation": 0.4916666666666667,
+        "practicality_and_scientificity_evaluation": 0.5,
+        "result_and_bias_analysis_evaluation": 0.7333333333333334
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The task clearly identifies the main modeling variables: lane count, traffic volume, self-driving penetration, cooperation, interactions with conventional vehicles, geographic scope, and application to the supplied data. However, it does not explicitly define performance metrics, equilibrium criteria, tipping-point indicators, or policy-evaluation measures, and it refers ambiguously to “SR 90” rather than I-90.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The decomposition is strongly aligned with the core modeling objective and includes the required corridors, counties, data inputs, and vehicle interactions. Nevertheless, it is presented as only one broad task and omits explicit subproblems for equilibrium existence, tipping-point analysis, dedicated-lane conditions, and additional policy recommendations. These omissions leave several stated requirements insufficiently covered.",
+            "score": 7
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly stated and generally plausible: separating latent demand from observed throughput, modeling cooperation through reduced headways, applying access-specific gains, and testing uncertainty in alpha are strong choices. However, several key assumptions are weakly justified, especially the 1.5 peak-penetration uplift, the alpha range, the physical headway floor, and the reduced state-route access factor. Treating each segment as homogeneous, splitting AADT evenly by direction, and using a median lane count may obscure congestion, directional imbalance, bottlenecks, ramps, and network spillbacks. The assumptions also do not explicitly model mixed-traffic platoon formation, disruption from human drivers, safety constraints, or how cooperation depends on market penetration. Overall, the framework is transparent and reasonably motivated, but its empirical grounding and sensitivity analysis need strengthening.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The steady-state capacity framework is an appropriate first-order model for estimating how lanes, demand, and automated-vehicle penetration affect corridor throughput. Comparing latent demand with revised capacity is more rational than comparing observed counts alone, and distinguishing interstates from state routes is useful. Nevertheless, the model remains a corridor-level approximation: it does not represent queue propagation, origin-destination flows, ramps, weaving, incidents, travel-time reliability, network interactions, or explicit equilibrium behavior. It also does not demonstrate how equilibria are solved, identify a tipping point mathematically, or rigorously evaluate dedicated lanes and policy alternatives. The assumed capacity gain is imposed rather than calibrated or derived from car-following and mixed-traffic dynamics. Thus, it is suitable for scenario screening but not a fully realistic network policy model.",
+            "score": 6
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The results are clear, quantitative, and decision-relevant. They compare penetration levels, dedicated-lane scenarios, corridor-specific equilibria, tipping points, capacity gains, and policy implications. The discussion appropriately notes saturation, latent-demand sensitivity, and why I-5 remains constrained. However, the inference process is not fully reproducible because the governing equations, spreadsheet calculations, and basis for converting p_base to p are not shown. Some conclusions also rely on broad corridor averages rather than segment-level conditions.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The report identifies numerous important biases and limitations, including daily rather than hourly data, inferred peak demand, equal directional splitting, smoothed lane counts, steady-state assumptions, the fixed SR access factor, and omitted cross-lane interactions. It also discusses sensitivity to latent demand. However, these issues are mostly acknowledged rather than corrected: there is no empirical calibration, validation against observed congestion, uncertainty intervals, alternative directional or peak-share scenarios, or systematic mitigation of the assumptions. Consequently, the bias analysis is useful but only moderately complete.",
+            "score": 6
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "Practical as a transparent screening model: it produces corridor-level capacity, demand, equilibrium, congestion, and tipping-point estimates for the requested penetration scenarios. However, its decision value is limited by major simplifications. It omits network interactions, rerouting, bottleneck locations, queue formation, incident effects, and detailed peak-period dynamics. The dedicated-lane term appears to apply the gain across all lanes rather than only one lane, likely overstating capacity. The peak uplift can also produce an invalid penetration above 100% at the 90% scenario. Arbitrary demand and benefit parameters, limited validation, and the coarse corridor aggregation make predictions and lane-policy recommendations unreliable without calibration.",
+            "score": 5
+          },
+          "analysis_2": {
+            "reason": "The model has a reasonable mathematical and transportation basis: it distinguishes demand from capacity, represents saturation of cooperative benefits, includes access conditions, performs sensitivity ranges, and uses root-finding to identify possible tipping points. These are scientifically interpretable features. Nevertheless, several assumptions are weakly justified or internally inconsistent. AADT-to-peak conversion is simplistic, latent demand is imposed rather than estimated, and the expert-derived gains lack empirical validation. The capacity equation does not correctly represent the share and geometry of a single dedicated lane, while the BPR calculation with q=min(D,c) suppresses actual queueing once capacity is exceeded. The model is therefore scientifically structured but only moderately defensible.",
+            "score": 6
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 1,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2017_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "Exchange 1 — Operational definition of the daily traffic counts.\n\nThe data gives average daily traffic counts per road segment. On congested\nfreeways like I-405, do these counts measure the actual traffic demand wanting\nto cross that segment (so more than the road could pass in free flow), or only\nthe cars actually passing? In practice, what makes the recorded count fall\nshort of the true demand?",
+              "Exchange 2 — Causal mechanism of cooperating self-driving cars.\n\nYou know these roads. In your experience, when cars can cooperate — keeping\ncloser gaps, merging smoothly, and driving in platoons — is the capacity gain\nmainly from cars moving faster, or mainly from more cars fitting in the same\nspace? Roughly how large is the effect compared with today's traffic?",
+              "Exchange 3 — Robustness of the capacity-gain conclusion.\n\nI am estimating that cooperating self-driving traffic adds roughly a third\nof its share of lanes to each road, plus an all-lane bonus growing with the\nshare. Given the data only shows cars actually passing, under what conditions\nwould you treat my capacity-gain estimate as trustworthy, and what sign of\nsomething would make you think the gain is overstated?"
+            ],
+            "expert_answers": [
+              "Recorded average daily traffic (ADT) counts are **actual vehicles passing the count point**, not latent demand. They are measured volumes, so they are capped by what the road physically carried.\n\nOn a congested freeway like I-405, the count falls short of true demand because:\n\n- **Queuing and diversion**: when demand exceeds capacity, some trips are suppressed (people forgo, retime, or reroute), so those vehicles never cross the segment.\n- **Peak spreading**: demand that would have occurred in the peak is shifted to shoulders or other periods, and the daily total reflects the shifted pattern.\n- **Count location and method**: counts come from loop detectors or short-duration sampling expanded to a daily figure; they capture throughput at that point, not upstream trip intentions.\n- **Incidents and ramp metering**: metering and breakdowns throttle inflow, so the segment passes less than the demand seeking entry.\n\nSo ADT is a throughput measure. True demand is generally **higher** than the recorded count during congested periods, but the gap is not directly observable from the data and must be inferred or assumed.",
+              "The gain is mainly from **more cars fitting in the same space**, not from higher speed.\n\nMechanism: capacity = flow = density × speed. Cooperation shrinks the effective headway (time gap) between vehicles, so the same lane carries more vehicles per hour at a given speed. Platooning and smooth merging cut the spacing that human reaction time and unpredictability force today. Speed itself barely rises — freeways are already near free-flow speed except in the congested regime, and raising speed further is limited by geometry, curvature, and safety.\n\nRough magnitude (empirical judgment, not a precise figure): the dominant effect is a headway reduction of roughly 2–3× in the best case, translating to a capacity gain on the order of **+50% to +100%** for high self-driving penetration with good cooperation, and much less (single-digit to ~20%) at low penetration where self-driving cars are diluted among human drivers. Real-world gains are typically well below the idealized platooning numbers because of mixed traffic, entry/exit, and lane changes.",
+              "Treat the estimate as trustworthy only under these conditions:\n\n- The gain is applied to **capacity**, not to the observed ADT. Since the data are throughput, the model must compare new capacity against a demand level that is at or above the recorded count; if you calibrate the gain to reproduce today's counts, you will understate it.\n- The share is the **fleet share on that segment at that hour**, not a regional or daily average. Penetration in the peak is what matters, and it is usually higher than the daily figure.\n- The bonus is bounded: it should saturate, not grow without limit, because cooperation gains come from headway reduction that has a floor (vehicle length plus minimum safe gap).\n- The road is a **limited-access, uninterrupted-flow** facility. On SR 520 and similar routes with ramps, weaving, and signals, the merge/lane-change losses eat much of the theoretical gain.\n\nSigns the gain is **overstated**:\n\n- The implied capacity exceeds roughly 2× today's per-lane capacity — that is beyond what headway reduction can physically deliver.\n- The gain is claimed at low penetration (10%) where dilution among human drivers should keep it small.\n- The model reproduces observed ADT without any congestion or queuing term, meaning it is fitting throughput rather than capacity.\n- Segments with high ramp density or heavy truck share show the same gain as clean mainline segments.\n\nThat is an empirical judgment, not a precise figure."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6166666666666667,
+          "dimension_scores": {
+            "analysis_evaluation": 0.6666666666666666,
+            "modeling_rigorousness_evaluation": 0.5833333333333334,
+            "practicality_and_scientificity_evaluation": 0.5,
+            "result_and_bias_analysis_evaluation": 0.7166666666666667
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p1_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The task clearly identifies the main modeling variables: lane count, traffic volume, self-driving penetration, cooperation, interactions with conventional vehicles, geographic scope, and application to the supplied data. However, it does not explicitly define performance metrics, equilibrium criteria, tipping-point indicators, or policy-evaluation measures, and it refers ambiguously to “SR 90” rather than I-90.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The decomposition is strongly aligned with the core modeling objective and includes the required corridors, counties, data inputs, and vehicle interactions. Nevertheless, it is presented as only one broad task and omits explicit subproblems for equilibrium existence, tipping-point analysis, dedicated-lane conditions, and additional policy recommendations. These omissions leave several stated requirements insufficiently covered.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated and generally plausible: separating latent demand from observed throughput, modeling cooperation through reduced headways, applying access-specific gains, and testing uncertainty in alpha are strong choices. However, several key assumptions are weakly justified, especially the 1.5 peak-penetration uplift, the alpha range, the physical headway floor, and the reduced state-route access factor. Treating each segment as homogeneous, splitting AADT evenly by direction, and using a median lane count may obscure congestion, directional imbalance, bottlenecks, ramps, and network spillbacks. The assumptions also do not explicitly model mixed-traffic platoon formation, disruption from human drivers, safety constraints, or how cooperation depends on market penetration. Overall, the framework is transparent and reasonably motivated, but its empirical grounding and sensitivity analysis need strengthening.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The steady-state capacity framework is an appropriate first-order model for estimating how lanes, demand, and automated-vehicle penetration affect corridor throughput. Comparing latent demand with revised capacity is more rational than comparing observed counts alone, and distinguishing interstates from state routes is useful. Nevertheless, the model remains a corridor-level approximation: it does not represent queue propagation, origin-destination flows, ramps, weaving, incidents, travel-time reliability, network interactions, or explicit equilibrium behavior. It also does not demonstrate how equilibria are solved, identify a tipping point mathematically, or rigorously evaluate dedicated lanes and policy alternatives. The assumed capacity gain is imposed rather than calibrated or derived from car-following and mixed-traffic dynamics. Thus, it is suitable for scenario screening but not a fully realistic network policy model.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The results are clear, quantitative, and decision-relevant. They compare penetration levels, dedicated-lane scenarios, corridor-specific equilibria, tipping points, capacity gains, and policy implications. The discussion appropriately notes saturation, latent-demand sensitivity, and why I-5 remains constrained. However, the inference process is not fully reproducible because the governing equations, spreadsheet calculations, and basis for converting p_base to p are not shown. Some conclusions also rely on broad corridor averages rather than segment-level conditions.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The report identifies numerous important biases and limitations, including daily rather than hourly data, inferred peak demand, equal directional splitting, smoothed lane counts, steady-state assumptions, the fixed SR access factor, and omitted cross-lane interactions. It also discusses sensitivity to latent demand. However, these issues are mostly acknowledged rather than corrected: there is no empirical calibration, validation against observed congestion, uncertainty intervals, alternative directional or peak-share scenarios, or systematic mitigation of the assumptions. Consequently, the bias analysis is useful but only moderately complete.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "Practical as a transparent screening model: it produces corridor-level capacity, demand, equilibrium, congestion, and tipping-point estimates for the requested penetration scenarios. However, its decision value is limited by major simplifications. It omits network interactions, rerouting, bottleneck locations, queue formation, incident effects, and detailed peak-period dynamics. The dedicated-lane term appears to apply the gain across all lanes rather than only one lane, likely overstating capacity. The peak uplift can also produce an invalid penetration above 100% at the 90% scenario. Arbitrary demand and benefit parameters, limited validation, and the coarse corridor aggregation make predictions and lane-policy recommendations unreliable without calibration.",
+                "score": 5
+              },
+              "analysis_2": {
+                "reason": "The model has a reasonable mathematical and transportation basis: it distinguishes demand from capacity, represents saturation of cooperative benefits, includes access conditions, performs sensitivity ranges, and uses root-finding to identify possible tipping points. These are scientifically interpretable features. Nevertheless, several assumptions are weakly justified or internally inconsistent. AADT-to-peak conversion is simplistic, latent demand is imposed rather than estimated, and the expert-derived gains lack empirical validation. The capacity equation does not correctly represent the share and geometry of a single dedicated lane, while the BPR calculation with q=min(D,c) suppresses actual queueing once capacity is exceeded. The model is therefore scientifically structured but only moderately defensible.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 1
+        },
+        {
+          "problem_id": "2017_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p1_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p1_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "The spreadsheet gives a single \"average daily traffic count\" per road section. When\nthere is a heavy weekday rush, what actually happens to cars wanting to use that\nsection? Do they go around it, or do they still try to get on it and just back up?",
+              "Why does a stretch of road that is clogged with ordinary cars carry fewer cars per\nhour than it could? Is the real bottleneck the drivers themselves — how far apart\nthey stop, how slowly they react, and the gaps they leave — or is it something the\nroad itself, like the number of lanes or its speed limit?",
+              "Suppose a city promises that a certain share of self-driving cars will noticeably\nease the morning rush. In your experience, what would have to actually be true out\nthere on the road before you'd trust that promise — and what sign would tell you\nit was an empty claim?"
+            ],
+            "expert_answers": [
+              "They still try to get on it and back up. On limited-access interstates and most state routes in this corridor, there is no practical parallel route for a through trip — the network is sparse and the alternatives (e.g., I-405 vs. I-5, SR-520 vs. I-90) are themselves congested at the same hours. So demand is essentially fixed and inelastic in the short run: the section operates at or above capacity, speeds drop, and queues form at on-ramps and upstream. Only a small share of trips divert, and mainly for discretionary or short local trips, not for the peak commute.\n\nThe practical consequence for modeling: the given ADT is a daily average that hides the peak. Peak-hour volume on these urban freeways typically runs around 8–10% of ADT (empirical rule of thumb), and the peak hour is what determines whether the section is over capacity. So the section should be treated as demand-driven and queuing, not as a route that sheds traffic when congested.",
+              "The real bottleneck is the drivers, not the road's physical design. A freeway lane's theoretical capacity (roughly 2,000 vehicles/hour) is set by how closely vehicles can follow each other, and that spacing is governed by human factors: reaction time, the safe headway drivers choose, and the distance they keep. When traffic is dense, small speed disturbances amplify into stop-and-go waves (the \"phantom traffic jam\"), and throughput falls well below the lane's potential — often to 1,200–1,600 veh/h/lane. Lanes and speed limits set the ceiling, but the achievable flow is limited by human reaction and gap behavior. This is exactly why self-driving, cooperating cars are proposed: tighter, more consistent headways and faster reaction can raise effective capacity without adding lanes.",
+              "For the promise to hold, three things must actually be true on the road:\n\n1. **The self-driving cars must be a large share of the *peak-hour* flow, not just of the daily or fleet total.** A 10% fleet share can be well under 5% of rush-hour vehicles on a given section, which is too few to change headway behavior.\n\n2. **They must be able to cooperate with each other in the same platoon** — i.e., enough of them in the same lane at the same time to form tight, consistent headways. Isolated self-driving cars surrounded by human drivers behave essentially like human-driven cars and add nothing.\n\n3. **The human drivers around them must not degrade the gain** — mixed traffic tends to revert to human spacing, and one human cutting in can break a platoon.\n\nThe tell-tale sign of an empty claim: the promised share is quoted as a fleet or sales percentage, and the measured peak-hour throughput (veh/h/lane) on the affected sections is unchanged. If capacity per lane doesn't move, the promise is marketing."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6125,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8000000000000002,
+            "modeling_rigorousness_evaluation": 0.4000000000000001,
+            "practicality_and_scientificity_evaluation": 0.5,
+            "result_and_bias_analysis_evaluation": 0.75
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p1_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The task analysis clearly defines the central modeling objective: relate lane count, traffic volume, and autonomous-driving share to traffic performance on the four specified routes. It also identifies the required comparison levels of 10%, 50%, and 90%, and explicitly addresses cooperation, interaction with conventional vehicles, equilibria, tipping points, dedicated lanes, and policy recommendations. However, it does not specify the performance metrics, equilibrium definition, modeling assumptions, or how “marked” performance changes will be measured. The goals are therefore clear and decision-oriented, but not fully operationalized.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The three subtasks are logically dependent and cover most required elements: Task 1 establishes the traffic model and applies it to the supplied segment data; Task 2 analyzes equilibrium and tipping behavior; Task 3 translates results into lane-allocation and policy recommendations. The scope remains focused on the four routes and the requested autonomous-vehicle shares. Important implementation details are missing, including treatment of spatial spillovers between segments, peak versus average demand, uncertainty and calibration, route-specific conditions, and explicit modeling of mixed traffic interactions. These omissions limit completeness but do not represent a major deviation from the problem.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is clear, quantitative, and directly addresses AD shares, route-level congestion, tipping behavior, equilibria, and policy implications. It makes the model’s threshold mechanism and limitations understandable, and the 90% scenario provides useful interpretation. However, the inference process is not fully reproducible because the capacity equations, baseline data treatment, and stability definition are not shown. The claim that equilibria are stable is also asserted rather than demonstrated, and static V/C results do not establish actual travel-time or queue outcomes. Overall, the conclusions are rational and useful, but somewhat stronger than the documented model evidence.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is relatively thorough: it recognizes peak-share versus fleet-share interpretation, assumed capacity interpolation, spatial uniformity, omitted queue and merge dynamics, inelastic demand, lane-changing effects, and the risks of dedicated lanes. It appropriately qualifies the policy recommendations and calls for microscopic or field validation. However, most biases are only disclosed, not corrected or quantitatively adjusted. It does not assess data quality, sampling or measurement bias in the spreadsheet, route-selection effects, induced demand, behavioral adaptation, or uncertainty in the 30% threshold and expert capacity anchors. Sensitivity claims are stated without sufficient numerical evidence, so bias mitigation is incomplete.",
+                "score": 7
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is moderately practical because it converts lane counts, traffic demand, and automated-vehicle share into capacity, V/C, LOS, tipping-point, and lane-dedication outputs that could support policy comparison. However, its usefulness is limited by reliance on AADT and a uniform peak-hour fraction, lack of time-varying demand, route interactions, bottlenecks, incidents, ramps, weather, and explicit application results from the spreadsheet. The mixed-traffic capacity function and dedication rule are highly stylized, so predictions across different corridors or datasets may be unreliable without calibration and validation. It offers interpretable scenario analysis, but does not yet fully solve the operational traffic problem.",
+                "score": 5
+              },
+              "analysis_2": {
+                "reason": "The model has a clear mathematical structure and recognizes nonlinear platoon formation, mixed traffic, capacity constraints, sensitivity ranges, equilibria, and threshold behavior. Nevertheless, several scientific weaknesses are substantial: the parameters and threshold are largely heuristic, the cited literature does not by itself validate the chosen function, and vehicle interaction is represented only through an aggregate capacity multiplier. The claim that both congested and free-flow states are stable fixed points is not supported by a dynamic traffic-flow model, and the tipping-point definition is partly arbitrary. Directional demand, network spillback, lane-changing, and dedicated-lane effects are also oversimplified. It is a reasonable conceptual model, but requires empirical calibration and dynamic validation.",
+                "score": 5
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated but only partially justified. Splitting AADT evenly by direction ignores directional peak imbalance, and using daily AADT does not represent peak-hour demand required by the problem. Capacity improvements from cooperative platoons are described conceptually, but no calibrated headway, penetration, lane-changing, safety, or mixed-traffic interaction parameters are provided. The model also assumes inelastic demand, homogeneous sections, no diversion, and no network spillback, despite analyzing connected Seattle-area corridors. These assumptions materially affect tipping points and dedicated-lane conclusions, and their sensitivity is not demonstrated.",
+                "score": 4
+              },
+              "analysis_2": {
+                "reason": "The flow=min(demand,capacity) framework and V/C metric are reasonable first-order screening tools, and the proposed capacity mechanism is directionally relevant. However, the structure is too static to realistically answer the full problem: it does not model time-dependent queues, shockwaves, bottlenecks, route interactions, merging, lane changes, or explicit heterogeneous human/automated vehicle dynamics. The claim that an over-capacity queue is a stable equilibrium is also incomplete without a dynamic queue formulation. No empirical calibration, uncertainty analysis, actual spreadsheet results, or demonstrated 10%, 50%, and 90% comparisons are supplied. Consequently, policy and tipping-point conclusions are weakly supported.",
+                "score": 4
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 3
+        }
+      ],
+      "refined_report_utility": 0.6145833333333334,
+      "interaction_cost": 0.826531940783154,
+      "interaction_penalty": 0.0413265970391577,
+      "net_utility": 0.5732567362941756,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1214,
+          "total_expert_latency_seconds": 7.26,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.833881824266127,
+          "latency_cost_component": 0.3354972065233018,
+          "interaction_cost": 0.8335527297064509,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 900,
+          "total_expert_latency_seconds": 6.5,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.7987778796496426,
+          "latency_cost_component": 0.32016030257427497,
+          "interaction_cost": 0.819511151859857,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2020_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "When customers judge an Amazon product's reputation over time, is it mainly the recent star-rating trend or the recent wave of helpful-voted reviews that tells them the product is improving or failing?",
+          "You said the recent star-rating trend is the main reputation gauge. In practice, what usually drives a product's recent stars to drift downward over a few months — a change in the product itself, or something else?",
+          "Since most short-horizon star drops are just buyer-mix or expectation effects, not real defects, how much of a sustained drop in recent stars would you need before you'd actually warn a company the product is genuinely failing?"
+        ],
+        "expert_answers": [
+          "Neither dominates; they carry different information and are usually read together.\n\n- The **recent star-rating trend** is the primary signal of product quality/reputation direction. It is what shoppers see first (the average and the distribution), it aggregates all buyers, and it moves only when actual satisfaction changes. A sustained drift down in recent stars is the clearest \"failing\" indicator.\n- The **recent wave of helpful-voted reviews** is a secondary, amplifying signal. Helpful votes reflect how visible and persuasive a review is, not whether the product is good. A cluster of highly-helpful negative reviews can shift perception disproportionately (negativity bias), and helpful-voted reviews often skew toward extremes and toward older, longer reviews, so they lag the star trend.\n\nPractical judgment: star-rating trend is the main reputation gauge; helpful-voted review volume/tone is a modifier that can accelerate or exaggerate the direction the stars already show. When they conflict, trust the star trend more, but treat a surge of helpful negative reviews as an early warning.",
+          "Most downward drift in recent stars over a few months is **not** caused by a change in the product itself. The product is usually unchanged; what changes is the mix and expectations of buyers and the visibility of problems.\n\nMain real-world drivers, roughly in order of how often they explain a drift:\n\n- **Buyer-mix shift / audience expansion.** As a product sells to a broader, less self-selected audience, ratings regress toward the category mean. Early buyers are enthusiasts; later buyers are ordinary and more critical.\n- **Expectation mismatch from listing/marketing.** Changed photos, claims, or bundling raise expectations without changing the item, producing disappointment.\n- **Accumulating defect or durability complaints.** Real quality problems do show up, but typically as a slow rise in \"stopped working after N months\" reviews, not an abrupt drop.\n- **Seller/fulfillment changes.** A new seller, counterfeit or gray-market stock, or packaging/shipping changes can degrade the delivered experience while the \"product\" nominally stays the same.\n- **Seasonality and promotion effects.** Discount-driven volume brings deal-seekers and gift buyers who rate differently.\n- **Review dynamics.** A few prominent negative reviews can pull the visible recent average down even when the underlying satisfaction distribution barely moved.\n\nSo: a genuine product change is one possible cause, but mix shift, expectation mismatch, and seller/fulfillment changes explain most short-horizon drifts. This is an empirical judgment, not a fixed figure.",
+          "There is no clean numeric threshold; it is a judgment call, and I would not treat any single magnitude as decisive. What matters is the combination of size, duration, and corroboration.\n\nRough empirical guidance:\n\n- **A drop of ~0.2–0.3 stars** in the recent average (e.g., trailing 3 months vs. prior 12) is within normal mix/expectation noise — note it, don't warn.\n- **~0.4–0.5 stars sustained for 3+ months**, with the decline still ongoing, is where I'd start flagging concern.\n- **≥0.5–0.7 stars sustained over 6+ months**, or a drop that keeps accelerating, is where I'd actually warn the company the product is genuinely failing.\n\nThe magnitude alone is not enough. I would only escalate to a real warning if the drop is **corroborated**: a rising share of low-star reviews, defect/durability language appearing in the text, and the decline persisting after promotions or mix shifts are accounted for. A large drop that is flat afterward and concentrated in one buyer segment is more likely mix than failure.\n\nThese are empirical judgments, not fixed figures."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_a42ea117176c",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.70625,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8333333333333335,
+        "modeling_rigorousness_evaluation": 0.6499999999999999,
+        "practicality_and_scientificity_evaluation": 0.65,
+        "result_and_bias_analysis_evaluation": 0.6916666666666667
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The problem definition is clear and closely aligned with Sunshine's stated objectives. It identifies the three datasets, their sizes and time span, the relevant variables, and the intended business outcomes. The six tasks translate the requirements into concrete analytical goals, including temporal reputation, rating-text relationships, helpfulness, and sentiment. However, some methodological definitions remain underspecified: “successful or failing,” “incite,” “strongly associated,” the sentiment lexicon, and the exact mathematical evidence are not operationalized. In particular, observational review data cannot establish that ratings cause later reviews without exposure or sequence information.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The decomposition covers all explicit problem requirements and has a sensible progression from broad dataset analysis to time trends, combined indicators, rating-review behavior, descriptor associations, and the required executive letter. The tasks are relevant and collectively support the final recommendation. Minor gaps reduce completeness: the plan does not explicitly require data-quality checks, handling of missing or unevenly sampled months, statistical uncertainty or significance testing, multiple-comparison controls, or validation of proposed success indicators. Task 4 also assumes that review-writing behavior and review sequences can be inferred from the supplied fields, which should be verified before analysis.",
+            "score": 8
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are clearly stated and generally reasonable for an observational marketplace dataset. The analysis appropriately acknowledges missing exposure, seller-identity, and causal fields, and distinguishes association from causation. However, several assumptions are weakly justified: the fixed lexicon may not capture sarcasm, context, or domain-specific language; review length is an imperfect proxy for incitement; and the claim that buyer-mix effects explain short-term drift is not established from the supplied data. Thresholds, window lengths, and baseline choices also require empirical justification. Overall, the assumptions are good but not fully validated.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The proposed descriptive statistics, contingency tables, nonparametric tests, and time-based comparisons are broadly suitable for identifying associations and monitoring reputation. Combining star ratings, low-star share, defect language, and text sentiment is more rational than relying on a single metric, and the explicit noncausal framing is appropriate. Nevertheless, the model remains somewhat ad hoc: recency weighting, six- and twelve-month windows, warning thresholds, and success/failure scores are not specified or calibrated. Multiple descriptor tests require multiplicity control, review volume and exposure are not normalized, and statistical significance may not imply business importance. It is a reasonable monitoring framework, but not a fully rigorous predictive model.",
+            "score": 7
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The process is practical for Sunshine's immediate monitoring needs. It uses only the supplied data, combines ratings, review text, helpfulness, and time trends, and produces interpretable indicators for reputation tracking and product-risk detection. The recency-weighted rating, low-star share, and defect-language share are actionable and suitable for implementation in a monitoring dashboard. However, the method is primarily descriptive rather than predictive, and lexicon counts may miss context, sarcasm, negation, and domain-specific language. The expert-selected thresholds are also not fully validated. It supports informed decisions but cannot reliably establish product success or failure across future markets without external validation and uncertainty estimates.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The process applies scientifically recognizable methods, including recency weighting, contingency-table chi-square testing, effect comparisons, and Mann-Whitney tests. It is appropriately tailored to the questions and distinguishes review volume from review length. Nevertheless, several foundations are weak: the thresholds and time windows come from unspecified expert exchanges rather than being derived or validated from the data; statistical assumptions, confidence intervals, effect sizes, and multiple-testing corrections are omitted; and the rule-based lexicons are not validated for sentiment or defects. The analysis also risks overinterpreting association as evidence that low ratings cause longer reviews or that language predicts product success. Thus, it is reasonably scientific but not fully rigorous.",
+            "score": 6
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is clear, quantitative, and highly interpretable. It compares products using star means, low-star shares, review length, text descriptors, verified status, and time trends, while providing useful effect sizes and significance results. It also distinguishes association from causation in the review-volume question and identifies practical monitoring measures. However, the recency-weighting method, warning thresholds, uncertainty intervals, and exact construction of several text-based measures are not sufficiently explained. Some conclusions, such as labeling negative drift as “stable/improving,” are also somewhat imprecise. Overall, the analysis supports sensible business decisions but does not fully document the inference process.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is strong in identifying important risks, including non-verified reviewer selection, vine-review positivity, helpful-vote censoring, temporal and product-mix confounding, small monthly microwave samples, lexicon limitations, and the inability to infer causality. Sensitivity comparisons using verified-only data and within-product baselines provide partial mitigation. However, most biases are acknowledged rather than quantitatively corrected: there is no reweighting, sensitivity range, confidence interval, missing-data treatment, multiple-testing discussion, or validation of the sentiment lexicon. Non-verified reviews are treated as potentially less reliable without establishing that assumption. Thus, the analysis is thorough diagnostically but only moderately effective at reducing bias impact.",
+            "score": 7
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 6,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2020_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "When customers judge an Amazon product's reputation over time, is it mainly the recent star-rating trend or the recent wave of helpful-voted reviews that tells them the product is improving or failing?",
+              "You said the recent star-rating trend is the main reputation gauge. In practice, what usually drives a product's recent stars to drift downward over a few months — a change in the product itself, or something else?",
+              "Since most short-horizon star drops are just buyer-mix or expectation effects, not real defects, how much of a sustained drop in recent stars would you need before you'd actually warn a company the product is genuinely failing?"
+            ],
+            "expert_answers": [
+              "Neither dominates; they carry different information and are usually read together.\n\n- The **recent star-rating trend** is the primary signal of product quality/reputation direction. It is what shoppers see first (the average and the distribution), it aggregates all buyers, and it moves only when actual satisfaction changes. A sustained drift down in recent stars is the clearest \"failing\" indicator.\n- The **recent wave of helpful-voted reviews** is a secondary, amplifying signal. Helpful votes reflect how visible and persuasive a review is, not whether the product is good. A cluster of highly-helpful negative reviews can shift perception disproportionately (negativity bias), and helpful-voted reviews often skew toward extremes and toward older, longer reviews, so they lag the star trend.\n\nPractical judgment: star-rating trend is the main reputation gauge; helpful-voted review volume/tone is a modifier that can accelerate or exaggerate the direction the stars already show. When they conflict, trust the star trend more, but treat a surge of helpful negative reviews as an early warning.",
+              "Most downward drift in recent stars over a few months is **not** caused by a change in the product itself. The product is usually unchanged; what changes is the mix and expectations of buyers and the visibility of problems.\n\nMain real-world drivers, roughly in order of how often they explain a drift:\n\n- **Buyer-mix shift / audience expansion.** As a product sells to a broader, less self-selected audience, ratings regress toward the category mean. Early buyers are enthusiasts; later buyers are ordinary and more critical.\n- **Expectation mismatch from listing/marketing.** Changed photos, claims, or bundling raise expectations without changing the item, producing disappointment.\n- **Accumulating defect or durability complaints.** Real quality problems do show up, but typically as a slow rise in \"stopped working after N months\" reviews, not an abrupt drop.\n- **Seller/fulfillment changes.** A new seller, counterfeit or gray-market stock, or packaging/shipping changes can degrade the delivered experience while the \"product\" nominally stays the same.\n- **Seasonality and promotion effects.** Discount-driven volume brings deal-seekers and gift buyers who rate differently.\n- **Review dynamics.** A few prominent negative reviews can pull the visible recent average down even when the underlying satisfaction distribution barely moved.\n\nSo: a genuine product change is one possible cause, but mix shift, expectation mismatch, and seller/fulfillment changes explain most short-horizon drifts. This is an empirical judgment, not a fixed figure.",
+              "There is no clean numeric threshold; it is a judgment call, and I would not treat any single magnitude as decisive. What matters is the combination of size, duration, and corroboration.\n\nRough empirical guidance:\n\n- **A drop of ~0.2–0.3 stars** in the recent average (e.g., trailing 3 months vs. prior 12) is within normal mix/expectation noise — note it, don't warn.\n- **~0.4–0.5 stars sustained for 3+ months**, with the decline still ongoing, is where I'd start flagging concern.\n- **≥0.5–0.7 stars sustained over 6+ months**, or a drop that keeps accelerating, is where I'd actually warn the company the product is genuinely failing.\n\nThe magnitude alone is not enough. I would only escalate to a real warning if the drop is **corroborated**: a rising share of low-star reviews, defect/durability language appearing in the text, and the decline persisting after promotions or mix shifts are accounted for. A large drop that is flat afterward and concentrated in one buyer segment is more likely mix than failure.\n\nThese are empirical judgments, not fixed figures."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7083333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8000000000000002,
+            "modeling_rigorousness_evaluation": 0.6333333333333333,
+            "practicality_and_scientificity_evaluation": 0.65,
+            "result_and_bias_analysis_evaluation": 0.75
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p2_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The problem definition is clear and closely aligned with Sunshine's stated objectives. It identifies the three datasets, their sizes and time span, the relevant variables, and the intended business outcomes. The six tasks translate the requirements into concrete analytical goals, including temporal reputation, rating-text relationships, helpfulness, and sentiment. However, some methodological definitions remain underspecified: “successful or failing,” “incite,” “strongly associated,” the sentiment lexicon, and the exact mathematical evidence are not operationalized. In particular, observational review data cannot establish that ratings cause later reviews without exposure or sequence information.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The decomposition covers all explicit problem requirements and has a sensible progression from broad dataset analysis to time trends, combined indicators, rating-review behavior, descriptor associations, and the required executive letter. The tasks are relevant and collectively support the final recommendation. Minor gaps reduce completeness: the plan does not explicitly require data-quality checks, handling of missing or unevenly sampled months, statistical uncertainty or significance testing, multiple-comparison controls, or validation of proposed success indicators. Task 4 also assumes that review-writing behavior and review sequences can be inferred from the supplied fields, which should be verified before analysis.",
+                "score": 8
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly stated and generally reasonable for an observational marketplace dataset. The analysis appropriately acknowledges missing exposure, seller-identity, and causal fields, and distinguishes association from causation. However, several assumptions are weakly justified: the fixed lexicon may not capture sarcasm, context, or domain-specific language; review length is an imperfect proxy for incitement; and the claim that buyer-mix effects explain short-term drift is not established from the supplied data. Thresholds, window lengths, and baseline choices also require empirical justification. Overall, the assumptions are good but not fully validated.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The proposed descriptive statistics, contingency tables, nonparametric tests, and time-based comparisons are broadly suitable for identifying associations and monitoring reputation. Combining star ratings, low-star share, defect language, and text sentiment is more rational than relying on a single metric, and the explicit noncausal framing is appropriate. Nevertheless, the model remains somewhat ad hoc: recency weighting, six- and twelve-month windows, warning thresholds, and success/failure scores are not specified or calibrated. Multiple descriptor tests require multiplicity control, review volume and exposure are not normalized, and statistical significance may not imply business importance. It is a reasonable monitoring framework, but not a fully rigorous predictive model.",
+                "score": 7
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The process is practical for Sunshine's immediate monitoring needs. It uses only the supplied data, combines ratings, review text, helpfulness, and time trends, and produces interpretable indicators for reputation tracking and product-risk detection. The recency-weighted rating, low-star share, and defect-language share are actionable and suitable for implementation in a monitoring dashboard. However, the method is primarily descriptive rather than predictive, and lexicon counts may miss context, sarcasm, negation, and domain-specific language. The expert-selected thresholds are also not fully validated. It supports informed decisions but cannot reliably establish product success or failure across future markets without external validation and uncertainty estimates.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The process applies scientifically recognizable methods, including recency weighting, contingency-table chi-square testing, effect comparisons, and Mann-Whitney tests. It is appropriately tailored to the questions and distinguishes review volume from review length. Nevertheless, several foundations are weak: the thresholds and time windows come from unspecified expert exchanges rather than being derived or validated from the data; statistical assumptions, confidence intervals, effect sizes, and multiple-testing corrections are omitted; and the rule-based lexicons are not validated for sentiment or defects. The analysis also risks overinterpreting association as evidence that low ratings cause longer reviews or that language predicts product success. Thus, it is reasonably scientific but not fully rigorous.",
+                "score": 6
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is clear, quantitative, and highly interpretable. It compares products using star means, low-star shares, review length, text descriptors, verified status, and time trends, while providing useful effect sizes and significance results. It also distinguishes association from causation in the review-volume question and identifies practical monitoring measures. However, the recency-weighting method, warning thresholds, uncertainty intervals, and exact construction of several text-based measures are not sufficiently explained. Some conclusions, such as labeling negative drift as “stable/improving,” are also somewhat imprecise. Overall, the analysis supports sensible business decisions but does not fully document the inference process.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is strong in identifying important risks, including non-verified reviewer selection, vine-review positivity, helpful-vote censoring, temporal and product-mix confounding, small monthly microwave samples, lexicon limitations, and the inability to infer causality. Sensitivity comparisons using verified-only data and within-product baselines provide partial mitigation. However, most biases are acknowledged rather than quantitatively corrected: there is no reweighting, sensitivity range, confidence interval, missing-data treatment, multiple-testing discussion, or validation of the sentiment lexicon. Non-verified reviews are treated as potentially less reliable without establishing that assumption. Thus, the analysis is thorough diagnostically but only moderately effective at reducing bias impact.",
+                "score": 7
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 6
+        },
+        {
+          "problem_id": "2020_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p2_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p2_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "# Expert Question 1 (Operational Definition)\n\nWhen Amazon shoppers decide whether to write a review, does their decision depend on how\nwell the product worked for them, or on whether the experience surprised them (much better\nor much worse than expected)? In practice, which situation is more likely to prompt a\nwritten review: a product that simply worked fine, or a product that disappointed?",
+              "# Expert Question 2 (Causal Mechanism)\n\nSuppose a well-liked product's average star rating slowly drifts downward over several\nmonths, but the number of new reviews stays flat. In your experience judging product\nhealth, does that flat review count reassure you that the product is still fine, or\ndoes the falling average tell you something is breaking down? What is the more honest\nsignal of a product's true standing?",
+              "# Expert Question 3 (Robustness Threshold)\n\nWhen watching one of your own listings, how few recent reviews in a row can you let pile\nup before you'd trust the average's drift as a real change — not just the bad luck of a\ndozen or so shoppers having a rough week? At what point does \"the last stretch looks\nworse\" become \"the product is actually getting worse\"?"
+            ],
+            "expert_answers": [
+              "**Disappointment is the stronger prompt.** The dominant empirical regularity in online review data is negativity bias / underreporting of the middle: customers with a merely satisfactory experience (product worked as expected) are the least likely to write anything, while strongly negative experiences are the most likely to trigger a written review. Strong positive surprise also drives reviews, but typically less than strong negative surprise.\n\nSo the decision depends mainly on **surprise relative to expectation**, not on absolute performance. A product that \"worked fine\" sits at the expectation baseline and generates few reviews; a product that disappointed generates many.\n\nCaveat relevant to this dataset: Amazon also actively solicits reviews post-purchase, so a nonzero baseline of \"worked fine\" reviews exists. But the marginal, self-initiated review is disproportionately driven by deviation from expectation, with negative deviation weighted more heavily than positive.",
+              "**The falling average is the more honest signal; flat review count is not reassuring.**\n\nFlat review volume tells you only that the *rate of new experience formation* is unchanged — it says nothing about the quality of those experiences. A drifting-down average with steady volume means the mix of incoming reviews is shifting toward lower stars, i.e., a growing share of recent buyers are dissatisfied. That is a genuine deterioration signal.\n\nWhy the flat count does not offset it: review volume is dominated by the negativity-bias baseline plus Amazon's solicitation, so it is a weak, lagging indicator of product health. It can stay flat while the underlying satisfaction distribution degrades, because the same number of people are still being prompted to review — they are just rating lower.\n\nCaveats that would weaken the inference: a small number of reviews (drift could be noise), a known change in the reviewer pool (e.g., a promotion bringing in different buyers), or a shift in solicitation. Absent those, treat the downward drift in the average as the real warning.",
+              "**Roughly 20–30 recent reviews is the practical floor; below ~10 it is essentially noise.**\n\nEmpirical judgment, not a precise figure: with a 1–5 star scale, the standard deviation of individual ratings is typically around 1.2–1.5 stars. That means the standard error of a mean over *n* reviews is roughly 1.3/√n — about 0.4 stars at n=10, 0.25 at n=25, 0.15 at n=50. So a drift of, say, 0.3–0.5 stars observed over only a dozen reviews is well within sampling luck; the same drift sustained over 25–30+ reviews is not.\n\nPractical reading:\n- **<10 recent reviews:** \"the last stretch looks worse\" is almost always noise. Do not act.\n- **~10–20:** suggestive only; treat as a flag to keep watching, not a conclusion.\n- **~25–30+ with a consistent direction:** trust it as a real change.\n\nTwo conditions tighten or loosen this: the drift must be *sustained and monotone* (not one bad cluster), and the reviewer pool must be stable — a promotion, a listing change, or a shift in who is being solicited can move the average without the product changing."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.7041666666666666,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8666666666666667,
+            "modeling_rigorousness_evaluation": 0.6666666666666666,
+            "practicality_and_scientificity_evaluation": 0.65,
+            "result_and_bias_analysis_evaluation": 0.6333333333333333
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p2_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The report gives clear category comparisons, time trends, practical monitoring measures, and quantitative evidence linking sentiment descriptors to star ratings. It explains key interpretations and limitations, including the distinction between review counts and per-purchaser propensity. However, some claims about review mechanisms and sentiment leading star averages are stronger than the described observational evidence supports, and important methods behind drift events and the composite score are not fully explained.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The report identifies selection bias, unverified-purchase imbalance, differing time spans, limited trend power, lexicon limitations, and unobserved purchaser populations. It appropriately qualifies several conclusions and recommends tracking solicitation and promotions. But it mostly discloses rather than corrects these biases: observed-review baselines remain unadjusted, the microwave verified-review skew is not tested through sensitivity analysis, and no correction for selection or exposure is demonstrated. Some bias explanations are speculative.",
+                "score": 6
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are clearly enumerated and acknowledge major limitations, especially review-selection bias, surprise-driven reporting, product-parent aggregation, reviewer-pool stability, and arbitrary streak/lexicon thresholds. This is a strong foundation. However, several assumptions are asserted rather than demonstrated from the supplied data: independence is questionable because reviews cluster by product and time, the “solicitation baseline” and negativity mechanism are not estimated, and the expert exchanges are not verifiable evidence under the data-only constraint. The 30-day window and minimum-sample rationale are also insufficiently justified. Overall, the assumptions are reasonable but their empirical validation and impact analysis are incomplete.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The methods are broadly appropriate for exploratory analysis: descriptive measures, contingency tables, sentiment indicators, and rolling temporal summaries match the questions. The analysis also correctly warns that raw review volume is not a direct quality measure. Nevertheless, the proposed rigor is overstated. Chi-square tests assume independent observations and do not address product-level clustering, temporal dependence, effect-size uncertainty, multiple testing, or causality. The low-streak definition, lexicon cutoff, 30-day window, and weighted success composite appear arbitrary, and no validation or sensitivity analysis is described. Claims that text-rating association is the most confident recommendation are therefore not fully supported by the stated methodology.",
+                "score": 6
+              }
+            },
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The task analysis clearly defines the central objective: use the three provided Amazon datasets to support Sunshine Company's sales strategy and product-design decisions. It identifies the key data domains, including star ratings, review text, helpfulness ratings, temporal patterns, and cross-product comparisons, and connects them to the Marketing Director's questions. The planned outputs, including a justified recommendation and a one- to two-page letter, are also explicit. However, it could define analytical success criteria, methods for interpreting qualitative descriptors, and safeguards against overclaiming causation more precisely.",
+                "score": 9
+              },
+              "analysis_2": {
+                "reason": "The sub-tasks provide strong coverage of the requirements and follow a rational progression from data analysis, to metric and temporal interpretation, to integrated evidence, and finally to executive communication. They explicitly address product comparisons, helpfulness, reputation trends, review volume, star-rating effects, and text descriptors. The main limitation is that the decomposition does not explicitly separate data validation, temporal ordering or lag analysis, and statistical testing of associations from the broader analysis tasks. It also does not explicitly state how results will be synthesized into the single most confident recommendation, though that dependency is implied.",
+                "score": 9
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The model is practical as an operational monitoring framework: its rolling rating, low-star, review-volume, helpfulness, and disappointment indicators directly support product and sales decisions. It is transparent and implementable using only the supplied review data. However, several outputs are weaker than claimed: review volume is strongly confounded by solicitation and customer exposure, the low-streak analysis cannot identify causation because non-reviewing purchasers are unobserved, and the composite score uses the single worst review, making it unstable and highly sensitive to lexicon errors. Arbitrary thresholds and pooled variability also require validation before deployment.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The process is reasonably scientific because it defines measurable variables, reports uncertainty criteria, distinguishes descriptive evidence from the non-identifiable review-generation model, and uses contingency-table tests and effect sizes. Nevertheless, many thresholds, weights, window lengths, and negativity parameters are expert-selected rather than estimated or validated, and the supplied expert parameters may conflict with the instruction to use only the provided datasets. Chi-square significance does not establish practical or causal importance, while the proposed incitement test lacks controls for product, seasonality, review exposure, and overlapping windows. The “largest effect” and predictive claims therefore exceed the demonstrated evidence.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        }
+      ],
+      "refined_report_utility": 0.70625,
+      "interaction_cost": 0.8284962551925625,
+      "interaction_penalty": 0.04142481275962813,
+      "net_utility": 0.6648251872403719,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1097,
+          "total_expert_latency_seconds": 7.15,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8219939459367642,
+          "latency_cost_component": 0.3333669400201343,
+          "interaction_cost": 0.8287975783747057,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 1083,
+          "total_expert_latency_seconds": 5.95,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8204873300260482,
+          "latency_cost_component": 0.3080585566725585,
+          "interaction_cost": 0.8281949320104194,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    },
+    {
+      "problem_id": "2023_C",
+      "repetition": 1,
+      "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325",
+      "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325/output/results/solution_report.md",
+      "interaction_receipt": {
+        "rubric_id": "interaction_initial_substantive_v1",
+        "interaction_stage": 2,
+        "questions_asked": [
+          "Does the \"number of reported results\" count only people who actually posted\ntheir score on Twitter, so that days with fewer posts may simply mean fewer\nplayers bothered to post — rather than fewer total players that day?",
+          "On days when far more players posted their Wordle score than usual, what\ntypically drove the extra posting — the word itself being unusually hard, or\nsomething about the day or the game's buzz at that time?",
+          "Given that posting volume swings with the game's popularity, when would you\ntrust a forecast for a future day, and what sign would tell you a forecast is\nmainly noise rather than a reliable signal?"
+        ],
+        "expert_answers": [
+          "Yes. The \"number of reported results\" is a count of scores mined from Twitter, i.e. only people who actually posted their result that day. It is not the total number of players who played Wordle on that date.\n\nSo day-to-day variation in that column reflects variation in posting/reporting behavior (and in Twitter activity generally), not necessarily variation in the total player base. The total number of daily Wordle players is far larger and is not observed in this dataset.",
+          "Both, but the dominant driver is usually the day/game-buzz factor rather than the word's difficulty.\n\nThe largest spikes in posting volume tend to coincide with external events — the game going viral, major media coverage, holidays or weekends when people have more time and are more likely to share, and periods of peak general Wordle popularity (early 2022). These produce broad, sustained increases across many days.\n\nWord difficulty does move posting volume, but typically as a secondary, single-day effect: an unusually hard or notorious word (or a controversial one) can trigger a one-day bump, because frustrated or amused players are more likely to post. But that effect is smaller and shorter-lived than the buzz/day effects.\n\nSo: day/buzz effects dominate the big spikes; word difficulty adds a smaller, word-specific increment on top.",
+          "Trust a forecast for a future day when the target date sits inside a period of stable, well-established posting behavior — i.e., the recent trend in reported results is smooth and the day is not near a known external event (viral spike, major media coverage, holiday, or the launch/peak of a popularity wave). In those conditions the buzz factor is roughly constant and the forecast mainly reflects the word and weekday effects.\n\nA forecast is mainly noise rather than signal when the recent history it is built on is itself volatile — large day-to-day swings, a spike or crash in the immediately preceding days, or a date far outside the observed window (e.g., March 2023, well past the dataset's end and past the game's peak). The clearest sign of noise: the forecast's uncertainty interval is as wide as, or wider than, the typical day-to-day variation in the data, so the point estimate carries little information."
+        ],
+        "exchange_count": 3,
+        "evidence_file": "results/interaction_evidence.md",
+        "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+        "interaction_complete": true,
+        "generated_by": "python_controller",
+        "workflow_id": "interaction_workflow_a42ea117176c",
+        "workflow_max_exchanges": 3
+      },
+      "average_score": 0.6833333333333333,
+      "dimension_scores": {
+        "analysis_evaluation": 0.8333333333333335,
+        "modeling_rigorousness_evaluation": 0.5916666666666668,
+        "practicality_and_scientificity_evaluation": 0.5583333333333333,
+        "result_and_bias_analysis_evaluation": 0.75
+      },
+      "judge_repeats": 3,
+      "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325/meta/mmbench_judge/judge_stability.json",
+      "judge_result": {
+        "analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The task analysis clearly identifies all four required objectives: modeling daily reported counts and hard-mode share, predicting the seven-category outcome distribution, classifying word difficulty, and exploring additional patterns. It also preserves important requested outputs, including prediction intervals, uncertainty, the EERIE example, and classification accuracy. However, it does not specify modeling assumptions, success criteria, how word attributes will be defined, or how the interrelated outcomes will be handled. Thus, the goals are clear but the analytical definition is not fully developed.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The decomposition closely covers the full problem without meaningful deviation. Tasks 1–3 correspond directly to the primary requirements, while Task 4 addresses the open-ended data-exploration request. The tasks are logically related: word attributes and difficulty can inform hard-mode and outcome-distribution models, and reported-count modeling provides context for percentages. Minor gaps include not explicitly addressing dependence among the seven percentages, potential reporting bias from Twitter, temporal effects, or how uncertainty from the count model connects to predictions of reported results. Overall coverage is strong.",
+            "score": 8
+          }
+        },
+        "result_and_bias_analysis_evaluation": {
+          "analysis_1": {
+            "reason": "The result analysis is clear, interpretable, and directly addresses all four tasks. It explains the main inferences, gives concrete predictions for March 1 and EERIE, distinguishes point estimates from uncertainty, and acknowledges weak classification performance and extrapolation risk. However, the report provides limited methodological detail about model specification, estimated effects, validation procedures, and how prediction intervals were computed, so some conclusions cannot be independently assessed.",
+            "score": 8
+          },
+          "analysis_2": {
+            "reason": "The bias analysis is strong in identifying Twitter-selection bias, posting-population changes, temporal nonstationarity, extrapolation risk, rounding, unusual word records, omitted word familiarity, and uncertainty from marginal intervals. It appropriately avoids claiming that weak word effects are meaningful. However, most biases are described rather than corrected: there is no demonstrated reweighting, sensitivity analysis, data cleaning decision, or joint compositional prediction method. Consequently, the analysis is candid and thorough, but bias mitigation remains limited.",
+            "score": 7
+          }
+        },
+        "modeling_rigorousness_evaluation": {
+          "analysis_1": {
+            "reason": "The assumptions are mostly explicit and relevant: the analysis correctly distinguishes Twitter reports from total players, recognizes the early viral-growth regime, and explains why word effects are omitted from the reporting-count model. However, several assumptions are insufficiently justified. The late-2022 window as a proxy for March 2023 is plausible but not validated, the extrapolation allowance is unspecified, and the claimed lack of word signal is not supported by statistical tests or out-of-sample evidence. Treating abnormal-length words as valid may also bias feature-based models. The independence and representativeness of Twitter reporters are not adequately addressed.",
+            "score": 7
+          },
+          "analysis_2": {
+            "reason": "The modeling choices are generally sensible but only moderately rigorous. Log regression with weekday effects is reasonable for positive counts, and feature-based regression plus cross-validated classification addresses the requested questions. Nevertheless, the count prediction interval is incomplete because the extrapolation uncertainty is not quantified; separate linear regressions for compositional percentages can produce incoherent distributions; clipping and renormalization distort uncertainty; and marginal intervals do not provide the requested joint predictive distribution. The difficulty classes are defined from the same outcomes used to characterize words, creating potential leakage and arbitrary tercile dependence. Leave-one-out validation is useful, but stronger time-aware and out-of-sample validation is needed.",
+            "score": 6
+          }
+        },
+        "practicality_and_scientificity_evaluation": {
+          "analysis_1": {
+            "reason": "The process addresses all four tasks with interpretable models and produces concrete forecasts, intervals, word classifications, and descriptive findings. However, practicality is limited by weak predictive validation, simplistic word features, separate regressions for compositional percentages, and unclear handling of negative predictions and renormalization. The reported-results forecast is especially unreliable: the extrapolation window and target time index appear inconsistent, and its very wide interval offers limited decision value. Hard-mode conclusions are also questionable because significant individual coefficients coexist with near-zero overall explanatory power and possible time/count confounding. The approach is usable for exploratory analysis, but not sufficiently reliable for operational prediction or generalization.",
+            "score": 5
+          },
+          "analysis_2": {
+            "reason": "The modeling is broadly scientific in using transformations, regression, uncertainty estimates, feature-based prediction, and explicit discussion of residual error. It recognizes nonstationarity and reports limitations rather than presenting forecasts as certain. Nevertheless, important scientific shortcomings remain: no clear out-of-sample or cross-validation results are provided; the count model assumes a stable regime without adequately justifying it; prediction intervals do not clearly account for parameter, model-selection, or structural uncertainty; and outcome percentages are modeled independently despite their compositional dependence. Difficulty labels are created from the response variable and then classified without reported accuracy, risking circularity. The methods are mostly standard statistical and machine-learning techniques, with limited innovation or deeper Wordle-specific theory.",
+            "score": 6
+          }
+        }
+      },
+      "solution_source": "agent_solution",
+      "subtask_count": 4,
+      "repetition_count": 2,
+      "representative_repetition": 1,
+      "repetitions": [
+        {
+          "problem_id": "2023_C",
+          "repetition": 1,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "Does the \"number of reported results\" count only people who actually posted\ntheir score on Twitter, so that days with fewer posts may simply mean fewer\nplayers bothered to post — rather than fewer total players that day?",
+              "On days when far more players posted their Wordle score than usual, what\ntypically drove the extra posting — the word itself being unusually hard, or\nsomething about the day or the game's buzz at that time?",
+              "Given that posting volume swings with the game's popularity, when would you\ntrust a forecast for a future day, and what sign would tell you a forecast is\nmainly noise rather than a reliable signal?"
+            ],
+            "expert_answers": [
+              "Yes. The \"number of reported results\" is a count of scores mined from Twitter, i.e. only people who actually posted their result that day. It is not the total number of players who played Wordle on that date.\n\nSo day-to-day variation in that column reflects variation in posting/reporting behavior (and in Twitter activity generally), not necessarily variation in the total player base. The total number of daily Wordle players is far larger and is not observed in this dataset.",
+              "Both, but the dominant driver is usually the day/game-buzz factor rather than the word's difficulty.\n\nThe largest spikes in posting volume tend to coincide with external events — the game going viral, major media coverage, holidays or weekends when people have more time and are more likely to share, and periods of peak general Wordle popularity (early 2022). These produce broad, sustained increases across many days.\n\nWord difficulty does move posting volume, but typically as a secondary, single-day effect: an unusually hard or notorious word (or a controversial one) can trigger a one-day bump, because frustrated or amused players are more likely to post. But that effect is smaller and shorter-lived than the buzz/day effects.\n\nSo: day/buzz effects dominate the big spikes; word difficulty adds a smaller, word-specific increment on top.",
+              "Trust a forecast for a future day when the target date sits inside a period of stable, well-established posting behavior — i.e., the recent trend in reported results is smooth and the day is not near a known external event (viral spike, major media coverage, holiday, or the launch/peak of a popularity wave). In those conditions the buzz factor is roughly constant and the forecast mainly reflects the word and weekday effects.\n\nA forecast is mainly noise rather than signal when the recent history it is built on is itself volatile — large day-to-day swings, a spike or crash in the immediately preceding days, or a date far outside the observed window (e.g., March 2023, well past the dataset's end and past the game's peak). The clearest sign of noise: the forecast's uncertainty interval is as wide as, or wider than, the typical day-to-day variation in the data, so the point estimate carries little information."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6708333333333334,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8000000000000002,
+            "modeling_rigorousness_evaluation": 0.6166666666666667,
+            "practicality_and_scientificity_evaluation": 0.5166666666666667,
+            "result_and_bias_analysis_evaluation": 0.75
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r1p3_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The task analysis clearly identifies all four required objectives: modeling daily reported counts and hard-mode share, predicting the seven-category outcome distribution, classifying word difficulty, and exploring additional patterns. It also preserves important requested outputs, including prediction intervals, uncertainty, the EERIE example, and classification accuracy. However, it does not specify modeling assumptions, success criteria, how word attributes will be defined, or how the interrelated outcomes will be handled. Thus, the goals are clear but the analytical definition is not fully developed.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The decomposition closely covers the full problem without meaningful deviation. Tasks 1–3 correspond directly to the primary requirements, while Task 4 addresses the open-ended data-exploration request. The tasks are logically related: word attributes and difficulty can inform hard-mode and outcome-distribution models, and reported-count modeling provides context for percentages. Minor gaps include not explicitly addressing dependence among the seven percentages, potential reporting bias from Twitter, temporal effects, or how uncertainty from the count model connects to predictions of reported results. Overall coverage is strong.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is clear, interpretable, and directly addresses all four tasks. It explains the main inferences, gives concrete predictions for March 1 and EERIE, distinguishes point estimates from uncertainty, and acknowledges weak classification performance and extrapolation risk. However, the report provides limited methodological detail about model specification, estimated effects, validation procedures, and how prediction intervals were computed, so some conclusions cannot be independently assessed.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is strong in identifying Twitter-selection bias, posting-population changes, temporal nonstationarity, extrapolation risk, rounding, unusual word records, omitted word familiarity, and uncertainty from marginal intervals. It appropriately avoids claiming that weak word effects are meaningful. However, most biases are described rather than corrected: there is no demonstrated reweighting, sensitivity analysis, data cleaning decision, or joint compositional prediction method. Consequently, the analysis is candid and thorough, but bias mitigation remains limited.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are mostly explicit and relevant: the analysis correctly distinguishes Twitter reports from total players, recognizes the early viral-growth regime, and explains why word effects are omitted from the reporting-count model. However, several assumptions are insufficiently justified. The late-2022 window as a proxy for March 2023 is plausible but not validated, the extrapolation allowance is unspecified, and the claimed lack of word signal is not supported by statistical tests or out-of-sample evidence. Treating abnormal-length words as valid may also bias feature-based models. The independence and representativeness of Twitter reporters are not adequately addressed.",
+                "score": 7
+              },
+              "analysis_2": {
+                "reason": "The modeling choices are generally sensible but only moderately rigorous. Log regression with weekday effects is reasonable for positive counts, and feature-based regression plus cross-validated classification addresses the requested questions. Nevertheless, the count prediction interval is incomplete because the extrapolation uncertainty is not quantified; separate linear regressions for compositional percentages can produce incoherent distributions; clipping and renormalization distort uncertainty; and marginal intervals do not provide the requested joint predictive distribution. The difficulty classes are defined from the same outcomes used to characterize words, creating potential leakage and arbitrary tercile dependence. Leave-one-out validation is useful, but stronger time-aware and out-of-sample validation is needed.",
+                "score": 6
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "The process addresses all four tasks with interpretable models and produces concrete forecasts, intervals, word classifications, and descriptive findings. However, practicality is limited by weak predictive validation, simplistic word features, separate regressions for compositional percentages, and unclear handling of negative predictions and renormalization. The reported-results forecast is especially unreliable: the extrapolation window and target time index appear inconsistent, and its very wide interval offers limited decision value. Hard-mode conclusions are also questionable because significant individual coefficients coexist with near-zero overall explanatory power and possible time/count confounding. The approach is usable for exploratory analysis, but not sufficiently reliable for operational prediction or generalization.",
+                "score": 5
+              },
+              "analysis_2": {
+                "reason": "The modeling is broadly scientific in using transformations, regression, uncertainty estimates, feature-based prediction, and explicit discussion of residual error. It recognizes nonstationarity and reports limitations rather than presenting forecasts as certain. Nevertheless, important scientific shortcomings remain: no clear out-of-sample or cross-validation results are provided; the count model assumes a stable regime without adequately justifying it; prediction intervals do not clearly account for parameter, model-selection, or structural uncertainty; and outcome percentages are modeled independently despite their compositional dependence. Difficulty labels are created from the response variable and then classified without reported accuracy, risking circularity. The methods are mostly standard statistical and machine-learning techniques, with limited innovation or deeper Wordle-specific theory.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 4
+        },
+        {
+          "problem_id": "2023_C",
+          "repetition": 2,
+          "run_dir": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p3_20261002_143325",
+          "final_report": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p3_20261002_143325/output/results/solution_report.md",
+          "interaction_receipt": {
+            "rubric_id": "interaction_initial_substantive_v1",
+            "interaction_stage": 2,
+            "questions_asked": [
+              "Does the number of reported Wordle results on a day reflect the total number of players, or only the people who chose to tweet their score? If only some players report, roughly who skips reporting on a given day?",
+              "If the posted percentages only come from the players who tweeted, do they still represent the typical player's outcome for that word, or are they skewed toward brag-worthy scores?",
+              "Given that the posted results under-report failures on hard words, when would a predicted outcome distribution for a new word be trustworthy enough to use, and when should it be treated as too uncertain?"
+            ],
+            "expert_answers": [
+              "Only the people who chose to tweet their score. The dataset is built by mining Twitter, so it is a self-selected sample of players who post results, not the full player base.\n\nWho skips reporting on a given day, roughly:\n\n- **Casual players** who don't use Twitter or don't post scores at all — the large majority of players.\n- **Players who failed (X)** — losing is less shareable than winning, so failures are systematically under-reported.\n- **Players who solved in very few tries vs. many** — reporting skews toward \"brag-worthy\" results (2–4 tries), while 1-try, 6-try, and X outcomes are relatively under-reported.\n- **Players on hard mode** — a minority of the player base, and their reporting behavior may differ.\n- **Day-to-day variation** — reporting depends on external factors (weekday/weekend, holidays, news cycles, word difficulty/interest), so the same underlying player pool reports at different rates on different days.\n\nEmpirical judgment: the reported count is a fraction of true daily players, and that fraction is not constant across days or outcomes.",
+              "Skewed toward brag-worthy scores. The posted percentages are conditional on having tweeted, and the decision to tweet is not outcome-neutral: players who solved in 2–4 tries are over-represented, while failures (X), 1-try, and 6-try outcomes are under-represented relative to the full player base.\n\nSo the distribution is a biased estimate of the typical player's outcome for that word. The direction of the bias is fairly consistent (toward mid-range wins, away from losses), but its magnitude varies with word difficulty and day — harder words likely have a larger failure under-reporting gap, since losing is the least shareable outcome.\n\nEmpirical judgment: the percentages are directionally informative about relative word difficulty but should not be read as the true population distribution of outcomes.",
+              "A predicted distribution is trustworthy enough to use when the word is **easy-to-moderate** and the prediction is **relative, not absolute**:\n\n- The word's attributes (common letters, common pattern, familiar vocabulary) put it in the range where failures are rare, so the failure under-reporting gap is small and the bias is minor.\n- You use it to rank or compare words, or to give a rough central tendency (e.g., \"most players solve in 3–4\"), not to state exact percentages.\n- The prediction interval is narrow and the model's inputs are well-represented in the historical data.\n\nTreat it as too uncertain when:\n\n- The word is **hard or unusual** (rare letters, repeated letters, obscure vocabulary, deceptive patterns like EERIE) — failures are common and most under-reported, so the true X is materially higher than predicted and the whole distribution shifts.\n- You need **absolute** percentages, especially the X and 1-try tails, which are the most biased.\n- The word is unlike anything in the training data, or the day has unusual reporting conditions.\n\nEmpirical judgment: for hard words, trust the direction (harder than average) but not the numbers; for easy words, the numbers are usable within a few percentage points."
+            ],
+            "exchange_count": 3,
+            "evidence_file": "results/interaction_evidence.md",
+            "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+            "interaction_complete": true,
+            "generated_by": "python_controller",
+            "workflow_id": "interaction_workflow_a42ea117176c",
+            "workflow_max_exchanges": 3
+          },
+          "average_score": 0.6958333333333333,
+          "dimension_scores": {
+            "analysis_evaluation": 0.8666666666666667,
+            "modeling_rigorousness_evaluation": 0.5666666666666668,
+            "practicality_and_scientificity_evaluation": 0.6,
+            "result_and_bias_analysis_evaluation": 0.75
+          },
+          "judge_repeats": 3,
+          "judge_stability_result": "/public1/home/stu52275901007/workspace/ghj_workspace/ModelingAgent/openclaw_experiments/evolve_exp/claude_fp8_scratch_data_r5b/cpe_evaluations/round_10/train_candidate/runs/round_10/r2p3_20261002_143325/meta/mmbench_judge/judge_stability.json",
+          "judge_result": {
+            "analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The decomposition clearly maps each required question to a separate task and identifies the main outputs: forecasting reported counts, testing word attributes against Hard Mode usage, predicting score distributions, classifying difficulty, and exploring additional features. It also preserves important requirements such as prediction intervals, uncertainty, an EERIE example, and classification accuracy. However, it does not define key modeling choices, such as the relevant word attributes, treatment of percentages and varying sample sizes, or how “difficulty” will be operationalized.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The five tasks collectively cover the stated requirements without significant deviation. The decomposition is logically coherent, with count forecasting providing context for reported-score reliability and the distribution and difficulty analyses addressing complementary aspects of performance. Still, dependencies are only implicit: the analysis should explicitly connect word-attribute engineering across Tasks 2–4, account for the compositional nature of the seven score percentages, and distinguish reporting behavior from player difficulty. Task 5 is appropriately open-ended but lacks criteria for selecting meaningful features.",
+                "score": 8
+              }
+            },
+            "result_and_bias_analysis_evaluation": {
+              "analysis_1": {
+                "reason": "The result analysis is clear, well structured, and directly answers the requested tasks. It provides interpretable forecasts, uncertainty intervals, validation metrics, feature-based explanations, and practical conclusions. Strengths and limitations are explicitly discussed, especially for extrapolation and weak word-level prediction. However, the underlying model specifications, variable definitions, estimation procedures, and evidence supporting some claims are not fully shown, so the inference process cannot be independently assessed in detail.",
+                "score": 8
+              },
+              "analysis_2": {
+                "reason": "The bias analysis is unusually thorough in identifying self-selection from Twitter, reporting-volume changes, temporal confounding, rounding, extrapolation, class imbalance, and weak out-of-distribution behavior for EERIE. It appropriately distinguishes reporting-player estimates from population quantities and uses cross-validation, normalization, time controls, and a recent-data robustness check. However, most biases are acknowledged rather than quantitatively corrected; the claim that reported failures are a lower bound is not directly validated, and no weighting, selection model, recalibration, or sensitivity analysis substantially removes reporting bias.",
+                "score": 7
+              }
+            },
+            "modeling_rigorousness_evaluation": {
+              "analysis_1": {
+                "reason": "The assumptions are generally explicit and appropriately recognize the data as self-selected Twitter reports rather than the full player population. Modeling reporting counts on a log scale and acknowledging temporal drift are reasonable. However, the quadratic trend and 10,000-report cutoff are only weakly justified, and no residual, heteroscedasticity, or sensitivity analysis is described. Treating hard-mode percentages as ordinary ratios ignores binomial uncertainty and reporting selection. The assumption that EERIE can be predicted from word attributes alone also omits date and reporting-trend effects. The treatment of outcome percentages is especially weak: large deviations from a 100% sum cannot be explained merely as rounding, and independent modeling of compositional outcomes is questionable.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The analysis uses several sensible methods, including log regression, cross-validation, multinomial classification, and explicit out-of-sample evaluation. Nevertheless, important modeling choices reduce scientific rigor. AIC selection and high R-squared do not establish that the count forecast is well calibrated, while extrapolating a quadratic trend may be unstable. Independent OLS models for seven dependent percentages violate their compositional structure; renormalization does not correct this, and modeling only X with boosting does not justify prediction intervals for all outcomes. The future prediction omits date effects despite claiming they matter. Tercile difficulty labels are arbitrary, and treating ordinal classes as nominal discards useful structure. Reporting bias is acknowledged but not quantitatively modeled.",
+                "score": 5
+              }
+            },
+            "practicality_and_scientificity_evaluation": {
+              "analysis_1": {
+                "reason": "Practical but limited. The approach addresses all five tasks and provides interpretable forecasts, uncertainty estimates, cross-validation, and descriptive findings. However, the count model extrapolates substantially beyond the observed period and models counts indirectly with a log-normal error assumption. Hard-mode percentages and outcome percentages are bounded and compositional, yet are modeled with ordinary linear regressions, which can produce impossible values and fail to enforce that percentages sum to 100%. The analysis also does not provide the required concrete EERIE distribution, and the difficulty classifier has only moderate accuracy (0.524). It is useful for exploratory decision support, but not sufficiently reliable for operational prediction.",
+                "score": 6
+              },
+              "analysis_2": {
+                "reason": "The process is reasonably scientific because it states assumptions, distinguishes confidence from prediction intervals, reports residual uncertainty, uses robust standard errors, cross-validation, and acknowledges reporting-selection bias. Nevertheless, several methodological issues weaken its scientific validity: multiple feature tests are interpreted without clear correction, the hard-mode model appears vulnerable to temporal confounding, OLS is inappropriate for bounded compositional outcomes, and the proposed prediction interval combines different models in a weakly justified way. The tercile labels are outcome-derived and therefore describe difficulty retrospectively rather than independently validating it. These shortcomings make the work scientifically defensible as exploratory analysis, but not a fully rigorous predictive model.",
+                "score": 6
+              }
+            }
+          },
+          "solution_source": "agent_solution",
+          "subtask_count": 5
+        }
+      ],
+      "refined_report_utility": 0.6833333333333333,
+      "interaction_cost": 0.8152378768585106,
+      "interaction_penalty": 0.04076189384292553,
+      "net_utility": 0.6425714394904078,
+      "interaction_cost_runs": [
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 722,
+          "total_expert_latency_seconds": 4.84,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.7729371052460222,
+          "latency_cost_component": 0.2804089031175423,
+          "interaction_cost": 0.8091748420984088,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        },
+        {
+          "exchange_count": 3,
+          "total_tokens_approx": 935,
+          "total_expert_latency_seconds": 5.6899999999999995,
+          "exchange_cost_component": 1.0,
+          "token_cost_component": 0.8032522790465306,
+          "latency_cost_component": 0.3020001989266,
+          "interaction_cost": 0.8213009116186123,
+          "token_count_method": "ceil(CJK + other_non_ASCII + ASCII_characters/4)",
+          "latency_source": "expert_bridge_elapsed_with_file_mtime_fallback"
+        }
+      ]
+    }
+  ],
+  "completed_at": "2026-10-02T14:55:03.834087",
+  "fixed_rubric_id": "interaction_initial_substantive_v1",
+  "fixed_rubric": {
+    "rubric_id": "interaction_initial_substantive_v1",
+    "name": "Traceable substantive consultation",
+    "purpose": "Ensure that one independent expert reply causes a verifiable change in the agent's subsequent analysis rather than merely confirming completed work.",
+    "criteria": [
+      {
+        "name": "Post-reply causal change",
+        "rule": "Consult before implementation about one unresolved qualitative decision without revealing a preferred answer. After the reply, the modeling agent must independently create or revise at least one decision-relevant assumption, criterion, validation scenario, evidence artifact, confidence boundary, or report-scope decision, and state the resulting impact honestly; calculations and validation remain the agent's responsibility.",
+        "positive_example": "An expert concern about peak-period fairness causes the agent to add and validate a peak-tail scenario after the reply, even if the final recommendation remains unchanged.",
+        "negative_example": "The agent completes all analysis before consulting, asks the expert to approve its preferred answer, and only copies that approval into the final report."
+      }
+    ]
+  },
+  "workflow_id": "interaction_workflow_a42ea117176c",
+  "workflow": {
+    "name": "Operational-Causal-Robustness Policy",
+    "changed_components": [
+      "## Interaction Strategy"
+    ],
+    "evolution_rationale": "The parent policy (Round 9) focuses on 'structural validity' and 'validation design', which led to questions about independence and cross-validation strategies. However, the judge feedback for the training runs (especially 2017_C and 2020_C) indicates that the primary failures were not in the validation design itself, but in the *operational definition* of key variables (e.g., confusing ADT with latent demand, or reviews with real-time reputation) and the *causal interpretation* of correlations (e.g., assuming linear uplift without validating the mechanism). Round 5, which focused on 'Causal Mechanism and Data-Model Consistency', was rejected, but it was framed around 'circular calibration' and 'physical plausibility', which is too abstract. This patch shifts the focus to 'Operational Definition' (what the data actually measures) and 'Causal Direction' (is it a direct effect or artifact), which directly addresses the 'modeling rigorousness' and 'result and bias analysis' penalties observed in the evidence. It departs from Round 5 by focusing on the *definition* of variables first, which is a prerequisite for causal analysis, and from Round 9 by replacing 'validation design' with 'robustness thresholds' to ensure the model's outputs are interpreted correctly given the identified biases.",
+    "interaction_policy": "# Human Expert Interaction\n\n## Interaction Strategy\n\nSequence the consultation to resolve the specific operational definitions and causal mechanisms that the problem statement leaves ambiguous, prioritizing gaps where the agent's model structure relies on unverified external parameters or conflates correlation with causation.\n\n**Exchange 1: Clarify the Operational Definition of Key Variables.**\nIdentify the specific variable or metric in the problem statement that has multiple plausible interpretations (e.g., 'demand' vs. 'observed volume', 'success' vs. 'completion') and whose definition directly determines the model's input structure. Ask the expert to clarify the *operational reality* of this variable: what it actually measures in the domain, what it excludes or suppresses, and whether the provided data represents the true underlying process or a biased subset of it. This prevents the model from building on a variable definition that is mathematically convenient but operationally invalid, directly addressing modeling rigorousness and practicality penalties related to data interpretation.\n\n**Exchange 2: Validate the Causal Direction and Dominant Mechanism.**\nBased on the variable definitions established in Exchange 1, identify the specific relationship between the input variables and the outcome that the model assumes (e.g., linear response, independent effects, or direct causation). Ask the expert to clarify whether this relationship reflects a direct causal mechanism or a common-cause artifact, and to identify the *primary operational driver* that distinguishes genuine system behavior from noise or selection bias. This ensures the model's explanatory framework is grounded in domain logic rather than statistical coincidence, addressing scientificity and result analysis criteria related to inference validity and bias.\n\n**Exchange 3: Define the Decision-Relevant Robustness Threshold.**\nIdentify how the model's output should be interpreted given the operational and causal limitations established in Exchanges 1 and 2. Ask the expert to clarify the *specific conditions* under which a model prediction is considered robust to the identified biases and uncertainties, distinguishing between a reliable signal that supports decision-making and an artifact that requires further validation. This ensures the final analysis is framed in terms of actionable confidence and clearly separates valid conclusions from results that are sensitive to unverified assumptions, addressing practicality and scientificity criteria related to decision relevance.\n\n**Example Interaction Shape:**\n- *Gap 1 (Operational Definition):* \"Does the recorded metric represent the total potential demand or only the realized transactions, and what operational factors cause the difference between these two measures?\" -> Expert clarifies the true meaning of the data variable and its limitations.\n- *Gap 2 (Causal Mechanism):* \"Given this definition, is the observed correlation between the input and outcome driven by a direct causal effect, or is it an artifact of a third, unobserved operational factor?\" -> Expert clarifies the causal direction and primary drivers.\n- *Gap 3 (Robustness Threshold):* \"Under what specific conditions is the model's prediction considered robust to the identified biases, and what level of deviation indicates that the result is an artifact rather than a reliable signal?\" -> Expert clarifies the criteria for robustness and the threshold for actionable conclusions.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "max_exchanges": 3,
+    "stop_condition": "The consultation stops when its exchange budget is used: three exchanges, one question each, as the policy's Interaction Limits section states. The policy states no other stop rule.",
+    "evolution_mode": "mutation",
+    "policy_text": "# Human Expert Interaction\n\n## Interaction Strategy\n\nSequence the consultation to resolve the specific operational definitions and causal mechanisms that the problem statement leaves ambiguous, prioritizing gaps where the agent's model structure relies on unverified external parameters or conflates correlation with causation.\n\n**Exchange 1: Clarify the Operational Definition of Key Variables.**\nIdentify the specific variable or metric in the problem statement that has multiple plausible interpretations (e.g., 'demand' vs. 'observed volume', 'success' vs. 'completion') and whose definition directly determines the model's input structure. Ask the expert to clarify the *operational reality* of this variable: what it actually measures in the domain, what it excludes or suppresses, and whether the provided data represents the true underlying process or a biased subset of it. This prevents the model from building on a variable definition that is mathematically convenient but operationally invalid, directly addressing modeling rigorousness and practicality penalties related to data interpretation.\n\n**Exchange 2: Validate the Causal Direction and Dominant Mechanism.**\nBased on the variable definitions established in Exchange 1, identify the specific relationship between the input variables and the outcome that the model assumes (e.g., linear response, independent effects, or direct causation). Ask the expert to clarify whether this relationship reflects a direct causal mechanism or a common-cause artifact, and to identify the *primary operational driver* that distinguishes genuine system behavior from noise or selection bias. This ensures the model's explanatory framework is grounded in domain logic rather than statistical coincidence, addressing scientificity and result analysis criteria related to inference validity and bias.\n\n**Exchange 3: Define the Decision-Relevant Robustness Threshold.**\nIdentify how the model's output should be interpreted given the operational and causal limitations established in Exchanges 1 and 2. Ask the expert to clarify the *specific conditions* under which a model prediction is considered robust to the identified biases and uncertainties, distinguishing between a reliable signal that supports decision-making and an artifact that requires further validation. This ensures the final analysis is framed in terms of actionable confidence and clearly separates valid conclusions from results that are sensitive to unverified assumptions, addressing practicality and scientificity criteria related to decision relevance.\n\n**Example Interaction Shape:**\n- *Gap 1 (Operational Definition):* \"Does the recorded metric represent the total potential demand or only the realized transactions, and what operational factors cause the difference between these two measures?\" -> Expert clarifies the true meaning of the data variable and its limitations.\n- *Gap 2 (Causal Mechanism):* \"Given this definition, is the observed correlation between the input and outcome driven by a direct causal effect, or is it an artifact of a third, unobserved operational factor?\" -> Expert clarifies the causal direction and primary drivers.\n- *Gap 3 (Robustness Threshold):* \"Under what specific conditions is the model's prediction considered robust to the identified biases, and what level of deviation indicates that the result is an artifact rather than a reliable signal?\" -> Expert clarifies the criteria for robustness and the threshold for actionable conclusions.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation.",
+    "actions": [
+      {
+        "action_id": "apply_policy_trigger",
+        "action_type": "agent_step",
+        "rule": "Apply the complete natural-language interaction policy below to decide whether and when strategic expert feedback is required.\n\n# Human Expert Interaction\n\n## Interaction Strategy\n\nSequence the consultation to resolve the specific operational definitions and causal mechanisms that the problem statement leaves ambiguous, prioritizing gaps where the agent's model structure relies on unverified external parameters or conflates correlation with causation.\n\n**Exchange 1: Clarify the Operational Definition of Key Variables.**\nIdentify the specific variable or metric in the problem statement that has multiple plausible interpretations (e.g., 'demand' vs. 'observed volume', 'success' vs. 'completion') and whose definition directly determines the model's input structure. Ask the expert to clarify the *operational reality* of this variable: what it actually measures in the domain, what it excludes or suppresses, and whether the provided data represents the true underlying process or a biased subset of it. This prevents the model from building on a variable definition that is mathematically convenient but operationally invalid, directly addressing modeling rigorousness and practicality penalties related to data interpretation.\n\n**Exchange 2: Validate the Causal Direction and Dominant Mechanism.**\nBased on the variable definitions established in Exchange 1, identify the specific relationship between the input variables and the outcome that the model assumes (e.g., linear response, independent effects, or direct causation). Ask the expert to clarify whether this relationship reflects a direct causal mechanism or a common-cause artifact, and to identify the *primary operational driver* that distinguishes genuine system behavior from noise or selection bias. This ensures the model's explanatory framework is grounded in domain logic rather than statistical coincidence, addressing scientificity and result analysis criteria related to inference validity and bias.\n\n**Exchange 3: Define the Decision-Relevant Robustness Threshold.**\nIdentify how the model's output should be interpreted given the operational and causal limitations established in Exchanges 1 and 2. Ask the expert to clarify the *specific conditions* under which a model prediction is considered robust to the identified biases and uncertainties, distinguishing between a reliable signal that supports decision-making and an artifact that requires further validation. This ensures the final analysis is framed in terms of actionable confidence and clearly separates valid conclusions from results that are sensitive to unverified assumptions, addressing practicality and scientificity criteria related to decision relevance.\n\n**Example Interaction Shape:**\n- *Gap 1 (Operational Definition):* \"Does the recorded metric represent the total potential demand or only the realized transactions, and what operational factors cause the difference between these two measures?\" -> Expert clarifies the true meaning of the data variable and its limitations.\n- *Gap 2 (Causal Mechanism):* \"Given this definition, is the observed correlation between the input and outcome driven by a direct causal effect, or is it an artifact of a third, unobserved operational factor?\" -> Expert clarifies the causal direction and primary drivers.\n- *Gap 3 (Robustness Threshold):* \"Under what specific conditions is the model's prediction considered robust to the identified biases, and what level of deviation indicates that the result is an artifact rather than a reliable signal?\" -> Expert clarifies the criteria for robustness and the threshold for actionable conclusions.\n\n## Prohibited Requests\n\nThe agent must not request feedback for:\n\n- coding, debugging, or implementation issues;\n- standard mathematical derivations;\n- computation or data processing.\n\n# Interaction Limits\n\nThe consultation runs three exchanges, one question each.\n\nAfter this policy terminates, the agent must not request further expert feedback for execution, computation, implementation, checking, or validation."
+      },
+      {
+        "action_id": "request_strategic_feedback",
+        "action_type": "expert_exchange",
+        "rule": "When the interaction policy requires consultation, present the specified strategic context and request only the qualitative expert judgment defined by that policy."
+      },
+      {
+        "action_id": "integrate_strategic_feedback",
+        "action_type": "agent_analysis",
+        "rule": "Evaluate and apply the expert reply according to the interaction policy, then continue all technical modeling work autonomously."
+      },
+      {
+        "action_id": "close_policy_interaction",
+        "action_type": "close",
+        "rule": "Stop expert interaction at the stated limit or termination condition and complete the remaining modeling work autonomously."
+      }
+    ],
+    "entry_action": "apply_policy_trigger",
+    "workflow_id": "interaction_workflow_a42ea117176c",
+    "evolution_operator": "cpe_batch_reflection_patch",
+    "created_round": 10,
+    "parent_workflow_ids": [
+      "interaction_workflow_2507e1cb763b"
+    ],
+    "training_batch": [
+      "2017_C",
+      "2020_C",
+      "2023_C"
+    ]
+  },
+  "evolution_operator": "cpe_batch_reflection_patch",
+  "substantive_interaction_checks": [],
+  "substantive_interaction_gate_enabled": false,
+  "substantive_interaction_passed": null,
+  "cpe_phase": "train_candidate",
+  "evaluation_split": "train",
+  "evaluation_problems": [
+    "2017_C",
+    "2020_C",
+    "2023_C"
+  ],
+  "absolute_utility": 0.6680555555555556,
+  "interaction_cost": 0.8234220242780758,
+  "interaction_penalty": 0.041171101213903785,
+  "net_utility": 0.6268844543416517,
+  "utility_basis": "mean_report_score_minus_interaction_cost",
+  "interaction_cost_parameters": {
+    "max_exchanges": 3,
+    "total_token_reference": 5000,
+    "total_latency_max_seconds": 540.0,
+    "exchange_weight": 0.5,
+    "token_weight": 0.4,
+    "latency_weight": 0.0,
+    "penalty_weight": 0.05
+  }
+}

@@ -1,0 +1,95 @@
+# Solution
+
+## Subtask 1: Subtask 1: Explain the day-to-day variation in the number of reported Wordle results during 2022 and produce a predictio
+
+### Problem
+
+Subtask 1: Explain the day-to-day variation in the number of reported Wordle results during 2022 and produce a prediction interval for the number of reported results on March 1, 2023. The dataset covers 359 daily puzzles (contest 202-560, January 7 - December 31, 2022); the count fell from 80,630 (Jan 7) to 20,380 (Dec 31), range 2,569-361,908.
+
+### Analysis
+
+Assumptions: (a) the count is a noisy self-selected Twitter sample, so its level carries popularity information but its daily scatter is inherently large; (b) per the domain consultation (exchange 1), the 2022 decline is a smooth, continuous erosion with a mild weekly rhythm, not a series of news-event cliffs - so a single smooth trend plus day-of-week effects is the correct structure, and no regime breaks or event dummies are needed; (c) the reporting behavior of the player base is stable over the 60-day extrapolation from Dec 31, 2022 to Mar 1, 2023. Approach: model the log count with an exponential decay trend plus 6 day-of-week dummy variables (OLS), then build the prediction interval from an AR(1) fit to the residuals plus parameter uncertainty. Log scale is used because the series is multiplicative in its components (shrinking player base x weekday pattern x noise) and the relative error is the natural metric. Soundness: R-squared 0.883, log RMSE 0.297; the residual autocorrelation (phi = 0.80) shows the trend does not absorb all serial dependence, which is exactly why the interval is inflated with an AR(1) term rather than using OLS standard errors alone.
+
+### Modeling Process
+
+Let N_t be the reported count on day t (t = days since 2022-01-07). Model: log N_t = b0 + b1*t + sum_{j=1..6} b_j * 1(day-of-week = j) + e_t, with e_t = phi*e_{t-1} + u_t, u_t ~ (0, sigma_u^2). Fitted values: b0 = 12.426, b1 = -0.00787/day (i.e. a factor of exp(-0.055) ~ 0.947 per week, roughly 20% of the player base lost per month of the fade); b1(Mon)=0.018, b1(Tue)=-0.009, b1(Wed)=0.016, b1(Thu)=0.012, b1(Fri)=-0.023, b1(Sat)=-0.035 (Sunday is baseline, the lowest day). phi = 0.800, sigma_u^2 = 0.0307. For the target date (March 1, 2023, a Wednesday, t = 419, h = 61 days beyond the sample end): point forecast exp(9.126) = 9,192. Interval: SE_log = sqrt(sigma_u^2*(1-phi^(2h))/(1-phi^2) + x_new' V(beta) x_new) = 0.297, so 95% PI = exp(9.126 +/- 1.96*0.297) = [5,134, 16,460]. Parameter table (empirical/calibrated inputs): none beyond the dataset - all coefficients are fitted to the supplied file; the weekday-structure and no-event-breaks form of the trend are the qualitative constraint supplied by exchange 1 (expert confirmation that the 2022 fade is gradual, not event-driven, valid over the sample period Jan-Dec 2022).
+
+### Outcome Analysis
+
+Prediction for March 1, 2023: about 9,200 reported results, 95% interval [5,100, 16,500]. Validation: on a 28-day holdout (the last month of 2022) the model's MAPE is 23.6%, with 41% of days within +/-20% and 72% within +/-30%; the expert-confirmed acceptability threshold for this kind of crowd-size forecast is roughly +/-20-30% (exchange 3), and the point forecast plus an honest interval is exactly the form the expert said matters. Limitations: the interval is wide (a factor of ~3) because (i) the AR(1) persistence (phi=0.80) carries uncertainty 61 days ahead, (ii) the fade itself is not perfectly exponential (R-squared 0.88, not ~1), and (iii) a 60-day extrapolation outside a one-year sample is sensitive to whether the fade accelerates or plateaus. The weekday pattern also compresses in magnitude as the base shrinks, which the additive-in-log form treats as constant. Bias risk: if the fade stalls in early 2023 (as happens when a game reaches a stable core audience), the true value will sit above the point forecast; if the Twitter reporting channel itself decays further, below it - the interval is constructed to contain that range.
+
+## Subtask 2: Subtask 2: Determine whether attributes of the daily solution word affect the percentage of reported scores played in Ha
+
+### Problem
+
+Subtask 2: Determine whether attributes of the daily solution word affect the percentage of reported scores played in Hard Mode, and if so how; if not, explain why.
+
+### Analysis
+
+Assumptions: (a) per the domain consultation (exchange 2), Hard Mode is a persistent per-player setting chosen by habit - players toggle it once and keep it - so the day's word cannot be a direct cause of a player being in Hard Mode; the only word channel is indirect, through which habitual Hard Mode players fail or skip reporting on especially hard days; (b) the hard-mode share H_t = (number in hard mode)/(number of reported results) therefore decomposes as a slowly varying player-base characteristic plus at most a small, noisy word-driven wobble; (c) word attributes are measured from the solution word's letter composition (unique-letter count, vowel ratio, rare-letter count Q/Z/J/X/K/W, corpus letter-frequency sum, counts of E/R/I, presence of double letters). Approach: (i) a time trend with day-of-week dummies on H_t to capture the player-base drift; (ii) univariate regressions of H_t on each word attribute; (iii) a multivariate OLS of H_t on all attributes jointly. Statistical tests at the 5% level decide 'affects or not'.
+
+### Modeling Process
+
+H_t = hard mode share on day t. (1) Trend: H_t = a0 + a1*t + sum_j a_j*1(dow=j) + eps_t, fitted a1 = +0.000230/day (p = 3.3e-21, R-squared 0.235): the share rises from ~2.8% in January to ~9.5-12.5% by Nov/Dec - Hard Mode adoption grew steadily all year. (2) Univariate word-attribute regressions H_t = c0 + c_x*A_x + eps: every coefficient is statistically indistinguishable from zero - unique letters (p=0.80), vowel ratio (p=0.62), rare letters (p=0.48), frequency sum (p=0.49), E-count (p=0.96), R-count (p=0.21), I-count (p=0.84), double letters (p=0.82); individual R-squared < 0.005. (3) Multivariate OLS on all eight attributes simultaneously: largest |p| = 0.23 (rare letters), none significant. Same-day correlation between H_t and that day's difficulty (mean tries) is 0.007, essentially zero.
+
+### Outcome Analysis
+
+Conclusion: word attributes do not meaningfully affect the hard-mode share. None of the tested letter-composition attributes shows a statistically significant association (all p > 0.2 in both univariate and multivariate regressions), and the day's difficulty is uncorrelated with the share (r = 0.007). This matches the mechanism identified in the consultation: Hard Mode is a habit-based, persistent player preference, not a per-day choice reacting to the word - so there is no causal path from the word to the share. The one real signal in the variable is time: the share nearly quadrupled over 2022 (2.8% -> 12.5% in November, mean 7.8%, std 5.1%), a pure adoption trend of the player base. Caveats: (i) with 359 days the test can only detect word effects above roughly 3-4 percentage points of share - a genuinely small indirect effect (e.g. very hard words causing a few habitual players to drop out) is not ruled out, it is only undetectable at this noise level; (ii) the extreme 93.6% hard share on Nov 30 ('study', only 2,569 total reports) is a denominator artifact of the count collapse, not a word effect; (iii) word effects could in principle act through reporting behavior rather than the mode toggle itself, which this share ratio cannot separate.
+
+## Subtask 3: Subtask 3: For a given future solution word on a future date, predict the distribution of reported results - the percent
+
+### Problem
+
+Subtask 3: For a given future solution word on a future date, predict the distribution of reported results - the percentages of (1, 2, 3, 4, 5, 6, X) tries - state the uncertainties, and give the specific prediction for EERIE on March 1, 2023 with a confidence statement.
+
+### Analysis
+
+Assumptions: (a) a word's score distribution is dominated by its letter structure, because the game is solved by process of elimination and words that share letters have strongly overlapping candidate spaces; (b) distributions drift slowly over time as player skill grows (the one-try share fell from ~1.0% in Jan-Feb to ~0.5% by Nov-Dec 2022), so neighbours from all of 2022 must be weighted toward recent dates; (c) EERIE does not appear in the 2022 data, so it must be predicted from analogous words, not from its own history. Approach: k-Nearest-Neighbours in letter space (Jaccard similarity of the unique letter sets), time-decay weighted (60-day half-life), blended with a time-weighted recent baseline (last 56 days, weight 0.6/0.4) so that no single similar word dominates and global skill drift is captured. Uncertainty is quantified by a nonparametric bootstrap resampling the neighbours' distributions 2,000 times, giving 95% intervals per cell.
+
+### Modeling Process
+
+Let D(w, d) = (p_1..p_6, p_X) be the normalized score distribution for word w (percentages renormalized to sum to 1, since the raw data sums to 98-126 in 180 of 359 rows due to rounding). For target (EERIE, 2023-03-01): 1. Similarity: J(w) = |L(w) ∩ L(EERIE)| / |L(w) ∪ L(EERIE)| over unique letter sets; top-12 neighbours (all real 2022 solution words): trite (0.75), brine, prime, drive, merit, prize, their, inter, trice, infer, inert, liver (0.60 each). 2. Time weights: w_i = exp(-ln2 * (419 - t_i)/60), normalized. 3. Similar-word distribution d_i = sum_i w_i * D(neighbour_i). 4. Baseline b = 60-day-half-life weighted mean of the last 56 days. 5. Prediction D_hat = 0.6*d + 0.4*b. 6. Bootstrap: resample the 12 neighbour rows with replacement (re-weighted), 2,000 replicates, 2.5/97.5 percentiles per cell.
+
+### Outcome Analysis
+
+Prediction for EERIE, March 1, 2023 (shares of reporters): 1 try: 0.4% [0.03, 0.75]; 2 tries: 6.9% [4.4, 9.7]; 3 tries: 24.6% [19.9, 28.4]; 4 tries: 31.9% [27.0, 32.9]; 5 tries: 22.1% [19.4, 25.3]; 6 tries: 11.2% [8.7, 16.6]; X (unsolved): 2.8% [1.6, 6.5]. Mean tries 4.12 versus the 2022 global mean 4.18, so EERIE is predicted roughly average, leaning slightly hard - consistent with subtask 4's classification (hard, mean 4.39) because EERIE's three repeated letters give only 3 distinct letters to pin down. Uncertainties: (i) the 95% intervals above are sampling uncertainty around the letter-similarity estimate; (ii) a systematic error of +/-2-3 percentage points is plausible because no 2022 word was an exact repeat of EERIE's structure, and because 2023 player skill will not equal late-2022 skill - the skill-drift term is exactly the 0.4 baseline weight and its direction is not known beyond the 2022 trend; (iii) the X cell is the least stable (interval [1.6, 6.5]) because unsolved rates are small and volatile day-to-day. Confidence statement: moderate-to-good for the 2/3/4-try cells (the bulk of the distribution, where intervals are 4-8 points wide and the mechanism - shared letter content - is strong); weaker for the 1-try and X tails. In the sense fixed by the consultation, i.e. decision-relevant accuracy of roughly +/-20-30% relative (exchange 3), the central cells are well inside that band; the point to communicate is the shape (peak at 3-4 tries, ~3% unsolved), not the exact decimals.
+
+## Subtask 4: Subtask 4: Develop and summarize a model classifying solution words by difficulty, identify which word attributes are as
+
+### Problem
+
+Subtask 4: Develop and summarize a model classifying solution words by difficulty, identify which word attributes are associated with each class, score EERIE with it, and discuss the model's accuracy.
+
+### Analysis
+
+Assumptions: (a) difficulty is operationalized as the empirical mean number of tries taken by that day's reporters (weighted 1-6 plus 6.5 for the X cell), since the dataset contains no external difficulty label; (b) classes are defined by the terciles of that 2022 distribution, i.e. data-driven cut points rather than arbitrary ones; (c) letter composition is the main controllable driver of difficulty, because it determines how much of the 12,900-ish five-letter candidate space a player can eliminate per guess. Approach: OLS regression of mean tries on nine letter attributes, with class = tercile of the fitted (or observed) value; accuracy measured by 5-fold cross-validation and leave-one-out (on a random half-sample for cost), predicting the class of held-out words from their letters alone.
+
+### Modeling Process
+
+y_t = mean tries on day t. X: uniq (number of distinct letters), vow_ratio, rare (count of distinct Q,Z,J,X,K,W), freq_sum (sum of corpus monogram frequencies of the 5 letters), freq_min (minimum of those), n_e, n_r, n_i, has_double. Fitted OLS (n=359): y = 6.287 - 0.342*uniq + 0.121*vow_ratio + 0.092*rare - 1.865*freq_sum + 0.147*n_e + 0.061*n_r - 0.044*n_i - 0.077*has_double - 6.719*freq_min; R-squared 0.384, adj R-squared 0.368. Significant predictors (p < 0.05): uniq (p=2.5e-16), freq_min (p=5.5e-5), freq_sum (p=2.2e-4), n_e (p=0.001), rare (p=0.019). Interpretation: fewer distinct letters (more repetition) hardens the word (-0.34 per unique letter); a rare letter in the word hardens it (rare +0.09, freq_min -6.7, i.e. the less common the least-common letter, the harder); more E's harden the word (+0.15 each), since E is the most frequent letter in English and its yellow/green feedback is less discriminating. Tercile cut points on observed mean tries: easy < 4.01, medium 4.01-4.33, hard > 4.33 (120/119/120 words). EERIE: uniq=3, n_e=3, rare=0, freq_sum=0.504, freq_min=0.06 -> predicted mean tries 4.39 -> HARD class. Class profiles (attribute means): easy words have ~4.88 distinct letters, few repeats, common letters; hard words have ~4.45 distinct letters, ~35% contain a rare letter, ~20% contain a double letter, and their least-common letter is much rarer (freq_min 0.014 vs 0.026).
+
+### Outcome Analysis
+
+EERIE is classified HARD (predicted mean tries 4.39, just above the 4.33 hard threshold): its triple-E gives only 3 distinct letters, and repeated letters are the single strongest negative signal for player performance in the model (uniq coefficient -0.34). The same-day evidence agrees - the closest 2022 analogues with 3 distinct letters (madam 4.48, motto 4.54, vivid 4.68, fluff 4.96, mummy 5.39) all sit in the hard half of the distribution. Accuracy: 5-fold cross-validated accuracy 48.2%, leave-one-out on a 179-word subsample 52.5% - roughly chance-plus for three balanced classes, with the confusion matrix showing the model reliably separates the extremes (45/120 easy correctly easy, 60/120 hard correctly hard) and collapses the middle (only 68/359 overall middle correct). Interpretation: letter composition predicts the tails of difficulty well - words with rare letters and heavy repetition are reliably hard - but the middle third of the distribution is driven by factors not in the word (the specific guess paths players actually take, which depend on the whole candidate-word list and on that day's player population), so no letter-only model can do much better than ~50-60% three-way accuracy. Honest statement of limits: R-squared 0.38 means ~62% of day-to-day difficulty variance is unexplained by letters; the classification should be read as 'structurally hard/structurally easy' rather than a precise ranking. The EERIE call is robust within the model (it would stay hard unless the cut points moved ~0.1 tries) and consistent with both its analogue words and its predicted score distribution from subtask 3.
+
+## Subtask 5: Subtask 5: List and describe other interesting features of the dataset.
+
+### Problem
+
+Subtask 5: List and describe other interesting features of the dataset.
+
+### Analysis
+
+Descriptive pass over the cleaned data (percentages renormalized where they do not sum to 100; no missing values; no duplicate words or dates; contest numbers 202-560 contiguous) looking for structural features beyond the four main questions.
+
+### Modeling Process
+
+No fitted model - computed summaries: early-vs-late (first/last 56 days) comparison of each distribution cell; monthly means of the hard-mode share; the 10 largest one-try days; the 5 largest hard-share days; rounding statistics of the raw percentage columns; correlation of same-day reported count with that day's difficulty; and mean tries grouped by first letter.
+
+### Outcome Analysis
+
+Features found: (1) A dramatic, smooth decline in the reporting base: 80,630 on Jan 7 to 20,380 on Dec 31 (range down to 2,569), a ~97% fall; the November 30 'study' day with 93.6% hard share is an artifact of that collapse (small denominator), not a genuine popularity spike of Hard Mode. (2) Player skill improved over the year while the crowd shrank: the one-try share fell from ~1.0% (first 56 days) to ~0.5% (last 56 days), and the X (unsolved) share fell from 2.7% to 1.9% - the surviving audience got better even as the audience got smaller, consistent with a novelty-driven audience leaving and a core of stronger players remaining. (3) Hard Mode adoption nearly quadrupled: monthly share from 2.8% (Jan) to 12.5% (Nov), with December easing back to 9.5% - a classic late-adopter S-curve beginning, still far from saturation. (4) Difficulty is visible in the distribution shape, not just its mean: on the hardest days (parer 5.75, mummy 5.39, coyly 5.33 mean tries) the X cell reaches 48-18%, versus ~2% on average; unsolved share is the most difficulty-sensitive cell (correlation 0.67 with mean tries). (5) One-try solves are rare and structural: the best days are train and slate (6.1% each on days of ~100k reports), and one-try rates are set by how guessable the word is from a canonical first guess - no day exceeded ~6%. (6) Data-quality: 180 of 359 days have raw percentage columns summing to 98-102 (one day to 126), so the analysis renormalized each day's vector to sum to 1; all three of the '7 or more' X entries and the other cells are rounded integers, a source of at most ~1 point noise per cell. (7) Words beginning with rare letters (Z, J, W, K, Y, E) average 4.4-4.8 tries versus ~4.2 for the corpus - the first letter is a weak difficulty cue because players rarely see it until late. (8) The reported count is essentially uncorrelated with same-day difficulty (r = -0.006): the puzzle that is hardest does not draw a different-sized Twitter audience, which supports treating count and difficulty as separate phenomena in subtasks 1 and 4.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

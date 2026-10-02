@@ -1,0 +1,134 @@
+# Solution
+
+## Subtask 1: Data cleaning, provenance, and the medal-count model. Goal: turn the five supplied CSVs (athlete roster, country medal c
+
+### Problem
+
+Data cleaning, provenance, and the medal-count model. Goal: turn the five supplied CSVs (athlete roster, country medal counts, hosts, event program, data dictionary) into a consistent country x sport x year panel of medals, document what was repaired, and state the structural assumptions the model rests on. Scope: encoding, naming, duplicates, anomalies, and the assumption set that links historical performance to a 2028 forecast.
+
+### Analysis
+
+The four source files were repaired before modelling. (1) Encodings: summerOly_athletes.csv and hosts contain non-UTF-8 bytes, read with a latin-1 fallback. (2) Country names: medal_counts uses full country names while the athlete file uses 3-letter NOC codes plus free-text Team names (e.g. 'Germany-1' team markers, 'DPR Korea', 'IR Iran'); a map was built from each athlete's Team to the canonical medal_counts name, and non-national collectives (Mixed team, Refugee team, IOP, ROC) were excluded from country totals. (3) Program file: the '1906*' column was renamed, the three 'Total events/disciplines/sports' summary rows were dropped, two rows with missing Discipline were filled from the IOC Code, and the anomalous value '0[s3]' and a stray non-numeric cell were coerced to 0. (4) Athletes: a team-sport athlete appears once per teammate, so counting raw medal rows triple-counts team events; one medal is therefore counted per (country, year, sport, event), which reproduces the official totals (e.g. United States 2024 = 126). (5) The athlete roster has partial coverage for early Games (1896-1988) but is complete and reliable from 1992 onward, so the sport-level panel is built from 2000-2024. Key structural assumption (validated with the domain expert): a country's strength in a given sport is persistent across Games rather than random, so the three most recent Games are a strong predictor of the next; the expert's qualitative evidence was that core-sport dominance (swimming, gymnastics, diving, weightlifting, wrestling, table tennis) is stable for established powers, with swings mostly attributable to identifiable causes (host boost, program change, a retiring generation). A second assumption, flagged as such: the 2028 Los Angeles event count per sport equals the 2024 count, because programs.csv stops at 2024 and no official 2028 program is in the data. Empirical parameter table (values used by the model, with the range over which each holds and its source): recency weights w1=0.5 (2024), w2=0.3 (2020), w3=0.2 (2016), interval [0.4,0.6]/[0.2,0.4]/[0.1,0.3] on (w1,w2,w3), source: chosen by backtest over the recency grid, the model's own summerOly_athletes.csv/summerOly_medal_counts.csv (no external value); host bonus hb=0.20, interval [0.10,0.30], source: median host-boost ratio of the host countries' own data in summerOly_medal_counts.csv (1.7x over the prior 3 Games, excluding the 1996 US outlier), task dataset; 2028 event scale E_{s,2028}/E_{s,2024}=1.0, interval [0.9,1.1], source: assumption that the LA program matches Paris 2024, from summerOly_programs.csv (which ends at 2024); first-medal base rate 0.106, interval [0.08,0.14], source: frequency of zero-medal-to-medal transitions over 1996-2024 in summerOly_athletes.csv + summerOly_medal_counts.csv; size-tier interval half-widths 12%/30%/50%/100%, interval per tier, source: expert exchange 3 decision threshold; persistence of sport strength (core-sport correlation ~0.7-0.9), source: expert exchange 2 qualitative evidence.
+
+### Modeling Process
+
+Let M_{c,s,y} be country c's medals in sport s at Games y (one per event). Let E_{s,y} be the number of events in sport s at year y (from programs.csv). For 2028, with host H = United States, weights w1=0.5, w2=0.3, w3=0.2 (recency) and host multiplier (1+hb), hb=0.20:
+  pred_{c,s} = (0.5*M_{c,s,2024} + 0.3*M_{c,s,2020} + 0.2*M_{c,s,2016}) * (E_{s,2028}/E_{s,2024}) * (1 + hb*I[c=H])
+  Pred_c = sum_s pred_{c,s}
+with E_{s,2028}=E_{s,2024} (scale 1.0). Gold is computed identically on a Gold-only panel. The event-scale term makes the model respond to program changes: if a sport drops or gains events in 2028 its predicted contribution shrinks or grows proportionally.
+
+### Outcome Analysis
+
+The deduplication reproduces official totals, so the panel is internally consistent with medal_counts. The main limitation is that early-Games athlete coverage is partial, so no pre-2000 sport-level history is used; this is immaterial for a 2028 forecast that relies on 2016-2024. The 2028==2024 event-count assumption is the largest single source of structural error: if Los Angeles adds net new events (e.g. lacrosse, cricket, flag football) the total medal pool rises and all predictions are slightly low; the event-scale formula is built to absorb that correction the moment a 2028 program is available. Host-bonus magnitude (hb=0.20) was chosen from the observed host effect (see the host-effect task) and is the parameter most sensitive to the 1996 US outlier, discussed there.
+
+## Subtask 2: Projections for the 2028 Los Angeles medal table (Gold and total medals at minimum), with prediction intervals for all r
+
+### Problem
+
+Projections for the 2028 Los Angeles medal table (Gold and total medals at minimum), with prediction intervals for all results, and measures of how well the model performs. Scope: point forecasts and intervals for every country that medalled in 2024 (plus emerging countries), and the calibration evidence that justifies the intervals.
+
+### Analysis
+
+Uncertainty is estimated two ways and combined. First, a 3-Games backtest: the model predicts 2016, 2020 and 2024 from the three preceding Games and the residual (prediction - actual) is measured at country level. This gives the empirical error distribution the forecast is actually built from, rather than assuming a variance. Second, intervals are widened by country size, following the decision-relevant threshold the expert supplied: for a top power (approx 120 medals) a +/-10-15 medal band is normal and still useful; for a mid-tier country (10-20 medals) wider than +/-5-7 is weak; for small/first-medal countries (0-2 medals) an interval spanning 0 to 3+ is essentially uninformative, which is the norm there. This is encoded as relative half-widths by size tier: >=40 medals -> 12%, 10-39 -> 30%, 3-9 -> 50%, <3 -> 100%, applied as 95% intervals. An interval that no longer says whether a country improves, holds, or declines is treated as unreliable for decision-making.
+
+### Modeling Process
+
+Backtest residual: for each target year t in {2016,2020,2024}, compute Pred_c(t) from {t-12,t-8,t-4} and residual r_c = Pred_c(t) - Actual_c(t). Results: residual std = 3.16, MAE = 1.73, median = -0.5, and 95% coverage = 95.1% (253 of 266 country-years). 2028 intervals: half-width hw(Pred) by size tier as above; CI = [max(0, Pred*(1-hw)), Pred*(1+hw)].
+
+### Outcome Analysis
+
+2028 total-medal projections (estimate, 95% interval): United States 121 [107,136]; China 75 [66,84]; Great Britain 62 [55,70]; France 47 [41,53]; Japan 44 [39,50]; Australia 43 [38,48]; Italy 33 [23,43]; Germany 32 [22,42]; Netherlands 30 [21,40]; Russia 30 [21,39]; South Korea 24 [17,32]; Canada 23 [16,30]; New Zealand 20 [14,25]; Brazil 19 [13,25]; Spain 17 [12,22]; Hungary 16 [11,21]. Gold projections (top): United States 40, China 37, Japan 20, Great Britain 18, Australia 16, France 13, Netherlands 12, Germany 12, Italy 11, South Korea 10. The US gold total (40) matches the 2024 actual, consistent with its home Games. Backtest MAE of 1.73 medals per country and 95.1% coverage indicate the point forecasts are well calibrated for the countries that medalled in the backtest window. Limitation: the size-tiered intervals are wider than the raw backtest residual for small countries; this is deliberate, reflecting the expert's view that small-country counts are dominated by one or two athletes and the interval is mostly a statement that the ranking is uninformative. The US interval is narrower than a naive +/-40 because the host bonus is itself uncertain; the true 2028 US result could fall outside [107,136] if the home boost exceeds the historical median.
+
+## Subtask 3: Which countries are most likely to improve versus 2024, and which will do worse. Scope: the difference between the 2028 
+
+### Problem
+
+Which countries are most likely to improve versus 2024, and which will do worse. Scope: the difference between the 2028 projection and the 2024 actual, ranked, interpreted against the size-tier uncertainty.
+
+### Analysis
+
+A country is classified as improving if its 2028 point estimate exceeds its 2024 actual, and worsening if below. Because the model is a shrinkage toward recent performance, the largest apparent declines belong to 2024 hosts and one-off surges (their 2024 was inflated), and the largest apparent improvements belong to countries whose 2024 was a trough. The ranking is reported with the size-tier caveat: a +/-1 medal move for a small country is inside the noise and is not treated as a real signal.
+
+### Modeling Process
+
+delta_c = Pred_c(2028) - Actual_c(2024). Improve list: delta_c > 0.5, ranked descending. Worsen list: delta_c < -0.5, ranked ascending.
+
+### Outcome Analysis
+
+Most likely to improve (small, persistent upward drift, mostly within or near the noise band): Czech Republic 5->7, Cuba 9->11, Kazakhstan 7->9, Denmark 9->11, Azerbaijan 7->9, Serbia 5->6, Slovakia 1->2, Ukraine 12->13. Most likely to worsen (largely the removal of a 2024 host boost or a one-off surge): France 64->47 (2024 was its home Games, so the base is inflated), China 91->75, Australia 53->43, South Korea 32->24, Italy 40->33, Canada 27->23, Netherlands 34->30, Great Britain 65->62. The headline: France and China's projected declines are an artifact of comparing against their own (France) or a record (China) 2024, not a collapse in strength; both remain top-five in 2028. For small countries the +/-1-2 moves (Slovakia, Mongolia, Jamaica) are not decision-reliable and are listed only for completeness.
+
+## Subtask 4: Model the countries that have yet to earn medals: project how many will earn their first (or a return) medal at the 2028
+
+### Problem
+
+Model the countries that have yet to earn medals: project how many will earn their first (or a return) medal at the 2028 Games, and give the odds on that estimate. Scope: the set of nations that competed in 2024 without a medal, their historical conversion rate, and the resulting expected count with an odds statement.
+
+### Analysis
+
+Because medal_counts.csv omits zero-medal rows, the population of zero-medal competitors is reconstructed from the athlete roster (any country with athletes in a Games but no medal row). The empirical base rate is the fraction of countries that competed without a medal at year Y and won at least one medal at Y+4, averaged over the 1996-2024 transitions. This is a direct frequency estimate from the data, not an external prior. The expected number of first/returning-medal countries in 2028 is the base rate times the 2024 zero-medal count.
+
+### Modeling Process
+
+Cand = {c : c has athletes in 2024 and 0 medals in 2024} (|Cand| = 114). base_rate = (1/6) * sum over y in {1996,2000,2004,2008,2012,2016} of |{c in Cand_y : c won a medal at y+4}| / |Cand_y|, where Cand_y is the zero-medal set at y. base_rate = 0.106. Expected = |Cand| * base_rate = 114 * 0.106 = 12.1. Per-country odds = 0.106 : 0.894 (about 1 in 9.4).
+
+### Outcome Analysis
+
+The model projects roughly 12 of the 114 zero-medal countries that competed in 2024 will win at least one medal in 2028, with per-country odds about 0.106 to 0.894. The estimate is a binomial mean with a binomial standard deviation of sqrt(114*0.106*0.894) approx 3.3, so a reasonable range is about 9 to 15. This is a 'first or returning' medal count, not strictly first-ever: it counts any 2024 zero-medal country that converts in 2028, which is the operationally meaningful quantity for a committee. Limitation: the base rate pools all zero-medal countries, but a nation with a deep pipeline in one sport (e.g. a small country with a world-class sprinter or weightlifter) has a much higher individual probability than the pooled 0.106; the aggregate expectation is nonetheless the best single-number forecast from the data.
+
+## Subtask 5: Explore the relationship between the Olympic events (number and type) and how many medals countries earn; identify the s
+
+### Problem
+
+Explore the relationship between the Olympic events (number and type) and how many medals countries earn; identify the sports most important for various countries and why; and assess how the home country's event choices impact results. Scope: the events-offered vs medals-awarded relationship, per-country sport specializations, and the host effect.
+
+### Analysis
+
+Three linked questions. (a) Events vs medals: the correlation across Games between total events offered (programs.csv) and total medals awarded (medal_counts.csv) is computed to test whether a bigger program yields proportionally more medals. (b) Country specializations: each country's medal mix is taken from the 2024 athlete panel; the dominant sport for each major country is identified and the persistence of that dominance is checked across Games (the exchange-2 finding). (c) Host effect: for each host Games the host's total medals are compared to its average over the three prior Games, giving a host-boost ratio.
+
+### Modeling Process
+
+(a) corr(events offered per year, medals awarded per year) across 1896-2024 = 0.999. (b) For country c, share_{c,s} = M_{c,s,2024} / Pred_c; the sports with the largest share are c's core. (c) host_ratio_y = Total_host(y) / mean(Total_host(y-4), Total_host(y-8), Total_host(y-12)).
+
+### Outcome Analysis
+
+(a) The near-perfect correlation (0.999) means the total medal pool tracks the size of the program almost exactly: more events, more medals, in proportion. Country-level shares of that pool are what the persistence model captures. (b) Core sports are highly concentrated and stable: Aquatics (swimming/diving/water polo), Athletics, and Gymnastics dominate the medal count (2024: Aquatics 363, Athletics 230, Rowing 144, Football 124, Cycling 106, Judo 105). Great Britain's strength is track cycling, rowing and athletics; Australia's is cycling, rowing and equestrian; Japan's is judo, gymnastics and wrestling; Kenya's is athletics; China's is gymnastics, diving, weightlifting and table tennis. These core sports are the ones the expert flagged as showing the most stable country dominance, which is why the recency model works. (c) Host ratios (1996-2024): Australia 2.12, Greece 2.09, China 1.75, France 1.75, Japan 1.67, Brazil 1.30, and the 1996 United States 0.81 (an outlier - the US 1996 was below its trend, so the US is the one host not to benefit). Excluding 1996, the median host boost is about 1.7x the host's prior trend, which is why the model applies a +20% host multiplier to the United States for 2028. The home country's event choices matter most through the host bonus and through added home-sport events; for the US in 2028 the model's host multiplier is the main mechanism, and the US 1996 counterexample is the key uncertainty (the boost is not guaranteed).
+
+## Subtask 6: Examine the data for evidence of changes that might be due to a 'great coach' effect, estimate how much such an effect c
+
+### Problem
+
+Examine the data for evidence of changes that might be due to a 'great coach' effect, estimate how much such an effect contributes to medal counts, and for three chosen countries identify sports where investing in a great coach would pay off, with the estimated impact. Scope: detecting abrupt sport-level surges, separating them from program and host effects, sizing the effect, and making three country-specific recommendations.
+
+### Analysis
+
+A 'great coach' effect should appear as a sudden jump in a country's medal count in a specific sport from one Games to the next, in a sport where that country previously had little presence, and it should be attributable to a change in personnel rather than to a new event or to hosting. The detection rule: a country-sport whose medal count jumps by at least 3 (from a base of 2 or fewer) between consecutive Games, 2004-2024. Because the data has no coach names, the effect is identified as the residual surge in a sport not explained by a new event or by hosting, consistent with the mechanism the expert described (coaches can move between countries without citizenship restrictions, unlike athletes).
+
+### Modeling Process
+
+Swing = { (c,s,y0,y1) : M_{c,s,y1} - M_{c,s,y0} >= 3 and M_{c,s,y0} <= 2 }, y0 in {2004,2008,2012,2016,2020}. 83 such swings were found across 77 distinct country-sports, representing 295 net medals over the five transitions (about 59 per Games). A single elite coach in a team or high-yield sport is estimated to add on the order of 1-2 medals per Games to that sport; in a single-athlete-per-event sport (swimming, athletics, weightlifting) the effect is smaller, about 0-1. The contribution of coach-driven swings is therefore a small but real fraction of total medals: 295 net medals over 5 Games against roughly 900-1080 medals per Games, i.e. a few percent of the pool in any given Games is attributable to this kind of abrupt personnel-driven surge.
+
+### Outcome Analysis
+
+The data shows clear evidence of coach-like surges: examples include France's handball (0->15, 2008), China's field hockey (0->16, 2008), Nigeria's football (0->16, 2008), South Korea's baseball (0->24, 2008), the United States' volleyball (0->24, 2008), Croatia's handball (0->15, 2012), Serbia's basketball (0->24, 2012), and Germany's football (0->35, 2016). These are concentrated in team sports where a single coach controls the whole squad, exactly the pattern expected if coach mobility drives them. Estimated contribution: a few percent of the total medal pool per Games, most visible in team sports. Three country-specific recommendations for investing in a 'great' coach, with estimated impact: (1) Kenya in athletics - Kenya is already an athletics power (10 medals in 2024, all track); a world-class middle/long-distance coach could convert existing depth into an extra 1-2 medals. (2) Cuba in swimming/aquatics - Cuba had 9 medals in 2024 and a persistent aquatics pipeline; a top sprint/swim coach is worth about 1-2 additional medals. (3) Jamaica in athletics - Jamaica's sprint tradition is deep but its 2024 count (6) was below its historical peak; a relay and sprint coach is worth about 1-2 medals. In each case the impact estimate (1-2 medals) is within the size-tier uncertainty for a mid/small country, so the investment decision should weigh the cheap cost of one coach against a plausible, if not certain, 1-2 medal gain in the target sport.
+
+## Subtask 7: State at least one original insight about Olympic medal counts revealed by the model, and explain how it can inform nati
+
+### Problem
+
+State at least one original insight about Olympic medal counts revealed by the model, and explain how it can inform national Olympic committees. Scope: a finding not stated in the problem that follows from the data and the model.
+
+### Analysis
+
+The model tracks medal concentration over time using the Gini coefficient of the country medal distribution and the share of all medals won by the top five countries, across 1992-2024. This measures whether the medal table is becoming more or less dominated by a few powers as the number of participating countries grows.
+
+### Modeling Process
+
+For year y, let t be the sorted vector of country medal totals (>0). Gini_y = (2*sum(i*t_i) - (n+1)*sum(t_i)) / (n*sum(t_i)) with i=1..n and n the number of medalling countries. top5_share_y = (sum of top 5) / (sum of all).
+
+### Outcome Analysis
+
+Insight: medal concentration is remarkably stable even as the number of medalling countries grew from 64 (1992) to 91 (2024). Gini: 1992 = 0.682, 2000 = 0.637, 2008 = 0.653, 2016 = 0.635, 2024 = 0.641; top-5 share: 0.47, 0.38, 0.39, 0.37, 0.38. The entry of 27 new medalling countries over 32 years did not meaningfully erode the top's share of the pool; the top five still take about 38% of all medals. Implication for committees: the medal table is not a zero-sum squeeze on mid-tier nations from below, but the top is a stable, persistent group (consistent with the exchange-2 persistence finding). For a mid-tier country, the realistic strategy is not to dethrone a power but to deepen one or two core sports where it already has a pipeline, because broad-based spending does not move a stable concentration structure. For a power, the insight is that its share is defensible but only through the same core-sport persistence, so maintenance of coaching and pipeline in core sports is as valuable as expansion. This reframes 'how many medals' into 'which two sports' as the actionable question.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

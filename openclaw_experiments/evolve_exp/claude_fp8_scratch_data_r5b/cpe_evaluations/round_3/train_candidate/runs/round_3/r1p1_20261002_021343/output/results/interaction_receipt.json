@@ -1,0 +1,21 @@
+{
+  "rubric_id": "interaction_initial_substantive_v1",
+  "interaction_stage": 2,
+  "questions_asked": [
+    "In the Wordle Twitter data, the solve-count percentages (1, 2, 3, 4, 5, 6 tries, and X) come from the same day's players. If I predict them for a future word, is it right that they must stay a valid whole — never negative and always adding up to 100 — rather than being predicted as separate unrelated numbers?",
+    "Only some players post their score on Twitter. Do you think the people who post are the ones who struggled, the ones who solved it fast, or is it a fair mix?",
+    "Players post scores on Twitter. When you predict next month's Wordle score count, should you expect the game to have grown, shrunk, or stayed about the same since late 2022?"
+  ],
+  "expert_answers": [
+    "Yes — that is right. The seven reported percentages are shares of one day's players, so they are a compositional vector: each is bounded in [0, 100] and the seven must sum to 100 (up to rounding). Predicting them as seven independent regressions can produce negative values or sums far from 100, which are not valid outcomes.\n\nSo the constraint is real and should be imposed, not ignored. In practice this means modeling on a simplex (e.g., a log-ratio or Dirichlet-style parameterization) or otherwise normalizing/clipping predictions to the simplex after fitting. Note the data are rounded to whole percents, so exact sums may deviate by a fraction of a percent; that rounding slack is the only legitimate departure from the sum-to-100 rule.",
+    "It is not a fair mix, and the skew is toward the fast/strong solvers, not the strugglers.\n\nThe main reason is selection on engagement: posting a Wordle score is a mild brag/share behavior, so people who solved it (especially in few tries) are more motivated to post than people who failed. The X (unsolved) share in the Twitter data is almost certainly understated relative to the true player base, and the 1–3 try shares are likely somewhat overstated.\n\nTwo caveats that matter for modeling:\n- The skew is not constant across days. On a hard word, even strong solvers struggle, so the composition of posters shifts and the bias changes with word difficulty.\n- The bias is a reporting/selection effect, not a property of the word, so it should be treated as a systematic distortion of the observed percentages rather than as signal about difficulty.\n\nEmpirical judgment: expect the true X rate to be meaningfully higher than reported, but I cannot give a reliable precise magnitude.",
+    "Expect it to have shrunk — modestly, not dramatically.\n\nWordle's Twitter-posting volume peaked in early 2022 (the January–April surge after the NYT acquisition) and declined through the rest of 2022 as the novelty faded. That downward trend is visible within the data file itself, so extrapolating a flat or growing count into 2023 would be wrong.\n\nTwo qualifications:\n- The decline is a slow decay, not a collapse; the game retained a large stable base, so month-over-month drops are on the order of a few percent, not tens of percent.\n- The count is also driven by day-of-week and word difficulty, which can swamp the trend on any single day.\n\nEmpirical judgment: for March 1, 2023, expect a count somewhat below the late-2022 level, continuing the mild downward drift. I cannot give a reliable precise rate."
+  ],
+  "exchange_count": 3,
+  "evidence_file": "results/interaction_evidence.md",
+  "dialogue_file": "logs/operator_feedback/human_expert_dialogue.md",
+  "interaction_complete": true,
+  "generated_by": "python_controller",
+  "workflow_id": "interaction_workflow_a9140df9511b",
+  "workflow_max_exchanges": 3
+}

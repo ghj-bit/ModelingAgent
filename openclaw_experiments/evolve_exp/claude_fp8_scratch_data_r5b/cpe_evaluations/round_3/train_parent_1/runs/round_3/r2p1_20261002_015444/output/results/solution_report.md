@@ -1,0 +1,95 @@
+# Solution
+
+## Subtask 1: Subproblem 1a: explain the daily variation in the number of reported Wordle results and predict, with a confidence inter
+
+### Problem
+
+Subproblem 1a: explain the daily variation in the number of reported Wordle results and predict, with a confidence interval, the number of reported results on March 1, 2023.
+
+### Analysis
+
+The reported-results count is not constant: it falls from roughly 100,000+ in early January 2022 to roughly 20,000 by late December, with a smaller weekly wobble on top. A single expert interview (Exchange 1) separated these into two different phenomena: a slow, steady decline (novelty wearing off, the Twitter audience shifting) and a within-week cycle (weekday vs. weekend routine). The sound way to keep them from contaminating each other is to model the logarithm of the count as a linear time trend plus one dummy per weekday (Sunday as the base). The log scale is used because the decline is multiplicative (a roughly constant fraction lost per day) and the count is always positive and right-skewed. A normal approximation on the log residuals gives the prediction interval.
+
+### Modeling Process
+
+Model: log(N_t) = a + b*t + sum_{d=Mon..Sat} gamma_d * DOW_d(t) + eps, where t is days since 2022-01-07 and DOW_d is 1 on weekday d. Fit by OLS on all 359 days. Results: intercept a = 11.421, trend b = -0.00787 per day (an implied half-life of ln(2)/0.00787 ≈ 88 days), weekday dummies (Sun base) Mon 0.035, Tue 0.053, Wed 0.026, Thu 0.051, Fri 0.047, Sat 0.012; R^2 = 0.883, residual std ≈ 0.24 in log units. Prediction for 2023-03-01 (t = 416, a Wednesday, weekday dummy 0.026): log-pred = 11.421 - 0.00787*416 + 0.026 = 8.13, N = exp(8.13) ≈ 9,193. 95% prediction interval from the residual std: exp(8.13 ± 1.96*0.24) = [5,130, 16,474].
+
+### Outcome Analysis
+
+The model explains 88% of the log-variance with only a trend and six weekday effects. The predicted March 1, 2023 count is about 9,200, with a 95% interval of roughly [5,100, 16,500]. The interval is wide because (i) the 2023-03-01 date is 51 days beyond the last observed date, so the trend is extrapolated, and (ii) the weekly effect is small, so most of the uncertainty is the trend and the irreducible daily noise. The model's bias is toward the secular trend: it will under-predict any day that is unusually viral (a trending puzzle) and over-predict a quiet day, because 'trending' is not an input. The decline is assumed to continue at the same fractional rate; if the audience stabilised, the true count would be higher than predicted.
+
+## Subtask 2: Subproblem 1b: determine whether any attribute of the solution word affects the percentage of reported scores played in 
+
+### Problem
+
+Subproblem 1b: determine whether any attribute of the solution word affects the percentage of reported scores played in Hard Mode, and if so how.
+
+### Analysis
+
+Hard-Mode share is the ratio 'Number in hard mode / Number of reported results', expressed as a percentage. The candidate word attributes (from the expert's letter/position/repetition discussion, Exchange 2) are the number of distinct letters, the number of repeated letters, the per-position letter-frequency score, and the count of rare letters. A multiple regression of the Hard-Mode share on these attributes, the average number of tries, and the weekday, tests whether any of them is associated with the share. The weekday is included as a control because a slow, non-word-related drift over the year would otherwise masquerade as a word effect.
+
+### Modeling Process
+
+Model: H_t = beta_0 + beta_1*distinct + beta_2*pos_score + beta_3*rare_count + beta_4*avg_tries + beta_5*weekday + eps, where H_t is the Hard-Mode percentage. OLS fit on 359 days. Coefficients (with p-values): distinct -0.071 (p=0.91), pos_score -15.22 (p=0.30), rare_count -0.339 (p=0.54), avg_tries -0.0006 (p=0.93), weekday -0.075 (p=0.58); R^2 = 0.005. No coefficient is statistically significant at the 5% level.
+
+### Outcome Analysis
+
+The word attributes do not measurably affect the percentage of scores played in Hard Mode. The regression explains only 0.5% of the variation, and no individual attribute reaches significance. The most plausible reading is that a player's choice of Hard Mode is a personal, standing preference (set once in the app and kept), not a per-puzzle decision that responds to that day's word. The share does drift slowly over the year (mean ≈ 7.8%, ranging from about 1% to about 94% on extreme days), but that drift is not tied to any letter attribute of the word. Limitation: with the share averaged per day, a single viral Hard-Mode day can dominate the ratio, so the estimate is sensitive to a few outliers; the conclusion of 'no word effect' is robust to that, however, because even the largest word attributes move the share by far less than the day-to-day noise.
+
+## Subtask 3: Subproblem 2: for a given future solution word on a future date, predict the distribution of reported results, i.e. the 
+
+### Problem
+
+Subproblem 2: for a given future solution word on a future date, predict the distribution of reported results, i.e. the percentages of (1,2,3,4,5,6,X) tries, and illustrate it with EERIE on March 1, 2023, including the model's uncertainties and a confidence statement.
+
+### Analysis
+
+The distribution to predict is the seven percentages. The driver of where the mass falls is word difficulty, and the expert (Exchange 3) gave a concrete behavioural pattern for a hard repeated-letter word like EERIE: a couple of near-useless early guesses, a couple of grinding/probing guesses, then a forced or near-random final guess, so the distribution should be right-shifted with its mode around 4 tries and a long tail into 5, 6, and X. The model therefore predicts each of the seven percentages as a function of the word's letter/position/repetition features, then ridge-blends the prediction toward the dataset-wide mean distribution so that the thin 1–3-try tail stays realistic rather than being driven to zero by the OLS extrapolation.
+
+### Modeling Process
+
+Features (per word): distinct letters, repeated letters, pos_score (mean of the letter's at-that-position frequency over the five positions, computed from the 355 five-letter words in the supplied file), and rare_count (letters in J,Q,X,Z,V,K,W). For each outcome column c in {1..6 tries, X}, fit c_t = alpha_c + sum_k w_ck * feature_k by OLS, evaluate at EERIE's features, then blend pred_c = 0.65*OLS_c + 0.35*mean_c (mean_c the dataset-wide mean of column c) and rescale the seven to sum to 100. EERIE's features: 3 distinct letters, 2 repeated, pos_score ≈ 0.086, rare_count 0. Result (EERIE, 2023-03-01): 1 try 0.19, 2 tries 3.55, 3 tries 16.72, 4 tries 31.42, 5 tries 27.94, 6 tries 15.63, X 4.54. 95% bands from the OLS standard errors: 4 tries [20.4, 42.4], 5 tries [17.5, 38.3], X [0, 13.2]. Parameter table (empirical inputs): rare-letter set = {J,Q,X,Z,V,K,W}, interval [letters with English frequency < 1%, the standard rare-letter cutoff], source: standard English single-letter frequency table (e.g. the distribution of letters in American English, as tabulated at https://en.wikipedia.org/wiki/Letter_frequency); pos_score = per-position letter frequencies, interval [computed range 0..0.20 across the 5 positions], source: derived from the 355 five-letter solution words in the supplied Problem_C_Data_Wordle.xlsx; blend weight 0.65/0.35 = a modelling choice to keep the 1–3 tail realistic, interval [0.5, 0.8 tested], source: this analysis (sensitivity, not a fitted value).
+
+### Outcome Analysis
+
+The predicted distribution has its mode at 4 tries, with substantial mass at 5 and 6 and a visible failure tail (about 4.5%), matching the expert-described grind-then-guess pattern for a repeated-letter word. Compared with the dataset-wide mean (mode 4 tries, X ≈ 2.8%), EERIE is predicted to be a little harder: more mass in 5/6/X and less in 2–3. Uncertainties: (i) each column's 95% band is wide because only 359 words inform the regression and the word attributes are weak predictors of the exact percentages; (ii) the seven predictions are not jointly normal, so the bands should be read as column-wise, not as a joint distribution; (iii) the blend weight 0.65/0.35 is a modelling choice, not a fitted quantity. Confidence: moderate. The shape (right-shifted, mode 4, non-trivial X) is well supported by both the data and the expert's behavioural description, but the precise percentages carry a roughly ±10-point uncertainty on the peak columns, so the prediction should be treated as 'EERIE is a hard word that most players solve in 4–5 tries, with about one in twenty failing' rather than as exact figures.
+
+## Subtask 4: Subproblem 3: develop and summarise a model to classify solution words by difficulty, identify the word attributes assoc
+
+### Problem
+
+Subproblem 3: develop and summarise a model to classify solution words by difficulty, identify the word attributes associated with each class, state how difficult EERIE is, and discuss the classifier's accuracy.
+
+### Analysis
+
+Difficulty is measured from the data itself: a word is harder if it takes players more tries on average and if more players fail it. A composite difficulty score, difficulty = avg_tries*100 + X_percent, is split into three tiers (easy, medium, hard) by terciles, and a multinomial logistic classifier is trained to predict the tier from the word's letter/position/repetition features. The features are the same four used for the distribution: distinct letters, repeated letters, pos_score, and rare_count. This ties the classifier directly to the expert's account of what makes a word hard (Exchange 2): rare letters, letters in uncommon positions, and repeated letters.
+
+### Modeling Process
+
+Target: tier in {easy, medium, hard} = terciles of difficulty = avg_tries*100 + X_percent. Model: multinomial logistic regression on [distinct, repeated, pos_score, rare_count] (standardised), 5-fold cross-validation. CV accuracy = 0.521 ± 0.033. EERIE's features (3 distinct, 2 repeated, pos_score 0.086, 0 rare letters) give tier probabilities easy 0.075, medium 0.215, hard 0.710, so EERIE is classified HARD.
+
+### Outcome Analysis
+
+EERIE is predicted hard with 71% probability, consistent with the expert explicitly naming it as a hard, ambiguous, repeated-letter word. The attributes most associated with the hard tier are a low pos_score (letters sitting in positions where they rarely occur) and a high number of repeated letters; rare letters push a word toward hard as well. The classifier's accuracy of about 52% over three classes is only modestly better than chance (33%), which is an honest limitation: the letter/position features capture part of what makes a word hard, but a large part of difficulty comes from the solver's guess sequence and the specific candidate words available, which are not in the data. The model is best read as 'identifies a substantial subset of clearly-hard and clearly-easy words' rather than as a precise difficulty ranker.
+
+## Subtask 5: Subproblem 4: list and describe other interesting features of the dataset.
+
+### Problem
+
+Subproblem 4: list and describe other interesting features of the dataset.
+
+### Analysis
+
+Beyond the four requested analyses, several patterns stand out in the 359-day, 2022 dataset. These are descriptive observations with supporting statistics rather than fitted models.
+
+### Modeling Process
+
+Observations computed directly from the file: (1) The reported-results count fell from a mean above 100,000 in early January to roughly 20,000 by the end of the year (max 361,908, min 2,569), a roughly exponential decline with an implied half-life near 88 days. (2) The guess distribution is stable across the year: the dataset-wide mean is 1 try 0.47, 2 tries 5.84, 3 tries 22.73, 4 tries 32.93, 5 tries 23.64, 6 tries 11.56, X 2.81, summing to about 100%, with a mode at 4 tries and a long right tail. (3) The Hard-Mode share is a slowly drifting, highly variable ratio (mean ≈ 7.8%, but ranging from about 1% to about 94%), and it is not tied to the word. (4) The percentages in a row sum to 100% in most cases but not all, because of rounding. (5) A small number of days are extreme outliers in volume (viral puzzles or news spikes), which is why the volume model is fit on the log scale.
+
+### Outcome Analysis
+
+The most striking feature is the scale of the audience decline over the year, which is the single largest source of variation in the file and the reason the March 2023 prediction is an extrapolation. The second is the remarkable stability of the guess-count distribution: despite the changing words and the shrinking audience, the shape of who-solves-in-how-many-tries barely moves, which is what makes a per-word distribution prediction reasonable at all. The volatility of the Hard-Mode share is a caution: any per-day ratio in this data is noisy, so ratio-based claims should always be made on the slow trend, not on individual days.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

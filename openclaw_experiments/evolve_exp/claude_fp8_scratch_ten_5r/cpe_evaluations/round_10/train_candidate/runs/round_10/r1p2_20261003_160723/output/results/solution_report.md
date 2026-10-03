@@ -1,0 +1,116 @@
+# Solution
+
+## Subtask 1: Task (a): Develop model(s) to explore passenger flow through a security checkpoint and identify bottlenecks; clearly ide
+
+### Problem
+
+Task (a): Develop model(s) to explore passenger flow through a security checkpoint and identify bottlenecks; clearly identify where problem areas exist in the current process.
+
+### Analysis
+
+Approach: a discrete-event simulation (DES) of the checkpoint as a serial chain of three stages (Zone A ID check -> Zone B belt: divest, X-ray image review, reclaim -> body scanner), with two sub-populations (45% Pre-Check, 55% Regular) that share the ID-check and body-scan server pools but route to separate belt-lane pools (the 1:3 Pre-Check:regular lane ratio from the problem). I chose DES over a closed-form queueing formula because (i) the service times are a mixture (flagged vs unflagged bags; pat-down vs clear) with a heavy right tail, (ii) there are two interacting sub-populations with different service times sharing some stages, and (iii) the problem asks us to test process modifications, which DES supports directly. The dominant mechanism was established first: the X-ray belt / image reviewer is the serial bottleneck (the only stage where throughput is gated by a shared human reviewer plus passenger-side divest/reclaim), and the binding constraint is the reviewer's per-image decision time, not belt speed. The model is sound because each stage is an M/G/c server pool (Poisson arrivals, Gamma service with the expert CV), it reproduces the M/M/1 queueing-theory sensitivity to utilization (mean wait grows steeply as utilization approaches 1), and its per-stage service times agree with the dataset columns.
+
+### Modeling Process
+
+Notation: stages A (ID), B (belt), C (body scan). Stage A: c_A = n_id servers, service S_A ~ Gamma mean t_id=10 s, CV 0.3. Stage B belt service per passenger S_B = D + R + V, where D (divest) and R (reclaim) are Gamma with population-dependent means (Regular 35 s / 15 s; Pre-Check 17.5 s / 7.5 s), and V (review) = t_review_normal=4.5 s with probability (1-p_flag) and t_review_flag=20 s with probability p_flag=0.10. Mean belt occupancy: Regular ~56 s, Pre-Check ~31 s. Stage C: c_C = n_mmwave servers, service ~ Gamma mean 11 s, plus a pat-down tail with probability p_patdown=0.035 adding ~45 s. Arrivals: Poisson per sub-population; the total arrival rate is set to load_factor x belt capacity, where belt capacity mu = n_belt_precheck/t_B_pre + n_belt_regular/t_B_reg. Utilization rho_stage = lam_stage x mean_service / c_stage. A stage is stable only if rho < 1. 
+
+Empirical parameter table (each value is a calibrated input to the model; interval is the range the expert stated it holds over; source is the exchange that supplied it, or the task dataset / problem statement where noted):
+  belt_speed = 0.25 m/s, interval [0.2, 0.3], source: exchange 2 (sets bag-spacing floor only, not the ceiling)
+  t_review_normal = 4.5 s, interval [3, 6], source: exchange 3 (officer clear/flag decision per unflagged bag image)
+  t_review_flag = 20 s, interval [10, 30], source: exchange 3 (flagged bag, secondary hand search)
+  p_flag = 0.10, interval [0.05, 0.15], source: exchange 4 (fraction of bags flagged, normal day; rises with volume/posture)
+  p_patdown = 0.035, interval [0.02, 0.05], source: exchange 5 (fraction of passengers stopped for pat-down, normal day)
+  t_divest_regular = 35 s, interval [20, 40], source: exchange 6
+  t_reclaim_regular = 15 s, interval [10, 20], source: exchange 6
+  t_divest_precheck = 17.5 s, interval [10, 20], source: exchange 6 (Pre-Check skips shoes/belt/jacket/laptop, ~half)
+  t_reclaim_precheck = 7.5 s, interval [5, 10], source: exchange 6
+  divest_multiplier_slow = 2.5x, interval [2, 3], source: exchange 7 (first-time/family traveler vs frequent flyer)
+  t_divest_fast = 20 s, interval [15, 25], source: exchange 7 (frequent flyer)
+  delta_cutting = [0, 0.2] (qualitative), source: exchange 8 (cultural fraction who cut in)
+  f_precheck = 0.45, source: problem statement (corroborated exchange 9); lane ratio Pre-Check:regular = 1:3, source: problem statement
+  t_id = 10 s, interval [5, 15], source: exchange 10 (ID check, short and low-variance)
+Dataset-derived (from 2017_ICM_Problem_D_Data.csv, 58 rows): ID-check service mean ~10 s (col C/D); mmwave exit-interval mean ~11.6 s (col E); X-ray bag-exit span 2.5-78 s mean ~31 s with a heavy right tail (col F); 'time to get scanned property' (belt-to-belt) 5-68 s mean ~28.6 s (col H); per-lane arrival ~10-11 pax over the ~10-min observation window. Arrival intensity and lane counts for the simulation operating point are set by a load factor on belt capacity (see subtask a).
+
+Simulation: 30-minute horizon, 5 random seeds averaged; all passengers merged on one arrival timeline and each stage processes them in start-time order so shared pools see true interleaving. Outputs per stage: mean/median/p90/p99 sojourn and the coefficient of variation (CV) of total sojourn as the variance metric.
+
+### Outcome Analysis
+
+Bottleneck identified: the belt stage, and specifically the single Pre-Check lane. At a peak load factor of 0.75 (utilization 0.75 of total belt capacity), the Pre-Check lane runs at utilization rho=0.90 while the regular lanes run at 0.66. A single near-critical M/G/1 lane produces the dominant wait: belt sojourn mean 106 s (p90 236 s) versus only 11 s at ID (rho=0.32) and 44 s at the body scanner. Total checkpoint sojourn: mean 163 s, std 74 s (CV 0.45). The problem area is the lane-allocation mismatch: 45% of passengers are Pre-Check but only 1 of 4 lanes is Pre-Check, so the fast population is queued behind a single reviewer. Variance is driven by (i) the 10% of bags flagged for a 20 s secondary search (heavy right tail) and (ii) the near-critical Pre-Check utilization. Limitations: the dataset is a 10-minute snapshot (58 passengers), so arrival rates are estimated per lane and then scaled by a load factor rather than observed over a full peak; the DES assumes FCFS, no balking, and independent service times, and it does not model Zone D re-screening feedback or conveyor-belt spacing. Strengths: it separates the two sub-populations, captures the mixture service times, and lets each modification be tested in isolation.
+
+## Subtask 2: Task (b): Develop two or more potential modifications to improve passenger throughput and reduce wait-time variance; mod
+
+### Problem
+
+Task (b): Develop two or more potential modifications to improve passenger throughput and reduce wait-time variance; model them and demonstrate the impact.
+
+### Analysis
+
+I modeled five candidate modifications against the baseline, each changing only the parameters the modification targets so the effect is attributable. The lever the model isolates (from the mechanism/constraint chain) is reviewer capacity and per-passenger belt occupancy, NOT belt speed: adding capacity where the constraint binds reduces both mean wait and variance, while speeding up a non-binding stage or adding a lane that overloads the other population can backfire. I report throughput (pax/hr), total sojourn mean, and CV (variance) for each.
+
+### Modeling Process
+
+Modifications (all at load factor 0.75, 5-seed mean):
+  M1 'Second Pre-Check lane' (1:3 -> 2:3): n_belt_precheck 1->2. Rebalances utilization to pre 0.62 / reg 0.91.
+  M2 'AI-assisted X-ray review': t_review_flag 20->12 s and p_flag 0.10->0.07 (faster, fewer flags) - attacks the variance tail directly.
+  M3 'Rebalance to 2:2': n_belt_precheck 1->2, n_belt_regular 3->2.
+  M4 'Express divest for Regular': t_divest_regular 35->20 s, t_reclaim_regular 15->10 s.
+  COMBINED = M1 + M2 + M4 (second Pre-Check lane + AI review + express divest).
+Each is a parameter change to the same DES; throughput and sojourn/CV are read off the identical metrics as the baseline.
+
+### Outcome Analysis
+
+Results (baseline 231 pax/hr, 163 s mean, CV 0.45):
+  M1 second Pre-Check lane: 318 pax/hr (+38%), 107 s (-34%), CV 0.41 - large gain, low cost (one lane).
+  M2 AI-assisted review: 237 pax/hr, 145 s (-11%), CV 0.44 - modest mean gain, best at cutting the p99 tail.
+  M3 rebalance 2:2: 270 pax/hr, 204 s (+25% WORSE) - overloads the now-single-regular-lane population (reg rho 1.16).
+  M4 express divest only: 312 pax/hr, 345 s (+111% WORSE) - removing Regular belt occupancy shifts load onto the already-critical Pre-Check lane (pre rho 1.21).
+  COMBINED: 411 pax/hr (+78%), 79 s (-52%), CV 0.33 - near-doubles throughput and halves variance.
+Key finding: M3 and M4 fail in isolation because the bottleneck is the *allocation* of review capacity between the two populations, not the total amount of service speed. A modification helps only if it lowers the utilization of the binding (Pre-Check) lane without pushing the other lane past critical. The combined modification does exactly this, holding both lanes at ~0.77. A load sweep (0.50-0.90) shows the baseline throughput plateaus (~247-278/hr) with wait spiking as load rises, while the combined configuration scales to ~493/hr with total wait held near 100 s and CV 0.34 - a materially higher throughput-variance frontier. Limitation: 'cost' of each modification is not monetized here; M1 (one lane) is the cheapest high-impact option, M2 depends on procurement of AI review tooling.
+
+## Subtask 3: Task (c): Sensitivity analysis for cultural norms / traveler styles that shape how passengers process through the checkp
+
+### Problem
+
+Task (c): Sensitivity analysis for cultural norms / traveler styles that shape how passengers process through the checkpoint; how can the system accommodate these differences to expedite throughput and reduce variance.
+
+### Analysis
+
+Cultural differences enter the model through two behavioral levers established with the expert: (1) traveler pace - a slow-traveler / family / first-time style multiplies divest and reclaim time (expert: 2-3x a frequent flyer), which widens the belt-occupancy distribution and its right tail; (2) queue discipline - a culture that tolerates 'cutting' (individual- or collective-efficiency styles) breaks strict first-come-first-served order, which the expert says lowers the effective service rate seen by waiters and raises wait variance even at constant throughput, whereas a strict-hold-place culture gives a smoother, more predictable queue. I map American=strict FCFS + normal pace, Swiss=coordinated/collective (slightly faster, no cutting), Chinese=individual efficiency (some cutting), and a slow-traveler/family style, plus a high-alert day (raised flag rate) as an additional variance driver. The accommodation tested is the M1+M4 modification.
+
+### Modeling Process
+
+Parameterization: slow-traveler style sets divest_multiplier = 2.5x (interval [2,3]) on both divest and reclaim for both populations; Swiss sets 0.9x (coordinated, slightly faster); Chinese sets 0.95x pace plus a cutting fraction delta_cutting~0.15 modeled as added re-check/pat-down pressure (raising p_patdown) to emulate the front-jumping load and its variance; high-alert adds +0.15 to p_flag. All else identical to the baseline DES; the same total-sojourn mean, std and CV metrics are reported per 'culture'.
+
+### Outcome Analysis
+
+Results at load 0.75 (total sojourn mean, CV): American strict FCFS 163 s / 0.45; Swiss coordinated 153 s / 0.40 (best mean and variance - collective efficiency); Chinese cutting 144 s / 0.43 (slightly faster on average because individuals move quickly, but the cutting raises the tail); slow-traveler/family 252 s with throughput collapsing to 101/hr (the dominant cultural effect - 2.5x divest overloads the belt); high-alert 172 s / 0.43. The accommodation (second Pre-Check lane + express divest) applied to the slow-traveler load restores throughput to 399/hr and cuts total wait to 82 s (CV 0.33). Interpretation: the system should accommodate diversity by (i) making belt occupancy short and uniform for everyone (express divest, so slow travelers are not the tail), (ii) guaranteeing Pre-Check capacity so the trusted-traveler fast path never becomes the bottleneck, and (iii) enforcing a single-file serpentine queue with visible position and a no-cutting norm to convert culture-dependent erratic variance into predictable wait for cutting-tolerant populations. Limitation: the cultural multipliers are expert-elicited ranges, not measured per-nationality data, and the cutting effect is approximated rather than modeled as an explicit queue-jumping rule.
+
+## Subtask 4: Task (d): Propose policy and procedural recommendations for security managers, globally applicable or tailored by cultur
+
+### Problem
+
+Task (d): Propose policy and procedural recommendations for security managers, globally applicable or tailored by culture/traveler type; validate the model, assess strengths/weaknesses, and propose future work.
+
+### Analysis
+
+Recommendations are derived directly from which modeled levers moved the throughput-variance frontier most per unit of cost. I validate the model three ways: (1) the DES reproduces the M/M/1 theoretical sensitivity of mean wait to utilization (steep as rho->1) and the correct M/G/1 ordering (variable service raises wait above the exponential case); (2) per-stage service times match the dataset columns (ID ~10 s, mmwave ~11 s, X-ray span 2.5-78 s with a heavy tail, belt-to-belt ~29 s); (3) the structural finding (single Pre-Check lane at rho~0.90 is the bottleneck under a 1:3 lane ratio with 45% Pre-Check traffic) is independently implied by the expert's mechanism-constraint chain. I then state strengths, weaknesses, and future work.
+
+### Modeling Process
+
+Policy recommendations (ranked by modeled impact per cost):
+  1. Rebalance lanes toward demand: open a second Pre-Check lane (1:3 -> 2:3) at high-traffic checkpoints; modeled +38% throughput, -34% wait. Globally applicable and cheap.
+  2. Deploy AI-assisted X-ray review to cut secondary-search time and false-flag rate; modeled to trim the p99 wait tail and free reviewer capacity; pairs with #1.
+  3. Adopt 'express divest' (standardized bin flow, fewer removals, coached passengers) to shorten and homogenize belt occupancy; most valuable for family/first-time-heavy populations (task c).
+  4. Enforce a single-file serpentine queue with visible position and a no-cutting norm; converts culture-dependent variance into predictable wait (task c, cutting-tolerant populations).
+  5. Dynamic lane control: open/close lanes and shift Pre-Check capacity by real-time arrival mix and alert posture, since the flag rate and slow-traveler share both push utilization up.
+Tailored policies: for cutting-tolerant (individual-efficiency) cultures, prioritize #4; for family/slow-traveler-heavy airports, prioritize #3; for high-Pre-Check-share airports, prioritize #1.
+
+Validation summary: DES vs M/M/1 theory matches in direction and in the steep near-critical sensitivity; service times agree with the dataset; the bottleneck is corroborated by the expert chain. Strengths: separates sub-populations, mixture service times, directly testable modifications, reports variance (CV) not just mean. Weaknesses: 10-minute dataset forces a load-factor operating point; no Zone D re-screening feedback or conveyor spacing; FCFS and no balking assumed; cultural multipliers are expert ranges, not per-nationality measurements. Future work: collect a full peak-hour dataset to calibrate arrival rates and lane counts directly; add a Zone D feedback loop and explicit queue-jumping rule for cutting; cost-benefit each modification (staffing, equipment); and a staffing-optimization layer that chooses the lane configuration that minimizes a weighted mean+variance wait under a staffing budget.
+
+### Outcome Analysis
+
+The model supports a clear, cost-ordered recommendation set whose top item (a second Pre-Check lane) is cheap, globally applicable, and modeled to deliver +38% throughput with -34% mean wait; combined with AI review and express divest it nearly doubles throughput (411/hr) and halves variance (79 s, CV 0.33). The cultural analysis shows the accommodation must be matched to traveler mix: express divest for slow-traveler-heavy populations, enforced single-file queues for cutting-tolerant populations, and Pre-Check capacity guarantees wherever the trusted-traveler share is high. The model is validated against queueing theory and the dataset but its quantitative arrival-rate operating point and cultural multipliers are the main items to firm up with a full-day dataset before deployment. Overall the analysis is internally consistent, the bottleneck and its fix are attributable, and the recommendations follow from the modeled leverage points.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

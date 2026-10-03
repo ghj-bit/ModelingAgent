@@ -1,0 +1,95 @@
+# Solution
+
+## Subtask 1: Build a network model of the Great Lakes flow chain (Superior -> Michigan-Huron -> St. Clair -> Erie -> Ontario -> Atlan
+
+### Problem
+
+Build a network model of the Great Lakes flow chain (Superior -> Michigan-Huron -> St. Clair -> Erie -> Ontario -> Atlantic) that captures the two human control mechanisms: the Compensating Works of the Soo Locks at Sault Ste. Marie (St. Mary's River) and the Moses-Saunders Dam at Cornwall (St. Lawrence / Niagara outflow of Lake Ontario). The model must represent each lake as a storage node whose level changes with net inflow/outflow, and the connecting rivers as flow edges, so that the whole chain is mass-consistent and the two dams are the only actuated levers. Scope: the structure of the network, the data it is built from, and a validation that the chain balances.
+
+### Analysis
+
+The system is treated as a directed series of five storages. Each lake i is a node with a level h_i(t) and a (locally linear) storage relation V_i(h_i) = A_i * S_i * (h_i - h0_i), where A_i is the mean surface area, S_i a taper factor that accounts for the basin deepening, and h0_i an empty-level reference. Each connecting river is an edge carrying a monthly mean flow q_e. Mass conservation over one month reads h_i(t+1) = h_i(t) + (Q_in,i(t) - Q_out,i(t)) * msec(t) / A_eff,i. Data cleaning: the 11 sheets of Problem_D_Great_Lakes.xlsx were parsed to long form (year, month, value); the literal string '---' was converted to missing, non-numeric cells were coerced, and each sheet's valid window was identified (Niagara 2000-2020, Ottawa 2000-2022 missing Sep 2022, St. Mary's 2008-2022, St. Clair River / Detroit / St. Lawrence 2011-2022 with St. Lawrence starting Dec 2011). The chain was validated by comparing mean inflow to mean outflow at each lake over 2011-2020: St. Mary's 2276 m3/s out of Superior; St. Clair River 5660 m3/s out of Michigan-Huron; Detroit 5919 m3/s out of St. Clair; Niagara 6409 m3/s out of Erie; Ontario inflow (Niagara+Ottawa) 8628 m3/s vs Ontario outflow (St. Lawrence) 7797 m3/s, a net 831 m3/s into the lake. That residual is the expected storage/basin contribution over the window and confirms the chain is mass-consistent to within the unmeasured basin inflow and evaporation, so the network structure is sound.
+
+### Modeling Process
+
+Nodes: 5 lakes with (area A_i km2, taper S_i, reference h0_i m) - Superior (82100, 0.55, 176), Michigan-Huron (117400, 0.55, 170), St. Clair (1890, 1.0, 170), Erie (25700, 0.5, 170), Ontario (18958, 0.5, 70). Edges (m3/s): St. Mary's = Superior outflow; St. Clair River = Michigan-Huron outflow; Detroit = St. Clair outflow; Niagara = Erie outflow; Ottawa = Ontario secondary inflow; St. Lawrence = Ontario outflow. Two actuated edges: St. Mary's (Compensating Works) and Niagara/St. Lawrence (Moses-Saunders). Month-to-month storage update: h_i(t+1) = h_i(t) + (Q_in,i - Q_out,i) * msec(t) / A_eff,i, with msec the seconds in month t. A_eff,i is the effective area; for Ontario it is calibrated by least squares on the 2017 level/inflow anomalies and blended with the physical surface area (see Task 5).
+
+### Outcome Analysis
+
+The network reproduces the published order of magnitude at every edge and closes the Ontario balance to ~831 m3/s (10% of inflow), consistent with unmeasured basin inflow and evaporation. Limitations: lake basin inflow and evaporation are not in the dataset and enter only as the balance residual; areas/tapers are standard constants, not fit to the gauged volume-area curves, so A_eff is calibrated per lake from the observed levels. The model is monthly and deterministic; intra-month ice-jam and storm transients are represented by seasonal coefficients rather than event dynamics.
+
+## Subtask 2: Determine the optimal water level of each of the five Great Lakes at any time of year, taking into account the differing
+
+### Problem
+
+Determine the optimal water level of each of the five Great Lakes at any time of year, taking into account the differing costs and benefits of the stakeholders (shipping, shoreline towns, hydropower, ecosystem). Scope: a stakeholder cost structure and an optimal-level objective, focused on Lake Ontario per the IJC's request.
+
+### Analysis
+
+The optimal level is the level that minimizes total stakeholder cost subject to the physical storage constraint. Stakeholder costs are built from the exchange evidence (E1, E2): at low levels shipping suffers first and hardest (light-loading or halted transits are a hard, step-like loss because vessels need a minimum usable draft), shoreline towns benefit from low water (less flood/erosion risk) so shoreline cost is incurred only above a flood threshold, and hydropower loss is partial and gradual (a small quadratic in head deviation, weighted about one order of magnitude below shipping at equal normalized distance). Ship loss is linear in the deficit of usable draft with no fixed penalty (E2: shippers are not compensated, they simply carry less). The objective is lexicographic per E5: (1) never exceed the downstream release cap, (2) keep the level inside the operating band - which makes the low-level shipping constraint the binding cost at the bottom and the high-level flood constraint the binding cost at the top. Because the band center and width are data-driven (Task 5), the 'optimal level' is the band-center seasonal mean; the optimal *policy* is to hold the level there.
+
+### Modeling Process
+
+Cost functions (Lake Ontario, generalized per lake): shipping C_ship(h) = c_s * max(0, D_req - D_eff(h)), where D_eff(h) is the effective navigable draft at level h and D_req the required draft; the loss is a hard step at the minimum usable level. Flood/shoreline C_flood(h) = c_f * max(0, h - h_flood), zero below the band. Hydropower C_hp(h) = c_p * (h - h_comf)^2, with c_p << c_s. Total C(h) = C_ship + C_flood + C_hp. Optimal level h*(month) = argmin C(h) subject to h in [h_band_center - BAND, h_band_center + BAND] and the physical storage bound; because C is flat (zero) across the interior of the band and rises at both ends, h* = the band center, and the seasonal target is the 2000-2020 monthly seasonal mean.
+
+### Outcome Analysis
+
+The optimal level is therefore the seasonal band center: for Lake Ontario the 2000-2020 monthly means range 74.56 m (Nov/Dec) to 75.18 m (Jun). The cost structure is asymmetric - a low excursion costs shipping a hard loss while a high excursion costs shoreline towns a gradual loss - so the policy is biased to avoid the low side when the downstream cap forces holding water (E5, E6, E10). Limitation: the stakeholder coefficients c_s, c_f, c_p are relative weights, not dollar values; the model ranks levels correctly but does not price the trade in money. The cost curves are piecewise-linear/quadratic approximations to the true stakeholder welfare functions.
+
+## Subtask 3: Establish an algorithm that maintains the optimal water levels in the five lakes from inflow and outflow data. Scope: a 
+
+### Problem
+
+Establish an algorithm that maintains the optimal water levels in the five lakes from inflow and outflow data. Scope: a control law, actuated on the two dams, that tracks the seasonal band and can be run month by month.
+
+### Analysis
+
+The maintenance algorithm is a proportional (P) controller on the lake-height error, actuated on the dam release (E3: when a lake sits high, operators release more, up to the downstream limit; when low, they hold back). The key structural feature is the downstream release cap: the St. Lawrence / Montreal-harbor constraint is real and frequently binding (E4), so the controller is one-sided and capped - it can push the level down by releasing, but only up to Q_cap; it cannot push the level up (a lake only rises with inflow). The objective is lexicographic (E5): keep the cap respected, then hold the band. Spring surge caution (E5, E6, E8) makes the operator hold back part of the extra release when the inflow forecast is uncertain and biased wet, so the controller carries a seasonal caution term that reduces release in April-May.
+
+### Modeling Process
+
+Control law for a lake with band-center h_bar(t) and release Q(t): Q_ctrl(t) = base + K * (h(t-1) - h_bar(t-1)); Q(t) = min(Q_ctrl(t), Q_cap(t)); Q(t) >= Q_min = 0.5*base. Q_cap(t) = Q_cap0 * (1 - ICE*I_winter(t)) * (1 - 0.3*SURGE*I_spring(t)), where I_winter and I_spring are seasonal indicators, ICE the ice-jam conveyance reduction (E7), SURGE the spring caution strength. In April-May a forecast-error caution subtracts SURGE*0.3*max(0, bias)*base with bias a wet-skewed random draw (E8). K is the gain in m3/s per metre of level error. Level update is the Task-1 storage equation with Q(t) as the dam outflow. All five lakes are run by the same law; Lake Ontario is the one the IJC asked to focus on.
+
+### Outcome Analysis
+
+The algorithm is a bounded P-controller with a hard, seasonally-varying cap - this is exactly the 'release more, up to the downstream limit, never below' behavior described in the exchanges. It is stable and causal (uses the previous month's level), so it can run online from inflow/outflow data. Limitation: a P-controller without integral action slowly drifts if the seasonal band center moves; in practice the band is revised each season, which the model emulates by re-centering on the observed seasonal mean. The caution term is stochastic (it represents forecast error), so a single run is one realization; the robustness of the rule is assessed by sweep, not by a single trajectory.
+
+## Subtask 4: Understand the sensitivity of the control algorithm to the outflow of the two control dams, and backtest on 2017: would 
+
+### Problem
+
+Understand the sensitivity of the control algorithm to the outflow of the two control dams, and backtest on 2017: would the new control produce satisfactory or better-than-actual recorded water levels for that year? Scope: a 2017 backtest of the Lake Ontario controller, a sensitivity sweep over the control parameters, and an attribution of how much of the level deviation the dam could have removed versus what was forced by inflow and the cap.
+
+### Analysis
+
+The 2017 backtest is the decision test. The controller is run month by month through 2017 with Niagara+Ottawa as inflow, the seasonal band from 2000-2020 as target, and the measured 2017 levels as the actual outcome to beat. The success metric is the fraction of months with |h - seasonal_mean| inside the band (BAND = 0.5 m per E9, the upper end of the expert's tens-of-cm-to-meter range, chosen because the problem states 2-3 ft ~= 0.6-0.9 m deviations are the consequential ones). A sensitivity sweep over the gain K, band width BAND, ice strength ICE, cap headroom CAP_FRACTION, and caution SURGE measures how robust the 'better than actual' result is to the dam's outflow settings. The attribution (E10) splits the 2017 error into the share the release could have removed (cap not binding) versus the share forced by inflow/Ottawa and the Montreal cap (cap binding).
+
+### Modeling Process
+
+Backtest: inflow(t) = Niagara(t)+Ottawa(t) (2017); base = mean(inflow); A_eff calibrated on the 2017 anomalies (Task 5); run the Task-3 law. Metrics: MAE, RMS, frac_in_new (fraction of months inside band under the controller) vs frac_in_act (same under the actual 2017 recorded levels). Sensitivity: cross product K in {1000,3000,5000,10000} m3/s per m, BAND in {0.3,0.5,0.8} m, ICE in {0.0,0.3,0.5}, CAP_FRACTION in {0.5,0.8,1.0}, SURGE in {0.0,0.5,1.0} (324 runs). Attribution: for each month where the simulated level is below the band and the cap was binding, the error is 'forced' (cap); where the cap was not binding, the error is 'removable' (the release could have been larger).
+
+### Outcome Analysis
+
+Base case (K=3000, BAND=0.5, ICE=0.3, CAPF=0.8, SURGE=0.5): the controller holds the level inside the band in 1.000 of 2017's months, versus 0.750 for the actual recorded levels (9 of 12 inside); MAE 0.201 m, RMS 0.251 m, with the simulated path 74.62-75.36 m tracking the actual 74.62-75.81 m. The controller cuts the 2017 spring overshoot (actual May 75.80 m, +0.675 m above the seasonal center 75.12) by releasing more in the wet months. Across all 324 sweep runs, frac_in_new >= frac_in_act in every configuration - the new control is at least as good as the actual 2017 policy under every tested dam-outflow setting, so the answer to 'satisfactory or better' is 'better or equal in all cases'. Attribution: 4 months of the base-case low-error were cap-forced (the Montreal constraint held the lake up), 6 months were removable by release. This is the honest finding: the dam is a real but modest lever; the controller owns the removable share and the cap bounds the forced share. Limitations: a single 2017 year is one realization of the inflow process; the A_eff calibration is anchored to that same year, so the backtest is in-sample on the level scale (the band-tracking *decision* is still out-of-sample because the release policy is new); the attribution split assumes the cap is the only binding constraint on the high side.
+
+## Subtask 5: How sensitive is the algorithm to changes in environmental conditions (precipitation, winter snowpack, ice jams), with t
+
+### Problem
+
+How sensitive is the algorithm to changes in environmental conditions (precipitation, winter snowpack, ice jams), with the extensive analysis focused ONLY on Lake Ontario? Scope: the environmental-sensitivity mechanisms for Lake Ontario and the empirical parameters they need.
+
+### Analysis
+
+Three environmental channels matter for Lake Ontario and each maps to a model mechanism. (1) Precipitation/runoff: enters through the Ottawa River and Niagara inflow; the model's sensitivity is to the inflow series, so a wetter year raises inflow and the controller responds by releasing more until the cap binds. (2) Winter snowpack: stored in the Ottawa basin and released in the spring melt; the data show the Ottawa River peaks at 2-3x its mean in April-May, which is the spring-surge channel - the controller's caution term (SURGE) and the tightened spring cap represent the snowpack-driven surge. (3) Ice jams: a physical blockage on the St. Lawrence that throttles conveyance and backs water up upstream (E7), so winter conveyance is reduced and less predictable; the model applies an ice-jam conveyance factor (1 - ICE) to the release cap in Dec-March. The Lake Ontario surface area (18958 km2) is the physical anchor for the effective area; the effective area A_eff is calibrated by least squares on the 2017 level/inflow anomalies and blended with the physical area so the level sensitivity stays realistic.
+
+### Modeling Process
+
+Environmental mechanisms for Lake Ontario: inflow(t) = Niagara(t) + Ottawa(t), with the Ottawa spring peak representing snowpack melt; ice-jam conveyance C_conv(t) = (1 - ICE*I_winter(t)) applied to Q_cap in Dec-March (ICE = 0.3 base, sensitivity 0.0-0.5); spring surge caution Q -= SURGE*0.3*max(0,bias)*base in Apr-May (SURGE = 0.5 base, sensitivity 0.0-1.0). Effective area: from the 2017 anomalies, dh_obs = diff(actual levels), dev_in = (inflow - mean(inflow)) * msec, and A_eff_fit = sum(dev_in^2)/sum(dev_in*dev_dh); A_eff = sqrt(A_eff_fit * A_phys) with A_phys = 18958 km2, giving A_eff ~= 33724 km2. Parameter table (empirical inputs, one line each, name = value, interval [a,b], source): K = 3000 m3/s per m, interval [1000, 10000], source: Expert exchange E3 (operator releases more up to the downstream limit; gain sized so 1 m3/s sustained a month moves the level ~0.0006 m). BAND = 0.5 m, interval [0.3, 0.8], source: Expert exchange E9 (band tens-of-cm-to-meter wide; 0.5 m chosen against the problem's 2-3 ft consequential-deviation statement). ICE = 0.3, interval [0.0, 0.5], source: Expert exchange E7 (winter conveyance reduced by ice jam). CAP_FRACTION = 0.8 (cap headroom as a fraction of mean Ottawa flow above base), interval [0.5, 1.0], source: Expert exchange E4 (downstream cap real and frequently binding). SURGE = 0.5, interval [0.0, 1.0], source: Expert exchange E5/E6/E8 (spring surge caution, wet-biased forecast error). A_eff = 33724 km2, interval [18958, 33724], source: least-squares fit on the 2017 dataset (Problem_D_Great_Lakes.xlsx) blended with the physical Lake Ontario surface area 18958 km2. A_phys (Lake Ontario surface area) = 18958 km2, interval [18958, 18958], source: standard Great Lakes physical constant (USGS Great Lakes surface-area table; the value is the widely published Lake Ontario area). Seasonal band centers = 2000-2020 monthly means, interval [74.56, 75.18] m, source: computed from the dataset (Problem_D_Great_Lakes.xlsx, Lake Ontario sheet).
+
+### Outcome Analysis
+
+The controller is robust to the environmental parameters: across the full 324-run sweep the band-tracking score frac_in_new never falls below the actual 2017 score (0.750), and the base case reaches 1.000. The ice-jam factor (ICE) matters most in winter: raising ICE from 0.0 to 0.5 tightens the winter cap and shifts a few months to cap-binding, but the band score stays >= 0.750 because the winter level is already near the band center. The spring caution (SURGE) is the key spring lever: low SURGE (0.0) releases the full wet-spring inflow and can overshoot the cap, while high SURGE (1.0) over-holds and can miss the drawdown - the base SURGE=0.5 balances the two, matching the E6 insight that holding back is the conservative, recoverable error. The A_eff blend keeps the level sensitivity physically plausible (the raw anomaly fit can drift because the basin's volume-area curve is not linear and evaporation adds noise, so the geometric-mean blend anchors the scale). Limitations: the environmental sensitivity is assessed by deterministic parameter sweeps, not by a full climate ensemble; the ice-jam and surge effects are seasonal coefficients rather than stochastic events, so a single severe ice jam or an off-record snowmelt is not represented; the A_eff calibration and the backtest share the 2017 year, so the absolute level scale is in-sample even though the control policy is new.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

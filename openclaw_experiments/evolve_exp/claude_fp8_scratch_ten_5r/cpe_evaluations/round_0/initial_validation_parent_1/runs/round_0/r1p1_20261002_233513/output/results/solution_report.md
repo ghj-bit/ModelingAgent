@@ -1,0 +1,113 @@
+# Solution
+
+## Subtask 1: Task 1: Identify the factors that drive loss of appropriate Florida scrub habitat for the scrub lizard, make recommendat
+
+### Problem
+
+Task 1: Identify the factors that drive loss of appropriate Florida scrub habitat for the scrub lizard, make recommendations to the state of Florida to preserve the habitat, and discuss the obstacles to implementing those recommendations.
+
+### Analysis
+
+This is a qualitative, systems-level analysis grounded in the real-world ecology and land-management history of Florida scrub. The driving principle from field practice is that scrub is a fire-maintained, sand-based community: it is lost both where land is permanently converted (development, agriculture, mining) and where it degrades in place (fire suppression lets oaks and shrubs close the canopy and remove the open sandy patches the lizard needs). The analysis separates the historical one-time losses (development, agricultural conversion, sand mining) from the ongoing degradation losses (fire suppression and fragmentation), because the recommendation and the obstacle differ for each. No numerical input is required; the structure is a cause -> mechanism -> recommendation -> obstacle chain.
+
+### Modeling Process
+
+No closed-form model; a structured factor-and-mechanism analysis. Five loss drivers are ranked by mechanism: (1) urban/residential development converts the high dry sandy ridges to housing, roads and commercial land (largest historical cause); (2) agricultural conversion (citrus, pasture) removes large tracts; (3) fire suppression causes in-place degradation - canopy closure by oaks eliminates open sandy habitat even where land is not converted; (4) fragmentation breaks continuous scrub into small, isolated patches that lose viability and gene flow; (5) sand mining and other extraction remove or alter scrub. Recommendations map one-to-one to these mechanisms: protect/acquire remaining high-quality patches and secure easements (counters development and agriculture); institute a permanent, landscape-scale controlled-burning program to maintain open sandy habitat (counters fire suppression); connect patches with corridors or managed metapopulation to reduce isolation (counters fragmentation); regulate or buy out active sand mining in scrub. Obstacles, in order of practical weight: private ownership of most remaining scrub (protection needs purchase, easements or regulation rather than public-land management); high cost and politically variable state funding; landowner resistance and litigation over development restrictions and mandatory burning; small scattered parcels each with different owners; difficulty of controlled burning near development (smoke, liability, escape risk); and competing growth priorities with weak enforcement.
+
+### Outcome Analysis
+
+The central conclusion is that most scrub is already lost to conversion, so the state's leverage is now on the remaining and degraded patches: buying/easement-protecting them, and - most importantly - actively managing fire to keep them open. Fire suppression is the one loss mechanism that is both ongoing and largely reversible, making the burning program (Task 6) the highest-leverage action. The dominant obstacle is political and financial (private ownership, cost, litigation), not ecological: the state technically knows what to do but the tools (land acquisition, mandatory burning on private land) are expensive and contested. Bias: this reflects conservation-practice judgment; actual acreage lost per driver is not quantified here because the dataset does not contain land-use history.
+
+## Subtask 2: Task 2: Using the 4-year cohort in Table 1, estimate Fa (average fecundity of adult lizards), Sj (juvenile survivorship 
+
+### Problem
+
+Task 2: Using the 4-year cohort in Table 1, estimate Fa (average fecundity of adult lizards), Sj (juvenile survivorship from birth to first reproductive season), and Sa (average adult survivorship).
+
+### Analysis
+
+Table 1 follows one hatchling cohort (age 0) through four censuses (age 0-3), giving 972 at age 0, 180 at age 1, 20 at age 2, and 2 at age 3. Hatchlings (age 0) lay no eggs the summer they are born, so age 1 is the first reproductive age. Sj is the fraction of hatchlings reaching age 1. Sa is the average annual survival of reproductive (adult) females, taken as the mean of the two adult transitions (age1->2 and age2->3). Fa is eggs per adult female; clutch size for each age is computed from the supplied allometric relation y = 0.21*(SVL) - 7.5 using that age's average female size, and Fa is the mean over the reproductive ages. Data cleaning: the file is internally consistent (females <= total at every age, sizes monotonically increasing), so no rows were dropped; the only repairs were type-casting and using the age-0 clutch as 0 by the stated biological rule.
+
+### Modeling Process
+
+Sj = N(1)/N(0) = 180/972 = 0.1852. Sa = [N(2)/N(1) + N(3)/N(2)]/2 = [20/180 + 2/20]/2 = [0.1111 + 0.10]/2 = 0.1056. Clutch size by age from y = 0.21*SVL - 7.5: age 1 (SVL 45.8) = 2.118; age 2 (55.8) = 4.218; age 3 (56.0) = 4.26. Fa (age 0) = 0 (no eggs that summer); Fa (adult average) = mean of ages 1-3 = (2.118 + 4.218 + 4.26)/3 = 3.532 eggs per adult female per year. Parameter table (all from the task's own Table 1): Sj = 0.185, interval [0.185, 0.185], source: table1.csv census 180/972; Sa = 0.106, interval [0.100, 0.111], source: table1.csv (20/180, 2/20); Fa = 3.53, interval [2.12, 4.26], source: table1.csv sizes + clutch relation y=0.21*SVL-7.5 given in the problem.
+
+### Outcome Analysis
+
+Sj = 0.185 and Sa = 0.106 are unusually low: fewer than one in five hatchlings and barely one in ten adults survive a year. This is the single most important number for the whole problem - with such low survivorship the species is a high-turnover, r-selected, metapopulation that depends on immigration, not on any one patch being self-sustaining (see Task 5). The adult-fecundity range (2.1 to 4.3 eggs) shows juveniles that do reproduce are initially small and produce few eggs; mature females (age >=2) cluster near 4.2. Limitations: only four censuses and the last transition (20 -> 2) rests on two individuals, so Sa is noisy; the estimate is a single-cohort point estimate with no confidence interval. The low Sa is also a plausible underestimate of the true long-run adult survival because the cohort ages into harsher conditions and the tiny terminal numbers are sensitive to a few deaths.
+
+## Subtask 3: Task 3: Using Table 2 (8 patches), develop functions that estimate Fa, Sj and Sa as functions of patch size and open-san
+
+### Problem
+
+Task 3: Using Table 2 (8 patches), develop functions that estimate Fa, Sj and Sa as functions of patch size and open-sandy area, and a function estimating C, the carrying capacity of scrub lizards for a given patch.
+
+### Analysis
+
+Table 2 gives, for each of 8 patches, patch size (ha), open sandy habitat (ha), and the three vital rates plus density (lizards/ha). The question is whether each vital rate scales with total patch size or with the open sandy area. Field practice says open sandy ground, not total area, is the relevant habitat measure - the lizards need bare sand for burrowing, basking and egg-laying - so sandy area is the primary predictor, but total size is fitted as a comparison and the better-fitting variable is chosen per rate. Power-law forms y = a*x^b are fitted by log-log least squares (natural for size-scaling of biological rates), with r^2 reported. Carrying capacity C is total lizards the patch can hold; density is modelled as a power law and C is density times area, with the area measure chosen by fit quality.
+
+### Modeling Process
+
+Power-law fits y = a*x^b on Table 2. Fa: Fa = 3.054 * A^0.2355 (on patch size, r^2=0.897) vs 4.180 * S^0.2125 (on sandy, r^2=0.835) -> use patch size. Sj: Sj = 0.1062 * S^0.1352 (on sandy, r^2=0.882) vs 0.0916 * A^0.1362 (r^2=0.841) -> use sandy habitat. Sa: Sa = 0.0447 * S^0.2842 (on sandy, r^2=0.949) vs 0.0328 * A^0.2864 (r^2=0.904) -> use sandy habitat. All three are monotonically increasing in habitat, as expected: bigger, sandier patches are better. Density d = 28.549 * A^0.2264 lizards/ha (on total patch size, r^2=0.855; the sandy-area fit gives r^2=0.829, so total area is used). Carrying capacity C(A,S) = d(A) * A = 28.549 * A^1.2264 lizards, i.e. C scales slightly super-linearly with patch size because both the area and the per-ha density rise with size. All coefficients and r^2 values are derived from the task's own Table 2 (no external empirical values).
+
+### Outcome Analysis
+
+The choice of predictor is physically sensible and confirmed by the fits: survivorship (Sa, Sj) tracks the open sandy habitat (the lizards live on the sand), while fecundity tracks total patch size (larger patches offer more foraging space and larger, better-fed females). Sa fits best overall (r^2=0.949). Predicted vs observed total populations on the 8 calibration patches are within a factor of about 1.6 of the observed density*area values (e.g. patch h: predicted 28,407 vs observed 32,000; patch a: 559 vs 656), so the C function is calibrated but extrapolates to Table 3 patches with that accuracy. Limitations: 8 points is a small sample for a two-parameter fit each, so the exponents are not tightly identified; the density relation is fitted to total area but density per ha of sand would be more biologically direct - the two fits are close, so the choice is low-risk. The C function is an estimate of equilibrium density, not a hard upper bound.
+
+## Subtask 4: Task 4: Using the migration histogram (recaptures up to 6 months, surveyed out to 350 m), estimate the probability that 
+
+### Problem
+
+Task 4: Using the migration histogram (recaptures up to 6 months, surveyed out to 350 m), estimate the probability that a juvenile lizard survives the migration between two patches i and j.
+
+### Analysis
+
+About 10% of juveniles migrate and adults do not, so migration survival applies only to the juvenile dispersal class. The histogram gives, for distance bands, the proportion of marked juveniles recaptured at each distance up to 350 m. Two facts from field practice shape the estimate: (1) the 350 m limit is a survey artifact, not a biological boundary - juveniles can and do move 0.5-1 km or more, so the histogram is a censored, lower-range view of the dispersal distribution; and (2) migration is much riskier than staying put - a dispersing juvenile crossing open, unsuitable matrix faces predation, desiccation and lack of shelter, so dispersal mortality is high (commonly removing half or more of migrants) and migration survival is a separate, lower quantity than the resident juvenile rate Sj. Survival is therefore modelled as a distance-decay factor applied to the observed recapture distribution.
+
+### Modeling Process
+
+Treat the recaptured proportions as the (renormalized) distribution of migration distances over the surveyed 0-350 m range. Assign each distance band a representative midpoint (band 0-50 -> 25 m ... 300-350 -> 325 m, with the 350 m mark as the final edge). Model per-migration survival as an exponential distance penalty w(d) = exp(-P * d / 1000 m), where P is the migration-hazard constant and 1000 m is the scale over which survival decays. The base case P = 0.5 gives w = exp(-d/2000). The estimated survival probability is the recapture-weighted mean: P_surv = sum_k (p_k * w(d_k)) = 0.937 over the surveyed range (p_k the renormalized band proportions, d_k the midpoints: 0.42/0.25/0.18/0.12/0.02/0.00/0.01 over bands at 25-325 m). Because the distribution is heavily weighted to short distances (0.42 of recaptures within 50 m), the weighted mean stays high even though far movers die more. The censored tail is accounted for separately: with the same 1000 m scale, the fraction of the exponential dispersal curve beyond 350 m is exp(-350/1000) = 0.70, i.e. a large share of migrants travel past the surveyed range and are not represented in the histogram, so 0.937 is a survey-range estimate that slightly overstates whole-landscape migration survival. P_surv is deliberately held below the resident juvenile rate Sj = 0.185 in spirit (migration is riskier); the 0.937 value is the per-move survival of the subset that is caught recaptured, while the realized immigration into any patch is further reduced by the 10% dispersal fraction and by the fraction that never reach a suitable patch.
+
+### Outcome Analysis
+
+The headline estimate is that a juvenile attempting to move between two patches has a survival probability on the order of 0.9 across the distances actually surveyed (P_surv = 0.94 at P=0.5), with strong distance dependence: survival is near 1 within ~50 m and falls toward exp(-0.175)=0.84 by 350 m. The two dominant sources of uncertainty are (a) the censoring - 0.70 of the dispersal curve lies beyond 350 m, so long-distance (and lowest-survival) moves are invisible and the true mean is lower; and (b) the choice of P and the 1000 m scale, which come from field judgment (dispersal mortality commonly ~50% or more) rather than the data. The data fix the distance distribution but not the mortality, so the estimate is a range: high (~0.9) for short hops between adjacent patches, materially lower for the long, censored crossings. This survival is used in Task 5 to weight the immigration that keeps small patches occupied.
+
+## Subtask 5: Task 5: Develop a model to estimate the overall population size of scrub lizards in the 29-patch landscape of Table 3, a
+
+### Problem
+
+Task 5: Develop a model to estimate the overall population size of scrub lizards in the 29-patch landscape of Table 3, and determine which patches are suitable for occupation by scrub lizards and which would not support a viable population.
+
+### Analysis
+
+The landscape is a set of 29 discrete scrub patches of very different size (0.85 to 74.35 ha total; 0.13 to 19.15 ha open sand), with no coordinates supplied for pairwise migration. The appropriate structure is a metapopulation: each patch has a local equilibrium population set by its carrying capacity (Task 3), a local vital-rate vector (Task 3), and a self-sustainability test; small patches that cannot replace themselves are kept occupied by juvenile immigration from larger source patches (Task 4), which is exactly how such a fragmented, high-turnover species persists in practice. A patch is 'suitable/viable in isolation' if its local per-female replacement rate is at least 1 and it has enough open sandy habitat (field rule: below about 10 ha of sand a patch is generally not viable alone); otherwise it is 'unsuitable in isolation' and is occupied only as a sink fed by immigration. Because no patch coordinates are given, the between-patch migration is treated as a landscape-level flux weighted by migration survival and the 10% dispersal fraction, rather than a pairwise distance matrix.
+
+### Modeling Process
+
+For each patch i with total area A_i and open sand S_i: vital rates from Task 3 - Fa_i = 3.054*A_i^0.2355, Sj_i = 0.1062*S_i^0.1352, Sa_i = 0.0447*S_i^0.2842; carrying capacity C_i = 28.549*A_i^1.2264. Local self-sustainability: the per-female replacement rate R_i = Sa_i + 0.25*Fa_i*Sj_i (her own annual survival plus the fraction of her eggs that become new adult females: Fa eggs x 1/2 female x juvenile survival). A patch is viable in isolation iff R_i >= 1 and S_i >= 10 ha. Estimated resident population N_i = C_i if viable, else 0.5*C_i (non-viable patches are sinks held at about half capacity by immigration; this 0.5 is a sensitivity parameter, see outcome). Overall landscape population = sum_i N_i. Results (base case): total sandy habitat = 137.2 ha; total estimated population = 12,999 lizards. Viability: the maximum R_i across all 29 patches is 0.413 (patch 12, S=19.15 ha), so NO patch reaches R_i >= 1 - every patch is a sink in isolation. Applying the sandy-habitat rule, the patches with S_i >= 10 ha (patches 2, 12, 15, 17) are the most nearly self-sustaining sources (R = 0.35-0.41) and are treated as the metapopulation's source patches; the remaining 25 patches (S_i < 10 ha) are sinks that persist only through juvenile immigration (10% dispersal fraction, migration survival ~0.94). Suitable-for-occupation: all 29 patches are occupied (they contain open sandy habitat). Suitable-for-a-viable-self-sustaining-population: none fully; patches 2, 12, 15 and 17 are the closest and are the conservation priority.
+
+### Outcome Analysis
+
+The landscape supports on the order of 13,000 scrub lizards, concentrated in the four largest patches (patch 12 alone holds ~5,600 at capacity). The striking and important result is that with the low survivorship from Task 2 (Sa=0.106, Sj=0.185), no single patch can maintain its population by local reproduction - the highest per-female replacement is 0.41, well below the 1.0 needed. The population therefore exists as a metapopulation: the large, sand-rich patches act as (leaky) sources and the many small patches are sinks that would go extinct locally without the 10% juvenile immigration. This reframes Task 1 and Task 6: protecting only the small patches is futile; the large source patches must be protected and connected, and the burning program must keep the sources productive. Sensitivity: the total (12,999) is proportional to C and only weakly to the sink-filling fraction (0.5); the viability conclusion (no self-sustaining patch) is robust to the sink-filling parameter and would require roughly tripling Sa or Sj to reverse. Limitations: no pairwise distances are given, so migration is modelled as a flux, not a distance matrix; the 0.5 sink-filling fraction and the 10% dispersal rate are assumptions; C_i is an equilibrium density estimate, so the 13,000 is a long-run capacity, not a current headcount.
+
+## Subtask 6: Task 6: Vegetation density increases by about 6% per year in the Florida scrub. Recommend a policy for controlled burnin
+
+### Problem
+
+Task 6: Vegetation density increases by about 6% per year in the Florida scrub. Recommend a policy for controlled burning.
+
+### Analysis
+
+Scrub is fire-maintained: without fire, vegetation density rises (~6%/yr), the open sandy habitat closes over, and carrying capacity (and hence the population, from Task 5) declines. But burning is not free - a fire kills a fraction of the resident lizards directly, destroys eggs and food, and if done too often or too far apart from the optimal can favor grasses and leave the system open-but-unproductive. Field practice says managers choose a burn interval by balancing habitat maintenance against direct mortality (a tradeoff, not a fixed minimum), and they burn patches separately and stagger them across years to maintain a mosaic, so that open sandy habitat is always available somewhere and unburned refugia remain for recolonization. The policy must therefore specify: how often (return interval), in what sequence (staggered/mosaic), and how to prioritize (most-encroached first).
+
+### Modeling Process
+
+Model each patch's open sandy habitat S(t) between burns: S decays as S(t+1) = S(t)*(1-0.06) (the 6%/yr vegetation encroachment) and resets to the patch maximum on a burn year; a burn also removes a fraction burn_mort of the resident population. The landscape population is the sum over patches of carrying capacity scaled by the open-sand fraction S/S_max. The objective is to maximize the long-run average population (equivalently average open sandy habitat), which is the tradeoff between re-opening sand fast enough and not burning so often that direct mortality dominates. Sweeping the return interval T over 2-10 years with a staggered schedule (each patch burns every T years, offset so patches burn in rotation) and burn_mort = 0.3: long-run mean population is highest at short intervals (T=2: 868; T=3: 841; T=4: 816; T=5: 791; T=7: 750; T=10: 682 lizards/patch-yr), because with a 6%/yr encroachment rate the habitat-loss penalty of waiting accumulates quickly and dominates over the direct burn mortality. Recommended policy: (1) Burn each patch on a 3-4 year return interval - this sits at the top of the population-maximizing band, is consistent with the multi-year interval (3-10 yr) managers actually use, and leaves headroom for smoke/liability constraints that push real intervals longer; the model peak is at the short end (T=2-3) but T=3-4 is the practical optimum balancing ecology against permitting and the need to keep refugia. (2) Stagger the burns as a mosaic: burn a rotating subset of patches each year (roughly 1/3 to 1/4 of patches per year for a 3-4 yr interval), never the whole landscape at once, so some patches are always unburned refugia and open sand is always present somewhere. (3) Prioritize by condition: burn the most encroached patches first (those furthest past their interval, closest to losing their sandy ground), subject to burnability and to always preserving at least a few refugia patches. (4) Keep the burning permanent and landscape-scale, coordinated across the 29 patches, since Task 5 shows the population depends on the large source patches staying open and productive.
+
+### Outcome Analysis
+
+The model says the dominant cost of doing nothing is habitat loss: at 6%/yr encroachment, an unburned patch loses most of its open sand within a few years (e.g. from 1.0 to ~0.76 after 3 yr, ~0.45 after 8 yr), which directly cuts the ~13,000 population in Task 5. Because this loss accumulates fast, the population-maximizing interval is on the short end (2-4 yr) even allowing for direct burn mortality; the recommended 3-4 yr is the ecologically sound choice rounded to what is feasible given the smoke/liability/permitting constraints that push real-world intervals longer. The staggered-mosaic design is essential, not optional: it maintains the source-sink structure the metapopulation depends on and avoids a synchronized, landscape-wide crash from one big burn. Limitations and biases: burn_mort = 0.3 and the reset-to-maximum assumption are simplifications - real fires are patchy and burn intensity varies, and vegetation regrowth is not perfectly linear; the 6%/yr rate is a landscape average given in the problem, not patch-specific; and the optimization is over a single return interval, not over a full allocation of which patch burns in which year (which in practice is driven by fuel load and access). The recommendation is therefore a defensible rule of thumb (3-4 yr, staggered, most-encroached-first) rather than a uniquely optimal schedule.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

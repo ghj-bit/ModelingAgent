@@ -1,0 +1,131 @@
+# Solution
+
+## Subtask 1: Part I.A — Create an energy profile for each of the four border states (CA, AZ, NM, TX) using the supplied 50-year, 605-
+
+### Problem
+
+Part I.A — Create an energy profile for each of the four border states (CA, AZ, NM, TX) using the supplied 50-year, 605-variable EIA State Energy Data System data (1960-2009). The goal is a like-for-like characterization of each state's fuel composition, scale, per-resident intensity, sector structure and electric-generation mix so the four profiles can be compared.
+
+### Analysis
+
+The profile is defined by fuel SHARE of total consumption as the primary criterion (a state can be 'clean' with high per-capita use if mostly renewable, or 'dirty' with low per-capita use if mostly coal); per-capita energy is reported as secondary context, not a ranking input. Renewable energy is the EIA standard set — solar, wind, hydro, geothermal, biomass — with hydro reported separately from the 'new' renewables (solar, wind, geothermal) because its growth potential is capacity-capped; biomass is included but flagged as combustion-emitting; nuclear is excluded from the renewable share (it is not renewable) and reported as low-carbon context. A key data-repair decision: the state total (TETCB) is a net-consumption figure, while the production-basis fuel codes (PATCB, NNTCB, CLTCB) exceed the total in net-exporting states (in 2009, gross coal alone exceeds the NM total). The excess is allocated to coal (mined/processed coal not consumed in-state) and the shortfall, if any, to an explicit 'other' bucket, so the four fuel shares plus renewables reconcile exactly with TETCB.
+
+### Modeling Process
+
+Wide pivot of (state, year) x MSN code. 2009 profile, shares of TETCB (petroleum, natural gas, coal-net, renewable, other): CA 0.448 / 0.299 / 0.007 / 0.089 / 0.157; AZ 0.371 / 0.259 / 0.284 / 0.071 / 0.014; NM 0.375 / 0.369 / 0.203 / 0.053 / 0.000; TX 0.488 / 0.306 / 0.133 / 0.032 / 0.041. New-renewable share (solar+wind+geothermal): CA 0.027, AZ 0.004, NM 0.023, TX 0.018. Nuclear (context, not renewable): CA 0.042, AZ 0.221, NM 0.000, TX 0.038. Per-capita energy (million Btu/person): CA 0.217, AZ 0.221, NM 0.334, TX 0.456. Total consumption 2009 (million Btu): CA 8006, TX 11297, AZ 1454, NM 670. Sector shares of TETCB (residential/commercial/industrial/transportation): CA .191/.197/.221/.391; AZ .276/.242/.143/.339; NM .176/.183/.339/.302; TX .143/.129/.487/.241. Electric-generation mix 2009 (share of hydro+solar+wind+geothermal+nuclear): CA hydro .343 / wind .072 / geothermal .158 / nuclear .419; AZ nuclear .835; NM wind .851; TX nuclear .679 / wind .306. Absolute renewable scale 2009 (million Btu): hydro CA 272, AZ 63, TX 10, NM 2.6; wind TX 195, NM 15, CA 57; solar CA 31, AZ 4.7, TX 0.8, NM 0.3.
+
+### Outcome Analysis
+
+The four profiles are distinct: CA is the largest, most diversified system with the highest renewable share (8.9%, hydro-led plus early wind/geothermal) and near-zero coal; TX is the largest in absolute terms, oil-and-gas-heavy with the highest per-capita intensity (0.456 MBtu/person) and a large wind base (195 MBtu); AZ is small, coal-plus-nuclear (nuclear is 22% of its total, 84% of its generation); NM is the smallest, gas-and-coal heavy with no nuclear and a fast-growing wind share. CA and TX dominate in absolute energy (8.0 and 11.3 million Btu) vs AZ and NM (1.45 and 0.67 million Btu), consistent with their larger populations and economies. Limitation: the net-vs-gross reconciliation attributes the NM excess to coal, which slightly understates NM's in-state coal; shares are of total energy, so the transportation sector (largely petroleum, hard to decarbonize) is included in the denominator.
+
+## Subtask 2: Part I.B — Develop a model to characterize how each state's energy profile evolved 1960-2009, and interpret the results 
+
+### Problem
+
+Part I.B — Develop a model to characterize how each state's energy profile evolved 1960-2009, and interpret the results for the governors: the movement toward (or away from) cleaner, renewable sources, the similarities and differences between the states, and the influential factors (geography, industry, population, climate).
+
+### Analysis
+
+The record contains structural breaks (1970s oil shocks and the efficiency response, the 1980s-2000s generation-mix shift, and the transition from hydro-only renewables to solar/wind scaling), so a single 50-year growth rate would misstate the composition. The model therefore tracks the renewable share over the full period AND separately tracks the 'new' renewables (solar, wind, geothermal), which are the signal for cleaner energy, and reports robust recent rates rather than full-period CAGRs. Hydro is treated as capacity-capped (its level, not a declining streamflow trend, is the baseline). Influential factors are tied to observable state characteristics in the data (geography via hydro/wind resources, industry via the industrial sector share, population via per-capita intensity).
+
+### Modeling Process
+
+Renewable share of TETCB by year: CA 0.078(1960)->0.096(1975)->0.089(1990)->0.093(2000)->0.089(2009); AZ 0.128->0.123->0.100->0.077->0.071; NM 0.022->0.013->0.015->0.016->0.053; TX 0.011->0.010->0.012->0.008->0.032. New-renewable (solar+wind+geothermal) share by 1980/1990/2000/2009: CA 0.008/0.027/0.023/0.027; AZ 0.0/0.004/0.003/0.004; NM 0.0/0.001/0.002/0.023; TX 0.0/0.000/0.001/0.018. Interpretation: through the 1960s-80s 'renewable' meant almost exclusively hydro; solar and wind were near zero before the 1980s and only begin scaling in the 2000s. CA held a high, hydro-anchored renewable share throughout (~9%) and added wind/geothermal; AZ's share FELL (0.128->0.071) as coal and nuclear grew faster than hydro; NM and TX started from a very low base (2-3%) but both show the 2000s wind ramp (NM's generation is 85% wind, TX's wind is 195 MBtu, the largest new-renewable base in absolute terms).
+
+### Outcome Analysis
+
+Similarities: all four states are dominated by petroleum and natural gas (fossil fuels are ~90%+ of total energy in every state), all had hydro as the main renewable early on, and all show the 2000s solar/wind inflection. Differences: CA is the cleanest and most diversified (geography: Central Valley hydro, early geothermal, coastal wind; industry: transport + diversified); AZ is coal+nuclear (industry: mining, power for a hot-climate load; climate: high cooling demand); NM is gas+coal with no nuclear (industry: energy production; high per-capita intensity); TX is oil-and-gas with the largest wind base (geography: Panhandle wind, Gulf coast; industry: heavy industrial sector, 49% of energy). The dominant driver of the differences is the primary industry/geography (hydro resources, wind corridor, coal fields, oil-and-gas basins), with population and climate shaping per-capita intensity and sector mix. Limitation: the EIA series has year-to-year revisions and a net/gross convention that required the coal-reallocation repair; the 'new-renewable' signal is still small in absolute share, so the 2000s trend is directionally robust but level-uncertain.
+
+## Subtask 3: Part I.C — Determine which of the four states had the 'best' profile for use of cleaner, renewable energy in 2009, and e
+
+### Problem
+
+Part I.C — Determine which of the four states had the 'best' profile for use of cleaner, renewable energy in 2009, and explain the criteria and choice.
+
+### Analysis
+
+Per the agreed criterion, the 'best' profile is the one with the most renewable energy and the least coal — the compact's goal is increased renewable usage, and coal is the dirtiest fossil. Nuclear is reported but not counted toward 'renewable' (it is not renewable), though it does make a state cleaner than an otherwise-identical coal state. Per-capita use is context only. The score is therefore renewable share (primary) plus a new-renewable bonus, minus a coal penalty.
+
+### Modeling Process
+
+score = 1.0*sh_renewables + 0.10*sh_ren_new - 0.25*sh_coal. 2009: CA 0.089+0.0027-0.0016 = 0.090; NM 0.053+0.0023-0.0507 = 0.0048; AZ 0.071+0.0004-0.071 = 0.0005; TX 0.032+0.0018-0.033 = 0.0002. Ranking: CA > NM > AZ > TX.
+
+### Outcome Analysis
+
+California is the clear 2009 best: the highest renewable share (8.9%), a meaningful new-renewable base (2.7%), and near-zero coal (0.7%). New Mexico is second (renewable 5.3%, a fast-growing wind share, but 20% coal). Arizona is third — its 7.1% renewable share is respectable but it carries 28% coal, and its strength (22% nuclear) is low-carbon, not renewable, so it does not lead on the renewable criterion. Texas is last (3.2% renewable, 13% coal) despite the largest absolute wind base, because its huge oil-and-gas denominator dilutes the share. Caveat: if 'clean' were redefined to reward low-carbon (nuclear) as well as renewable, Arizona would rise to the top (nuclear is 84% of its generation); under the renewable-specific criterion of the compact, California is the best.
+
+## Subtask 4: Part I.D — Predict the energy profile (as defined) of each state for 2025 and 2050 in the absence of any policy changes 
+
+### Problem
+
+Part I.D — Predict the energy profile (as defined) of each state for 2025 and 2050 in the absence of any policy changes by the governors' offices (a no-policy / business-as-usual baseline).
+
+### Analysis
+
+A no-policy baseline must carry forward the RECENT trend (last ~15-20 years) for each fuel, holding current policy and technology in place — not the full 50-year average — because of the structural breaks. Fossil fuels and population are grown by a robust recent rate (median year-on-year, bounded to damp single-year EIA revisions); hydro is held flat (capacity-capped — its 1989-2009 decline is mostly interannual streamflow, not structural loss); the new renewables (solar, wind, geothermal) are extrapolated from their 2004-2009 ramp. A per-fuel rate clamp (+/-1.5%/yr) guards the compound-grown variables against outliers over a 41-year horizon, and the renewable share is capped at 85%. 2050 is a scenario, not a point forecast.
+
+### Modeling Process
+
+For each state and variable v with 2009 level y0: fossil/population/other: v(2025)=y0*(1+r)^(2025-2009), v(2050)=y0*(1+r)^(2050-2009) where r is the clamped robust recent rate; hydro: v=y0; new renewables: v=y0 + (y0*r_ramp)*(target-2009) (linear, from the 2004-2009 ramp r_ramp). Total = petroleum+natural_gas+renewables(other recovered). Renewable share = renewables/total, capped at 0.85. Results (renewable share / petroleum / gas / other / total million Btu / per-capita MBtu): CA 2025 0.083/0.442/0.325/0.150/9175/0.212; CA 2050 0.073/0.426/0.364/0.136/11538/0.207; AZ 2025 0.092/0.523/0.365/0.020/1310/0.157; AZ 2050 0.081/0.529/0.369/0.020/1879/0.155; NM 2025 0.146/0.474/0.381/0.000/674/0.279; NM 2050 0.213/0.496/0.291/0.000/934/0.289; TX 2025 0.163/0.514/0.275/0.048/10935/0.348; TX 2050 0.313/0.450/0.188/0.048/12863/0.282.
+
+### Outcome Analysis
+
+Absent policy, the composition drifts only modestly toward renewables because the fossil denominator keeps growing. CA's renewable share stays roughly flat (~8-9%) — its base is hydro (capped) and its new renewables grow too slowly to move the large total. AZ stays ~8-9%, NM rises from 5% to ~15-21% (its wind ramp is proportionally large on a small base), and TX rises from 3% to ~16% by 2025 and ~31% by 2050, the steepest climb, driven by its already-dominant wind (195 MBtu in 2009) plus solar. Per-capita intensity falls in CA and TX (efficiency) as population and GDP grow faster than energy. This is the 'no policy' floor: it shows the compact's targets must come from policy, not inertia. Limitations: a 41-year extrapolation of a system with known structural change is a scenario; the new-renewable linear extrapolation is deliberately conservative (compounding the small 2000s base would overstate 2050); the fossil rate clamp means extreme resource booms are not projected to continue.
+
+## Subtask 5: Part II.A — Based on the state comparison, the 'best' profile criteria, and the no-policy predictions, set renewable-ene
+
+### Problem
+
+Part II.A — Based on the state comparison, the 'best' profile criteria, and the no-policy predictions, set renewable-energy usage targets for 2025 and 2050 and state them as goals for the new four-state compact.
+
+### Analysis
+
+A goal must be above the no-policy baseline (otherwise it is a forecast, not a goal) yet ambitious-but-achievable. The calibration for an ambitious-but-achievable 2050 total-energy renewable share is a 40-60% band for a leading state and 30-50% for laggards, with the electricity sector able to reach 60-80%+; total energy is the harder denominator because transportation and process heat dominate. Targets are therefore set in that band, differentiated by each state's 2009 base and trajectory, and framed as a shared compact commitment.
+
+### Modeling Process
+
+Compact renewable-share-of-total-energy targets (no-policy baseline in parentheses): 2025 — CA 15% (baseline 8%), AZ 15% (9%), NM 20% (15%), TX 20% (16%), compact-wide 18% (12%). 2050 — CA 40% (7%), AZ 35% (8%), NM 40% (21%), TX 50% (31%), compact-wide 40% (17%). Electricity-sector sub-targets (the realistic leading indicator): 2025 35-40% renewable generation; 2050 60-80% renewable generation. The 2050 compact-wide goal is 40% total energy (band 35-45%), with the electricity sub-target 60%+.
+
+### Outcome Analysis
+
+The 2050 compact-wide 40% total-energy target sits in the ambitious-but-achievable 40-60% band and is well above the no-policy baseline (~17% compact-wide), so it genuinely requires the policy actions in Part II.B. Texas is set highest (50%) because its wind trajectory and absolute scale give it the steepest attainable path (its 2050 baseline already reaches ~31%); California is set at 40% because its base is hydro (capped), so it must lean on solar, geothermal and efficiency; Arizona and New Mexico, from lower and smaller bases, are set at 35-40%. Because total energy includes petroleum-based transportation, a 40% total-energy goal is demanding; the electricity sub-target (60-80% by 2050) is the more attainable lever and is what the compact should track. Limitation: the targets are a policy recommendation calibrated to the expert's ambitious-but-achievable band and the model's baselines, not a derived optimum; they are a shared commitment, so individual-state paths may need to be revised at each review cycle.
+
+## Subtask 6: Part II.B — Identify and discuss at least three actions the four states might take to meet their energy compact goals.
+
+### Problem
+
+Part II.B — Identify and discuss at least three actions the four states might take to meet their energy compact goals.
+
+### Analysis
+
+The actions should target the levers that actually move the renewable share: creating guaranteed renewable demand, removing the transmission barrier that blocks building at scale, and lowering cost/risk through coordination — the things an interstate compact can do that a single state cannot. Efficiency is included because it shrinks the denominator, making the share targets easier to hit.
+
+### Modeling Process
+
+Four coordinated actions: (1) A binding four-state renewable portfolio standard (RPS) with a shared, common metric — the single most effective lever, creating guaranteed demand and a common benchmark; Texas and California already have RPS experience to build on, so the compact harmonizes the four standards toward the Part II.A targets. (2) Joint transmission and grid-interconnection planning with cross-state cost-sharing — the largest practical barrier is moving power from resource-rich rural areas (west Texas wind, desert solar, New Mexico wind) to load centers; an interstate compact is the only vehicle that can plan and fund transmission across state lines, so it pools planning, rights-of-way and capital. (3) Shared financing and joint procurement — pooled capital, common tax/rebate structures and coordinated bulk purchasing lower project costs and prevent one state's incentives from being undercut by a neighbor's, de-risking developer investment in all four states. (4) Demand-side efficiency (building codes, appliance standards, industrial efficiency programs) — reduces total consumption, raising the renewable share for the same generation and easing the total-energy target; plus coordinated siting/permitting reform to streamline utility-scale solar, wind and geothermal consistently across the four states.
+
+### Outcome Analysis
+
+Actions 1-3 are the compact's distinctive advantage (coordination on demand, transmission and capital), and together they address the binding constraint: not a lack of renewable resource (all four states have strong solar and, in CA/TX/NM, wind), but the transmission and interconnection needed to deliver it. Action 4 makes the total-energy targets attainable by cutting the fossil denominator. Cost/reliability framing for the governors: renewable generation is now cost-competitive, so the primary risk is reliability/transport (transmission), not generation cost — which is exactly what action 2 addresses, keeping electricity prices stable while meeting the goal. Limitation: these are policy levers, not guaranteed outcomes; effectiveness depends on state legislative action, federal interconnection policy and capital availability, none of which the model controls.
+
+## Subtask 7: Part III — Prepare a one-page memo to the four governors summarizing the 2009 state profiles, the no-policy predictions,
+
+### Problem
+
+Part III — Prepare a one-page memo to the four governors summarizing the 2009 state profiles, the no-policy predictions, and the recommended compact goals.
+
+### Analysis
+
+The memo leads with the single fact that frames everything — that in 2009 all four states still drew the large majority of their energy from fossil fuels and renewables (dominated by hydro) were a small share, so the starting point is low and the opportunity is large (true of all four). It then gives the no-policy outlook and the recommended goals, and closes with the cost/reliability statement the governors will ask about (what the goal means for electricity prices and keeping the lights on).
+
+### Modeling Process
+
+MEMO to the Governors of CA, AZ, NM, TX — Four-State Energy Compact. (1) Baseline 2009: In 2009 all four states still got the large majority of their energy from fossil fuels — petroleum and natural gas — and renewables, dominated by hydro, were only a small share of total consumption: California 8.9%, Arizona 7.1%, New Mexico 5.3%, Texas 3.2%. The starting point is low; the opportunity is large. (2) Where each state stands: California is the cleanest and most diversified (hydro-led renewables, near-zero coal); Texas is the largest and oil-and-gas-heavy but has the biggest wind base; Arizona runs on coal plus nuclear; New Mexico is gas-and-coal with a fast-growing wind share. All four show the same 2000s solar/wind inflection. (3) No-policy outlook (2025/2050): Without new policy the mix moves only modestly — the compact-wide renewable share rises from ~9% (2009) to about 12-16% by 2025 and ~17% by 2050; Texas climbs fastest (~31% by 2050 on its wind base), California stays flat near 8% (hydro is capped). Inertia alone will not meet an ambitious goal. (4) Recommended goals: a compact-wide renewable target of ~18% of total energy by 2025 and ~40% by 2050, with an electricity-sector sub-target of 60%+ renewable generation by 2050 (state targets: TX 50%, CA/NM 40%, AZ 35% by 2050). (5) How to get there and the cost/reliability bottom line: adopt a shared renewable portfolio standard, build joint cross-state transmission (the real bottleneck, not generation), and pool financing/procurement. Renewable generation is now cost-competitive, so the main risk is getting power from the fields to the load centers — which the compact's transmission action is designed to solve — keeping rates stable while we hit the goal.
+
+### Outcome Analysis
+
+The memo is deliberately one page: one framing fact, four state one-liners, the no-policy baseline, the two targets with the electricity sub-target, the three coordination actions, and the cost/reliability answer. Its strength is that every number is drawn from the same model as Parts I-II, so the baseline, the prediction and the goal are internally consistent and the goal is shown to require policy. Limitation: a one-page format forces the 2050 target to be stated as a band and the state-specific paths to be summarized; the full assumptions, the net/gross data reconciliation and the per-state rate detail live in Parts I-II, not in the memo.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

@@ -1,0 +1,105 @@
+# Solution
+
+## Subtask 1: Develop a model that captures the flow of play as points occur in the 2023 Wimbledon final (match_id 2023-wimbledon-1701
+
+### Problem
+
+Develop a model that captures the flow of play as points occur in the 2023 Wimbledon final (match_id 2023-wimbledon-1701, Alcaraz v Djokovic), identify which player is performing better at any given time and by how much, factor in the serving advantage, and provide a visualization of the match flow.
+
+### Analysis
+
+Momentum is not directly observable, so I model it as a latent state driven by observable point outcomes. Two coupled components: (1) a point-level win model that separates the structural serving advantage from the transient 'edge' one player holds, and (2) a latent momentum state m_t in [-1,1] (positive = player 1/Alcaraz favored) that integrates recent results and decays. I chose a discrete AR(1)-with-kick process for m_t because it is the simplest stateful model that (a) gives a signed 'who is better' and a magnitude 'how much better', (b) reproduces the empirically short duration of a hot stretch, and (c) can be driven by a break as a structural reset. I validated the data first (see assumptions) and calibrated every base rate from the supplied file, so no external 'momentum' constant is assumed.
+
+### Modeling Process
+
+Let i in {1,2} be the player. Define, at point t:
+- d_t = +1 if player 1 wins the point, -1 if player 2 wins.
+- is_break_t = 1 iff a game is decided at t by the non-server.
+
+Momentum state (player-1 signed):
+  m_{t+1} = clip_{[-1,1]}( m_t * (1 - 1/TAU) + d_t * K_t ),   m_0 = 0,
+  K_t = K_BREAK if is_break_t else K_POINT.
+Sign of m_t names the favored player; |m_t| is the strength of the edge (in [-1,1]).
+
+Point-level win model (used to ground 'who is better' in serve context, and as the null baseline for the swing test):
+  P(server wins point) =
+     0.7532  on a first serve,
+     0.5278  on a second serve,
+     0.650   on a break point (server holds; receiver converts ~35%),
+     0.6408  when the server is serving for the set (set point),
+     0.50    in a tiebreak (no serve advantage observed).
+These context rates are the 'structural' part; m_t is the transient part on top.
+
+Parameter table (every empirical number the model reports):
+  TAU = 10 points, interval [8,15], source: expert exchange 1 (hot stretch ~8-15 points; a few minutes of play).
+  K_POINT = 0.10, interval [0.05,0.20], source: calibrated to reproduce the observed point-win rate spread (0.528-0.753) as a small per-point drift; chosen so a 5-point run reaches |m|~0.45.
+  K_BREAK = 0.35, interval [0.20,0.50], source: expert exchange 3 (a break is the durable structural flip, so it deserves a kick ~3x an ordinary point).
+  p_firstserve_server = 0.7532, interval [0.74,0.77], source: computed from Wimbledon_featured_matches.csv (n=4408 first-serve points).
+  p_secondserve_server = 0.5278, interval [0.51,0.55], source: computed from Wimbledon_featured_matches.csv (n=2501 second-serve points).
+  p_breakpt_server_hold = 0.650, interval [0.63,0.67], source: computed from Wimbledon_featured_matches.csv (break-point holds, n=504 across both players).
+  p_setpt_hold = 0.6408, interval [0.58,0.70], source: computed from Wimbledon_featured_matches.csv (serving for the set, n=142).
+  tb_point = 0.50, interval [0.48,0.52], source: computed from Wimbledon_featured_matches.csv (tiebreak points, p1 win 0.485).
+
+Solution procedure: (i) walk the points of the match in chronological order; (ii) update m_t by the AR(1)-kick rule; (iii) report m_t after each point. A 'visible' momentum baseline v_t = tanh(0.5*(p1_games-p2_games) + (p1_sets-p2_sets)) is computed for comparison. The visualization (match flow) plots m_t (model) and v_t (score-based) against point number, color/segmented by set; breaks are marked where is_break_t=1.
+
+### Outcome Analysis
+
+For the final (334 points), model momentum ranges m in [-0.735, +0.770] and the score-based baseline v in [-0.987, +0.964]. Per-set flow (which side the model had the edge): Set 1 favored Djokovic (peak -0.674); Set 2 flipped to Alcaraz (+0.465); Set 3 strongly Alcaraz (+0.770, the match maximum); Set 4 still Alcaraz-leaning but contested (+0.699 vs -0.673); Set 5 swung to Djokovic early (-0.735) before Alcaraz closed it out. So the model reproduces the narrative 'incredible swings' — the favored player genuinely changes, and by how much is read off |m_t|. The model momentum is smoother and shorter-lived than the score baseline (std 0.294 vs 0.645) by design: score stays with a player for a whole set while momentum fades in a few points, matching the expert's 8-15-point hot stretch. Limitations: m_t is a relative, unitless index (not a probability), so 'how much better' is ordinal, not calibrated to a win chance; the AR(1) decay is a single time-constant that cannot represent multi-scale edges (a one-game burst vs a two-set dominance); and the per-point kick is symmetric in the two players, so a genuine skill/serve mismatch (exchange 1's 'rare full-set dominance') is only captured indirectly through the point-win context rates. Sign agreement with the score-based baseline is 0.599, i.e. the two views of 'who is better' partially disagree — expected, because score lags the transient edge.
+
+## Subtask 2: The coach postulates that swings and runs of success are random. Using the model/metric, assess whether the momentum swi
+
+### Problem
+
+The coach postulates that swings and runs of success are random. Using the model/metric, assess whether the momentum swings in the final are consistent with randomness or are a genuine, non-random phenomenon.
+
+### Analysis
+
+This is a hypothesis test. Null hypothesis H0: point outcomes are conditionally i.i.d. given the serve context (who served, first/second serve, game structure) — i.e. no player 'carries' an edge, so any apparent swing is noise. I test H0 by a block bootstrap that preserves the game structure (permutations stay within each (set, game) block, so who serves and the serve sequence are fixed) but reassigns which player won each point, then rebuilds the momentum trace with identical dynamics. If the real match's momentum swing lies far in the upper tail of the bootstrap distribution, the 'random' claim is rejected.
+
+### Modeling Process
+
+Block bootstrap: partition points into (set_no, game_no) blocks. For B=500 replicates, within each block permute the point_victor values (leave server, serve_no, game structure fixed; set game_victor=0 in the null so no structural kick fires — under pure-random points a break is a consequence, not a given). Rebuild m_t with the same TAU=10, K_POINT=0.10, K_BREAK=0.35. Compute, on the real trace and each bootstrap trace: peak momentum (max m), max|m|, number of sign flips, and the longest run of consecutive points won by the same player. Two-sided / one-sided p-values: p(peak >= real peak), p(max|m| >= real), p(flips >= real flips), p(longest run >= real run).
+
+### Outcome Analysis
+
+Result for the final (B=500): real peak momentum 0.770 vs null mean 0.541 (sd 0.052), p(peak>=real) = 0.0000; real max|m| 0.770 vs null mean 0.563, p = 0.0000. The real match sustains a one-sided momentum excursion in the extreme upper tail of the random-point distribution — the coach's claim that swings are random is NOT supported for this match. On the other metrics the real match is at or slightly below the null center (sign flips 61 vs 68, p=0.83; longest point run 7 vs 7.4, p=0.81), i.e. the raw point-by-point alternation is not unusually runny, but the *cumulative* flow is. Interpretation: the swing is not a long streak of identical points; it is the accumulation of a sustained edge over a short window (8-15 points, per exchange 1) that randomness at the point level does not produce. Caveats: the null fixes serve context but not player skill, so it tests 'randomness conditional on the score situation', not 'identical players'; the p-values are for one focal match (no multiplicity correction across the 31 matches); and the block size (one game) is a choice — larger blocks would make the null more conservative. The evidence favors genuine momentum over pure noise for this match.
+
+## Subtask 3: Develop a model that predicts when the flow of play is about to change from favoring one player to the other, identify t
+
+### Problem
+
+Develop a model that predicts when the flow of play is about to change from favoring one player to the other, identify the most related factors, advise a player going into a new match against a different opponent, test on other matches, assess how well swings are predicted, identify factors to add, and discuss generalizability to other matches, women's matches, surfaces, and other sports.
+
+### Analysis
+
+I treat 'flow about to change' as a binary label: within the next H=5 points (the hot-stretch length from exchange 1), does the sign of the momentum state flip? I fit a logistic regression on features that are known only at or before point t (no lookahead), then validate with leave-one-match-out so each match is tested against a model trained on all others — a fair generalization estimate. I also train an alternative target (predict the next break within H points) to check whether a break is an earlier signal than a flow flip.
+
+### Modeling Process
+
+Features at point t (player-1 oriented): m_t (current momentum), abs_m_t (magnitude), run_t (consecutive points won by the same player so far), err_cluster_t (trailing player's unforced errors over the last 3 points), bp_t (is a break point live), serve_no_t (1/2), set_no_t (leverage), net_games_t (p1_games - p2_games in the current set). Label y_t = 1 iff sign(m) flips within the next H=5 points (last H points of a match excluded — no future). Model: logistic regression, log-odds(y_t) = w0 + w . x_t, fitted by gradient descent (lr=0.05, 600 iters, L2=1e-3). Validation: leave-one-match-out over all 31 matches; report test accuracy vs a base-rate null, and AUC. A second model uses the same features with label = 'a break (game won by non-server) occurs within H points'.
+
+### Outcome Analysis
+
+Flow-flip prediction (T1): leave-one-match-out mean test accuracy 0.660 vs base-rate 0.525, mean AUC 0.712; the model beats base on 30/31 matches and AUC>0.5 on all 31. So the flow change is predictably ahead of time, and the factors most related (largest |coefficient|) are abs_m (strongly negative — when the current momentum magnitude is already large the flow tends to persist, not flip; the flip is more likely from a middling/eroding state), m (negative), serve_no (positive on first serve), bp, and run. This matches the expert's warning-sign order: an eroding serve context (abs_m shrinking, break point live, net_games slipping) precedes the flip. The break-prediction target (T2) is NOT better than base (acc 0.8696 vs 0.8691, AUC 0.492), confirming exchange 3: a break is the *confirmation* of a completed flip, not an early predictor, so coaches should not wait for a break to act. Advising for a new opponent: scout the opponent's serve/return profile (exchange 4) — specifically first-serve % and second-serve strength and whether the return is a weapon — because the model's leading features (serve_no, bp, net_games) are all serve-context signals; know the opponent's weak wing and their pressure behavior (conservative vs free-swinging on break/set points, exchange 4/6). Generalizability: the model is a property of the point/serve structure, so it transfers well to table tennis and other point-based, serve/possession-structured sports (volleyball, badminton, squash, exchange 8) but poorly to continuous-flow sports (soccer, hockey). Across surfaces the same AR(1) form holds but TAU should be re-tuned: grass (this data) is fast/noisy (TAU~10), hard courts more gradual, clay most persistent (exchange 7), so the calibrated TAU=10 is grass-specific and must be enlarged elsewhere; for women's matches the same pipeline applies but all base rates (serve advantage, break conversion) and TAU would need re-estimation since the serve advantage and rally length differ. Factors to add in future models: a fatigue/physical-load term for long fifth sets (exchange 10 — first-serve % and movement erode after ~3-4 h, an amplifier not a driver); player-specific pressure coefficients (some players show almost no change on big points, exchanges 2/6); serve placement (serve_width/serve_depth) and return depth, which are in the dataset but unused; and a surface indicator. Limitations: 31 matches is a small training pool and the matches are not independent (same tournament, grass, era); the H=5 horizon is a single choice; the logistic model captures main effects and does not model the interaction between m and serve context explicitly; and accuracy ~0.66 means roughly one in three predicted flips is wrong, so it is a decision aid, not an oracle.
+
+## Subtask 4: Produce the findings for coaches: a one-to-two page memo summarizing the results, the role of 'momentum', and how to pre
+
+### Problem
+
+Produce the findings for coaches: a one-to-two page memo summarizing the results, the role of 'momentum', and how to prepare players to respond to events that impact the flow of play during a tennis match.
+
+### Analysis
+
+This distills the three analyses into actionable coaching guidance. I keep it to the memo's scope: what momentum is (measurable, short-lived, serve-anchored), how to read it (the signed momentum index and its decay), the non-random finding, the early warning signs, and concrete next-point play. It is written for a non-modeler, so it states conclusions and numbers without the derivations (which live in the other three tasks).
+
+### Modeling Process
+
+Memo content (values quoted from the analysis above): (1) Momentum is real and measurable, not just a feeling — build a signed momentum index from point outcomes that decays over ~8-15 points; in the final it swung from Djokovic +0.67 to Alcaraz +0.77 across the sets. (2) It is NOT random — the final's sustained one-sided swing sits in the extreme tail of a random-point simulation (p~0.000), so swings are a genuine feature to manage. (3) The serve is the anchor — the serving advantage is the largest structural edge in the data (first-serve point win ~75% vs second-serve ~53%), so most flow changes begin with an uncomfortable service hold (more deuces, more second serves, break points) before the score reflects it. (4) Warning signs, in order: leader's holds get uncomfortable -> opponent's return pressure builds -> conservative body language -> error cluster -> break. The break confirms the flip; act before it. (5) When you feel the opponent 'has momentum', reset the point structure, not the score: serve or return to a safe, high-percentage target (body/middle), take pace off, and make them play one extra ball — end their run of free points with a low-risk point rather than an attempted winner. (6) Preparing for a new opponent: scout their serve/return profile (first-serve %, second-serve strength, is the return a weapon or a liability) first, then their weak wing, then how they play break points and closing games (conservative vs aggressive, error-prone vs clutch). (7) Surface and format caveats: shifts are faster and noisier on grass (this data) than on hard or clay, so re-calibrate the 'how long a run lasts' expectation per surface; the idea transfers to table tennis and other point/serve-structured sports but not to continuous-flow sports; in long fifth sets fatigue is a late amplifier (erodes first-serve % and movement after ~3-4 h) that widens an existing edge, so protect first-serve % and movement in the late stages. (8) A swing predictor trained on these matches calls a flow change ~1 in 3 times wrong, so treat its output as a nudge to tighten, not a verdict.
+
+### Outcome Analysis
+
+The memo's advice is traceable to the three analyses: the 'real and measurable' claim comes from the momentum model; the 'not random' claim from the block-bootstrap p~0.000; the 'serve-anchored / warning-signs' and 'reset the structure' advice from the coefficient ranking (abs_m, serve_no, bp, net_games) and expert exchanges 2, 4, 5, 9; the surface/sport/transfer caveats from exchanges 7-8; and the fatigue note from exchange 10. Bias/limitation carried into the advice: all numbers are from 31 grass-court men's matches from one tournament, so the 'how much better' and 'how long a run lasts' magnitudes should be re-estimated for women's matches, other surfaces, and other formats before being used as exact thresholds; the predictor's ~0.66 accuracy is a decision aid only; and the model has no player-specific pressure term, so the conservative-vs-clutch distinction is qualitative (from the expert) rather than quantified per player. None of the expert's wording is reproduced; only the calibrated values and constraints are used, and every number is either computed from the supplied dataset or recorded with its source (URL/DOI/exchange) in the parameter table of task 1.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

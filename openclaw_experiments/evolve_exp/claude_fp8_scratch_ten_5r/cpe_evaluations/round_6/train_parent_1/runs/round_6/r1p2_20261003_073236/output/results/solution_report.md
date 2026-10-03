@@ -1,0 +1,65 @@
+# Solution
+
+## Subtask 1: Build a model of how the share of cooperating self-driving (AV) vehicles (10%, 50%, 90%) affects traffic flow on the Was
+
+### Problem
+
+Build a model of how the share of cooperating self-driving (AV) vehicles (10%, 50%, 90%) affects traffic flow on the Washington State freeways of interest (I-5, I-90, I-405, SR-520 through Thurston, Pierce, King and Snohomish counties), given lane counts and 2015 average daily traffic (AADT) per road segment. The model must cover the number of lanes, peak traffic volume, and AV percentage, and must represent cooperation between AVs and interaction between AV and human-driven vehicles. Apply it to the supplied data and answer: how do effects change across 10/50/90%? Do equilibria exist? Is there a tipping point where performance changes markedly? When should lanes be dedicated to AVs? What other policy changes follow?
+
+### Analysis
+
+Assumptions: (1) At peak, all lanes of a segment are used roughly uniformly, so congestion is characterized by an aggregate volume-to-capacity ratio rather than a single bottleneck lane (expert exchange 1). (2) Peak-hour demand is a fixed fraction of daily volume; the 2015 AADT is treated as representative of the peak period studied. (3) A freeway lane's free-flow capacity is a per-lane rate independent of segment length; the dataset's daily counts are converted to peak-hour demand by the peak fraction. (4) The AV benefit is a headway (gap) reduction, not a speed increase: an AV's shorter reaction time lets it follow closer and damp stop-and-go waves, but it cannot drive faster than the flow when the lane is full (expert exchanges 4, 5, 7). (5) The mix of followers in a lane follows a uniform random assignment, so the probability a gap is AV-following-AV is p^2, AV-following-human p(1-p), human-following-human (1-p) (expert exchange 8: platooning requires consecutive AVs and is rare at low penetration). (6) Traffic at capacity does not settle into a steady slow state but oscillates (stop-and-go waves); above capacity it is unstable and queues grow (expert exchange 9). (7) A lane reserved for AVs is not perfectly exclusive: a fraction of human demand encroaches on it (expert exchange 6). Method: a per-lane fundamental-diagram capacity model. It is appropriate because the question is about capacity headroom and regime change (free flow vs oscillation vs breakdown) as AV penetration varies, not about microscopic vehicle trajectories. Soundness: each structural rule is grounded in a domain-expert exchange; each numeric parameter has a stated interval and source; results are swept over the parameter intervals, so conclusions are read from the robust parts only.
+
+### Modeling Process
+
+Variables: p = AV penetration (0-1); L = total lanes of a segment (sum of both directions); AADT = daily volume; V_p = f_peak * AADT = peak-hour demand; c = baseline per-lane capacity (veh/h/lane); c_bd = breakdown-onset per-lane volume; rho = V_p / C_eff = volume-to-capacity ratio; C_eff = effective capacity of the segment.
+
+Effective per-lane capacity under AV penetration. A follower that keeps a gap k times the human gap admits throughput c/k. With AV-AV gap multiplier k_avav and AV-human multiplier k_avhu, and pair fractions p^2, p(1-p), (1-p) in a uniform mix:
+  ceff(p) = c * [ p^2/k_avav + p(1-p)/k_avhu + (1-p) ]
+  C_eff(p) = L * ceff(p)   (mixed traffic, no dedicated lanes)
+At p=0, ceff = c; at p=1, ceff = c/k_avav = 2c (platooned flow doubles the lane capacity).
+
+Damping of stop-and-go oscillation. The oscillation-onset threshold in rho is raised by the platoon share: rho_bd_eff(p) = (c_bd/c) * (1 + D p^2), with D chosen so that a segment at baseline rho0 = 1.15 exits oscillation at p = 0.40 (expert exchange 10): D = (1.15/(c_bd/c) - 1)/0.40^2 = 2.03.
+
+Regime classification (per segment):
+  rho <= rho_bd_eff  : free-flow equilibrium (stable, T/T_free = 1)
+  rho_bd_eff < rho <= 1 : congested equilibrium with stop-and-go oscillation; delay index T/T_free = 1 + a(rho - rho_bd_eff), a = 1.5
+  rho > 1 : breakdown, no stable equilibrium; queues grow, T/T_free = 1 + a(rho - rho_bd_eff) + b(rho - 1), b = 4.0
+
+Dedicated-lane policy. Reserve one lane of a segment for AVs. AV lane runs fully platooned at c/k_avav. Humans lose that lane except the encroached part, which runs mixed at c/k_avhu. Total capacity:
+  C_ded = c/k_avav + (L - 1) c + eps * c/k_avhu,
+with eps = human encroachment share. The policy is compared at the same p against the mixed-traffic C_eff(p); it is worthwhile when C_ded > C_eff(p) and when it moves more segments back into free flow.
+
+Calibrated parameters (all empirical, expert-sourced; interval; source = interaction exchange N):
+  f_peak = 0.09, interval [0.08, 0.10], source: exchange N=2 (peak hour is 8-10% of daily volume on these corridors)
+  c = 1900 veh/h/lane, interval [1800, 2000], source: exchange N=3 (standard planning lane capacity)
+  c_bd = 1650 veh/h/lane, interval [1500, 1800], source: exchange N=3 (congestion onset below full capacity)
+  k_avav = 0.50 (gap multiplier, i.e. 2x throughput), interval [0.45, 0.60], source: exchange N=4 (coordinated AVs halve the gap)
+  k_avhu = 0.75 (gap multiplier, 4/3x throughput), interval [0.70, 0.85], source: exchange N=5 (AV behind a human cuts gap by one third to one half)
+  eps = 0.15 (encroachment share), interval [0.10, 0.20], source: exchange N=6 (reserved lanes are imperfectly exclusive)
+  D = 2.03 (damping strength, calibrated), anchor p_tip = 0.40, interval [0.30, 0.50], source: exchange N=10 (stop-and-go clearly eases at 30-50% penetration, marked at 40-50%)
+Dataset-derived (no empirical gap): per-segment L and AADT from 2017_MCM_Problem_C_Data.csv, cleaned (see below).
+
+Data cleaning performed: decoded UTF-8 with BOM; stripped whitespace from headers; renamed columns to AADT / RteType / Lanes_DECR / Lanes_INCR; coerced numerics; 224 segments, 0 duplicates (route + start + end milepost), 0 non-numeric values, 0 segments with end < start, all RteType in {IS, SR}; 201 of 224 Comments empty (dropped as uninformative); 206 Interstate + 18 State Route segments across routes 5, 90, 405, 520.
+
+Solution procedure (code/model.py): for each segment compute L, V_p, rho(p) and regime over p in {0, 0.05, ..., 1}; aggregate by route (volume-weighted rho_agg = sum V_p / sum C_eff); detect the tipping point as the smallest p at which 80% of the segments that are in breakdown at baseline return to stable flow (rho <= 1); compare dedicated-lane capacity against mixed-traffic capacity at each p. The script takes parameter overrides and a p-list on the command line (e.g. --sweep F_PEAK=0.08,C=2000) and prints route tables plus an aggregate capacity sweep.
+
+### Outcome Analysis
+
+Baseline (p = 0, all human): route-level aggregate rho: I-5 1.05, I-90 0.75, I-405 1.22, SR-520 0.83. At peak, 125 of 224 segments (56%) already exceed capacity (rho > 1) and another ~26% oscillate between capacity onset and capacity. The worst segments are I-5 near mileposts 163-164 (rho0 up to 2.29, 5 lanes, AADT ~242,000) and I-405 (rho0 up to 2.10, 4 lanes). Route 405 is the most overloaded (74% of its segments in breakdown at baseline, mean delay index 3.1x free flow).
+
+Effect of AV penetration (mixed traffic, no dedicated lanes): capacity gain per lane is +4.0% at p = 0.10, +33.3% at p = 0.50, +84.0% at p = 0.90 (ceff = 1976, 2533, 3496 veh/h/lane vs 1900). Aggregate rho falls from 1.04 (baseline) to 1.00 at 10%, 0.78 at 50%, 0.57 at 90%. Consequence by route at p = 0.10: I-5 50% of segments still in breakdown (delay 1.77x); I-405 70% (2.82x). At p = 0.50: I-5 17% (1.05x), I-405 45% (1.30x) — most of I-405 recovers. At p = 0.90: breakdown under 7% everywhere; I-90 and SR-520 fully free-flowing; I-405 still 6% of segments in breakdown (it is so overloaded that even 90% AVs cannot fully clear it).
+
+Equilibria: a stable free-flow equilibrium exists for every segment at every p (it is the low-density branch); the practical question is which branch the system occupies. Below the (damped) oscillation threshold the congested state is stable; above it, oscillations appear; above rho = 1 there is no stable equilibrium at all and queues grow without bound. With AV damping the oscillation band shrinks in p, so more of the corridor sits on the stable branch.
+
+Tipping point: capacity gain is monotone but the regime change is not uniform. The smallest p at which 80% of the over-capacity segments return to stable flow (rho <= 1) is p_tip ≈ 0.17 (17% AV penetration). The remaining over-capacity segments are the worst five or six (rho0 > 2); the single worst (I-5, rho0 = 2.29) only returns to stable flow near p ≈ 0.63. So there is a two-stage picture: a first tipping near 15-20% penetration relieves the majority of congestion, and a second, much higher crossing (~60%) is needed to clear the most overloaded 4-5-lane corridors. This matches the expert range of 30-50% for a marked easing of stop-and-go (exchange 10): the oscillation regime (not the breakdown set) is what clears around 40%, by construction of the D calibration; the hard capacity deficit of the worst segments persists to higher p because their baseline deficit (rho0 ~ 2.1-2.3) is too large for headway reduction alone.
+
+Dedicated lanes: one reserved AV lane adds c/k_avav + (L-1)c + eps*c/k_avhu = +17.6% (4-lane segments), +21-23% (5-6 lane), up to +30% (2-lane) capacity over the all-human baseline, at every p. Compared with mixed traffic at the same p: at p = 0.10 the dedicated lane is strictly better (mixed adds only +4.0%); at p = 0.50 mixed traffic already gives +33.3%, so a dedicated lane is inferior in total capacity — it wastes platoon gains by isolating AVs from each other and by giving humans a faster lane that gets encroached; at p = 0.90 mixed (+84%) dominates again. Conclusion: a dedicated lane is worth building only while AV penetration is low (roughly p < 0.3), when it buys the platoon capacity that the mixed flow cannot yet exploit, and only with enforcement against encroachment (eps). Once platooning is common, keep lanes shared: the p^2 term makes the shared-lane capacity super-linear in p, and a dedicated lane caps the AV side at 2c per lane while still charging humans a full lane. Dedicated lanes also do not fix the worst segments (I-5 mp 163-164 stays at rho ≈ 1.85 even with a dedicated lane) — they must be treated by demand management or added capacity.
+
+Other policy changes the model supports: (1) prioritize AV cooperation deployment on I-405 first (worst baseline rho_agg 1.22, 74% of segments in breakdown) and on I-5's 163-164 corridor, where even 90% AVs leave residual overload; (2) demand management (managed pricing, transit priority, staggered commuting) on the residual-overload segments, since headway reduction alone cannot move them below capacity until p is high; (3) enforce reserved-lane compliance if such lanes are introduced — the model shows the benefit decays linearly in eps, and the incentive to encroach grows with congestion; (4) treat I-90 and SR-520 as lower priority: at baseline they sit at rho_agg 0.75-0.83 and reach full free flow by p = 0.5-0.9 without any capital investment; (5) plan for the two-stage tipping: expect visible network improvement once ~15-20% of the fleet cooperates, but do not expect the worst corridors to be solved until ~50-60%.
+
+Limitations and biases: (1) The dataset has daily volumes only; the peak fraction f_peak = 0.09 converts it, so every rho scales with f_peak — at f_peak = 0.08 the whole network is 11% under its current operating point (aggregate rho 0.93) and the tipping point shifts earlier; at 0.10 it shifts later. Conclusions about relative ordering (405 worst, 90/520 healthiest) are robust across the interval. (2) AADT is bidirectional while lane counts are per direction; combining them as L = Lanes_DECR + Lanes_INCR is consistent only if the two directions carry comparable volumes — a directional split would change individual segment rho by tens of percent. (3) The uniform-mix assumption (pair fractions p^2, p(1-p), (1-p)) ignores lane-assignment strategy: if AVs cluster into lanes, platooning is more common than p^2 and the tipping point moves earlier; the model is therefore conservative on the low-p side. (4) The delay index coefficients a = 1.5 and b = 4.0 are illustrative shapes, not calibrated measurements — regime percentages and capacity gains do not depend on them, only the reported delay multiples do. (5) No time-varying demand, incidents, or weather are modeled; the analysis is a steady-state snapshot of the peak hour. (6) The encroachment parameter eps is applied to capacity, not to a behavioral equilibrium; a game-theoretic compliance model could lower the effective dedicated-lane gain.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

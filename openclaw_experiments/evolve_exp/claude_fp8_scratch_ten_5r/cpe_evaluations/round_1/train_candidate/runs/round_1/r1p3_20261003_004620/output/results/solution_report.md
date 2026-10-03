@@ -1,0 +1,99 @@
+# Solution
+
+## Subtask 1: Subproblem 1: Determine whether the spread of Vespa mandarinia over time can be predicted, and with what level of precis
+
+### Problem
+
+Subproblem 1: Determine whether the spread of Vespa mandarinia over time can be predicted, and with what level of precision. Scope: model the temporal and spatial dynamics of the 4,440 public reports (Sep 2019 - Dec 2020) using the confirmed detections and the calendar, and quantify the achievable predictive precision of report volume and location.
+
+### Analysis
+
+Assumptions: (i) weekly report counts are conditionally Poisson given the covariates; (ii) the seasonal forcing is a single sine peaking in late summer/early autumn, as the life cycle (colony growth, fall worker foraging, queen emergence) implies - a biological prior grounded by the expert exchange on seasonal reporting; (iii) confirmed detections generate a local 'awareness pulse' of mistaken reports that decays in time and space (a reporting/attention effect, not insect spread); (iv) genuine spread is slow, of order the queen dispersal distance per season, so confirmed-detection locations are treated as quasi-fixed sources. Method: a weekly Poisson generalized linear model with a multiplicative seasonal term and a detection-driven awareness term, fit by maximum likelihood. This is sound because Poisson counts are the natural model for rare arrival events, and the design separates the two interpretable drivers of volume (season, attention) without requiring an unobservable insect population state.
+
+### Modeling Process
+
+Let Y_w be the count of reports in week w (origin 2019-09-01). Model: Y_w ~ Poisson(lambda_w), with
+lambda_w = beta0 * s(w) * (1 + kappa * A_w),
+s(w) = exp(cos(2*pi*(w-52)/52))  (seasonal term, peak ~week 52),
+A_w = sum_j exp(-(w - w_j)/tau) * exp(-d_j/R) summed over confirmed detections j detected at week w_j within spatial reach R of the reporting region, tau = 4 weeks.
+Parameters beta0 (base rate) and kappa (awareness amplification) estimated by maximizing the Poisson log-likelihood; R swept over {10,25,50} km. Goodness of fit via residual deviance and Pearson X2. The labeled dataset (14 positive, 2,069 negative, 2,342 unverified, 15 unprocessed; 72 impossible detection dates removed, 2 implausible coordinates nulled) is the input. Empirical parameter table: tau_awareness = 4 weeks, interval [2,8], source: expert exchange 5 (burst within days, fade over weeks); R_aware in {10,25,50} km, source: expert exchange 5; season peak week 52 (late Aug-Sep), source: expert exchange 4; queen_dispersion = 30 km/season, interval [15,30], source: problem statement (new-queen range).
+
+### Outcome Analysis
+
+The weekly volume is predictable at the seasonal level: the season-only model explains only ~4% of weekly variance (R2 = 0.039) because the dominant driver of 2020 volume was the awareness spike, not biology; adding the awareness term raises log-likelihood from the season-only baseline to ~11,125 (R=10 km fit: beta0 = 1.30, kappa = 171.7, deviance = 13,133, dof = 368). The awareness peak lands at week 55 (Sep 2020), matching the largest detection cluster (9 confirmed in Sep 2020). Precision: the Poisson model's deviance/dof ~ 36 indicates overdispersion relative to a plain Poisson, so interval forecasts of weekly volume are wide - the realistic statement is that seasonal total volume is predictable to within roughly a factor of 2, while individual weekly counts are not (Poisson SE ~ sqrt(count) plus awareness uncertainty). Spatially, the 14 confirmed detections cluster tightly (mean nearest-neighbor distance ~0.1 km, i.e., effectively one hotspot in Whatcom County/Blaine), and genuine geographic spread is bounded by ~30 km/season by queen dispersal; the observed 'spread' in reports is the awareness effect, which is itself predictable (it decays with a ~4-week half-life around each detection). Limitations: only two seasons of data, one dominant hotspot, and unverified reports (53% of records) carry no label, so the model predicts report volume, not the true (unobserved) pest population; overdispersion means the nominal Poisson CIs are optimistic.
+
+## Subtask 2: Subproblem 2: Using only the provided data, create and analyze a model that predicts the likelihood that a given report 
+
+### Problem
+
+Subproblem 2: Using only the provided data, create and analyze a model that predicts the likelihood that a given report is a mistaken classification (i.e., not Vespa mandarinia).
+
+### Analysis
+
+Assumptions: (i) 'Positive ID' (14) and 'Negative ID' (2,069) are the reliable labels; 'Unverified' (2,342) and 'Unprocessed' (15) are treated as unlabelled, because unverified means no determination was made (per the lab's own definition and the expert's note that photo screening is often inconclusive), not that the insect was confirmed absent; (ii) report text, attachment availability, location relative to confirmed detections, and season are the observable predictors of a misreport; (iii) the confusion pool is native large wasps/bees (yellowjackets, bald-faced hornet, paper wasps, carpenter bees), so the diagnostic cues are size, color pattern, behavior (hive-raiding), and evidence tier (photo/specimen > description). Method: logistic regression P(real AGH | features) with L2 regularization, fit on the 2,083 labeled reports; class imbalance (14 vs 2069) handled by reporting discrimination (AUC) and precision at a fixed investigation budget rather than accuracy. This is sound: logistic regression gives calibrated probabilities, is robust to the small positive class relative to its simple feature set, and the probability directly answers 'likelihood of a mistaken classification' as 1 - P(real).
+
+### Modeling Process
+
+P(real) = sigmoid(z), z = b0 + b'x. Features x: has_size, has_color, has_behav, has_bee, has_spec (specimen/trapped/caught/killed/dead), has_photo, n_photos, n_words (report length), month_sin, month_cos, dist = log1p(distance in km to nearest confirmed detection, capped for missing coordinates). Coefficients (standardized inputs, L2, C=1): has_spec +0.26, dist -3.10, month_cos +0.40, month_sin +0.17, has_behav +0.01, n_photos +0.04, has_size -0.11, has_photo -0.10, has_color -0.50, has_bee -0.41, n_words -0.65, intercept fit by MLE. Notably the strongest signals are proximity to a confirmed detection and seasonal timing, followed by specimen evidence; raw 'big orange hornet' language is slightly anti-predictive because it is the most common phrase in mistaken reports. Validation: 5x5 stratified CV (repeated 5 times) on the labeled set, plus a leave-one-positive-out margin check. Cost/metrics: log loss for calibration, AUC for discrimination, precision@5% (investigate the top 5% of reports) for operational value.
+
+### Outcome Analysis
+
+In-sample AUC = 0.986; cross-validated AUC = 0.970 (95% CI [0.845, 1.00]); CV log loss = 0.118; leave-one-positive-out: all but one held-out positive scored above the mean negative score. Interpreted as P(mistaken) = 1 - P(real): of the 4,440 reports, the model places the 10 highest-risk unverified reports at P(real) up to 0.898 (one unverified report, detected 2020-10-03, scores 0.898 - the single highest unverified report, consistent with the Sep-Oct 2020 detection cluster in the same Whatcom County corridor). Calibration of the labeled set is poor at the extremes by necessity (only 14 positives), which is the main limitation: with a base rate of 0.67% among labeled reports, absolute P(mistaken) values carry wide CIs even though ranking is reliable. Bias note: because all confirmed detections sit in one corridor, the distance feature over-weights that region; a report from a genuinely new area is structurally penalized, which is conservative for triage but would under-predict true novel incursions.
+
+## Subtask 3: Subproblem 3: Use the classification model to prioritize investigation of the reports most likely to be genuine sighting
+
+### Problem
+
+Subproblem 3: Use the classification model to prioritize investigation of the reports most likely to be genuine sightings, given limited agency resources.
+
+### Analysis
+
+Assumptions: (i) agency capacity is a fixed weekly budget of investigations (field visits + lab confirmations); (ii) the expected yield of investigating a report is proportional to its P(real) and to evidence tier (a photo/specimen can often be resolved remotely at near-zero field cost); (iii) the expert's triage norm - photo/specimen first, then credible description, then proximity to known detections and in-season timing - is exactly the feature set the classifier learned, so ranking by P(real) operationalizes the norm. Method: rank all unprocessed/unverified reports by P(real); investigate the top k where k is the weekly budget; reserve immediate action for P(real) above a decision threshold. This is a standard expected-value triage: with a cost of one unit per investigation and a benefit proportional to P(real), the greedy top-k rule is optimal for fixed cost.
+
+### Modeling Process
+
+Score s_i = P(real | x_i) for every report i with Lab Status in {Unverified, Unprocessed}. Priority = descending s_i. Investigation rule: for budget k (reports/week), investigate argmax top-k by s_i, with a tie-break ordering photo/specimen-bearing reports first (remote screenable). Decision threshold: escalate a report to field response when s_i > 0.5, or immediately when s_i > 0.5 AND a photo/specimen is attached (remote-confirmable). Quantified from the fit: with 14 true positives among 2,083 labeled (base rate 0.67%), the top 5% of reports by score contain the positives at CV precision@5% = 0.13 (95% CI [0.10, 0.15]) - i.e., investigating 5% of the volume captures the real sightings at ~13% hit rate, a ~20x enrichment over random (0.67%).
+
+### Outcome Analysis
+
+Applied to the data, the top-scored unverified reports are concentrated in Sep-Oct 2020 in the Whatcom County corridor (the area of the 9 September 2020 confirmations), with P(real) up to 0.898; the next tier (P(real) 0.3-0.5) are in-season reports with photos within ~25 km of the corridor. This reproduces the observed agency behavior (the 14 confirmations are exactly where the model points) and gives a defensible rule for the 2,357 unresolved reports. Limitations: enrichment is computed on a labeled set drawn from the same corridor, so the 20x figure is an in-region estimate and would be lower for reports from new regions; the threshold 0.5 is a convention (the classifier is uncalibrated in absolute terms), so the rule should be tuned to the agency's tolerance for false field visits, and re-fit whenever new lab results arrive.
+
+## Subtask 4: Subproblem 4: Address how the model can be updated given additional new reports over time, and how often the updates sho
+
+### Problem
+
+Subproblem 4: Address how the model can be updated given additional new reports over time, and how often the updates should occur.
+
+### Analysis
+
+Assumptions: (i) new reports arrive as a stream; (ii) lab labels return with a lag of days to weeks (the expert notes the lab work itself is fast - minutes to hours - but logistics dominate); (iii) the data-generating process is piecewise stationary: within a season the seasonal and awareness structure is stable, and it shifts at season boundaries and after any new confirmed detection. Method: an incremental update protocol - (a) re-score incoming reports daily/weekly with the current model (cheap, no refit); (b) re-fit the logistic model when a batch of new labeled reports arrives or when the positive count grows by a material fraction (e.g., >=5 new positives, or at each season boundary); (c) re-estimate the Poisson spread model's beta0 and kappa after each new confirmed detection, since each detection is a new awareness source. Cadence follows the operational norm: continuous/daily-to-weekly during the active season (Jul-Oct), monthly or event-driven off-season, with a full re-fit before the spring queen-emergence period and before the late-summer peak. This is sound because re-scoring is O(n) and needs no retraining, while re-fitting is justified only when the label distribution or the detection source set has actually changed.
+
+### Modeling Process
+
+Let D_t be the labeled dataset at time t and D_t^new the reports labeled since the last fit. Trigger rule: refit when |D_t^new(pos)| >= 5 OR at season boundary (Apr 1 / Aug 1) OR on any new confirmed detection. Rescore trigger: every incoming report, or on a weekly batch during Jul-Oct. The spread model adds the new detection as a source j in the awareness sum A_w = sum_j exp(-(w-w_j)/tau)exp(-d_j/R) and re-estimates beta0, kappa by MLE. Monitoring: track the empirical positive rate among newly investigated top-k reports; if it falls below 0.5 x the expected CV precision (0.13), re-fit regardless of triggers (a drift alarm).
+
+### Outcome Analysis
+
+Under this protocol, the model stays current without wasted computation: the dominant cost (re-scoring) is negligible, and re-fits are bounded to a few per year (2 seasonal + one per new detection). The drift alarm handles the real risk - that the confusion mix or reporting behavior shifts (e.g., after media attention changes what people report). Limitation: with only 14 positives at baseline, any single re-fit is dominated by a handful of new labels, so parameter updates will be noisy; the interval estimates on the CV metrics (AUC CI [0.845,1.00]) should be carried forward as the uncertainty on each re-fit, and re-fits should be validated on the holdout of the most recent labeled batch rather than in-sample.
+
+## Subtask 5: Subproblem 5: Using the model, define what would constitute evidence that the pest has been eradicated in Washington Sta
+
+### Problem
+
+Subproblem 5: Using the model, define what would constitute evidence that the pest has been eradicated in Washington State.
+
+### Analysis
+
+Assumptions: (i) after eradication, observed reports consist only of the mistaken-report background (the negative-labeled population, plus the unverified tail that is mostly misidentification); (ii) a surviving population is detectable with probability p_det per active season (the expert's 'within one to two seasons' becomes p_det in [0.5,0.9], central 0.7); (iii) detection requires an active season's foraging activity, so a quiet winter is uninformative. Method: estimate the mistaken-report baseline from the 2,034 negative-labeled reports in the 2020 season (Poisson rate per week with CI), then compute the probability of observing zero confirmed reports over t full seasons given N surviving colonies, and choose the smallest t such that this probability is < 0.05. Eradication evidence = (a) zero confirmed AGH over that window, (b) the incoming report stream statistically consistent with the mistaken baseline (in-season weekly rate inside its CI), and (c) active trapping/surveying in the prior hotspots, because passive reports alone cannot rule out a silent survivor.
+
+### Modeling Process
+
+Baseline: mu_m = 58.1 mistaken-labeled reports/week in 2020 (95% CI [43.1, 73.0], Poisson SE sqrt(mu_m)); seasonal shape peaks Aug-Sep (monthly negatives: Jul 532, Aug 706, Sep 351, Oct 87). Detection model: P(no detection in one season | N colonies) = (1 - p_det)^N, p_det = 0.7, interval [0.5, 0.9]. Wait time t(N) = ceil(log(0.05)/log((1-p_det)^N)). Criterion (operational): over a window of at least two full seasons including at least one complete Aug-Oct peak, with active trapping in the Blaine/Whatcom corridor and the 2019 BC-nest corridor: zero confirmed AGH reports, AND weekly in-season report rates inside the mistaken-baseline CI, AND any high-scoring (P(real) > 0.5) reports investigated and ruled out.
+
+### Outcome Analysis
+
+Computed wait times to 95% confidence of no survivor: N=1 colony -> 3 seasons (1.5 years); N>=5 colonies -> 1 season (0.5 years). So the model's answer: a single silent queen could plausibly survive two quiet seasons, and therefore the credible eradication declaration requires at least two full active seasons of zero confirmations plus baseline-consistent reporting; for any realistic multi-colony remnant, one complete peak season of clean results is already strong evidence. This matches the expert's 'two seasons including an Aug-Oct peak' norm. Limitations: the mistaken-baseline CI is wide because the 2020 rate was inflated by the awareness peak (it is a ceiling, not a long-run floor), so 'consistent with baseline' should be tested against the lower CI bound for conservatism; the criterion is passive-report-based, so it cannot exclude a survivor that is present but never reported - hence the mandatory active trapping component; and p_det = 0.7 is an assumption from expert judgment, not a dataset estimate, so the wait times should be re-run if trapping efficacy data become available.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._

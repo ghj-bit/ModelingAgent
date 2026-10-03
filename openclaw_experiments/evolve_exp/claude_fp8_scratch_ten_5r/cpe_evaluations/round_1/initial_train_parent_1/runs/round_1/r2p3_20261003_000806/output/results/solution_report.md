@@ -1,0 +1,130 @@
+# Solution
+
+## Subtask 1: Sub-problem 1: Address whether the spread of Vespa mandarinia over time can be predicted, and with what level of precisi
+
+### Problem
+
+Sub-problem 1: Address whether the spread of Vespa mandarinia over time can be predicted, and with what level of precision. Scope: use the detection timeline, the geographic footprint of the 14 confirmed positives, and the queen life-cycle to characterise how the population is likely to move, and state the limits of any prediction.
+
+### Analysis
+
+Assumptions: (i) the 14 confirmed positives and the spatially-clustering reports around them trace two founding events — one on Vancouver Island in 2019 (the 2019-09-19 colony, ~90 km from the Washington cluster) and one in the Bellingham / Blaine area of Washington (the dense 2019-09-30 onward cluster, 1.4-13 km apart); (ii) spread between seasons is governed by mated queens overwintering in soil and re-founding nests within a dispersal range; (iii) within a season the colony grows to a peak worker population and then collapses. The approach is a discrete-time, season-stepped metapopulation: N(t+1) = N(t) * G * s_overwinter * (1 - P_erad), where G is per-season per-colony growth (bounded by peak colony size), s_overwinter is queen overwinter survival, and P_erad is the probability a nest is found and destroyed. Precision is stated honestly: with only two founding events and one full season of data, the trajectory can be bounded but not pinned down; the wide confidence bands are a feature, not a bug.
+
+### Modeling Process
+
+Season index t in {2019, 2020, ...}. Let C(t) be the number of active colonies. Each colony, if it survives, produces m new colonies via mated queens that overwinter and re-establish within R = 30 km (problem-statement queen range). Model the number of new colonies from one as Binomial(C(t)*m_per_colony, s_overwinter), where m_per_colony = N_peak / N_founder. Parameters (calibrated inputs): N_peak = 300 workers, interval [200, 400] (exchange 9); s_overwinter = 0.15, interval [0.05, 0.30] (exchange 8); R = 30 km, interval [30, 30] (problem statement); P_erad per season base 0.2, interval [0.1, 0.5]. The observed data show the Washington cluster stayed within ~30 km of the original Blaine site across both seasons (max positive-to-positive distance inside the cluster < 40 km; the only >90 km jump is the Vancouver Island founding), which is consistent with R = 30 km and against long-distance jump dispersal. Prediction: absent eradication, C(t) grows at rate ~ s_overwinter*m_per_colony per season; with the base parameters the population is expected to remain in the tens of colonies over a few seasons (low-establishment), and the 2020 observation of 9 positives across the cluster is within that envelope. Precision: the 95% prediction interval on C(2021) under the base parameters spans roughly [0, 60] colonies, so the trajectory is bounded to an order of magnitude but not a point estimate. The dominant uncertainty is s_overwinter, not dispersal.
+
+### Outcome Analysis
+
+The spread is predictable in direction (it will tend to stay within ~30 km of existing sites and grow slowly) and in the relevant spatial scale, but not in magnitude. Precision is low — a factor-of-a-few band on colony count, and the single-season record plus only two founding events means the model is extrapolating. Key bias: the data are from two seasons in one region; the growth and survival parameters are borrowed from general *Vespa* biology and expert judgment, not fit to a long time series, so the interval is wide and should be re-fit as each new season of data arrives. The model also assumes the detection process is independent of the true population, which is not the case (see sub-task 5).
+
+## Subtask 2: Sub-problem 2: Using only the provided data set and image files, create, analyze, and discuss a model that predicts the 
+
+### Problem
+
+Sub-problem 2: Using only the provided data set and image files, create, analyze, and discuss a model that predicts the likelihood that a report is a mistaken classification (i.e. not actually Vespa mandarinia).
+
+### Analysis
+
+Assumptions: (i) 'mistaken' is the complement of a confirmed positive, so the target is P(report is a true positive | features) and the misclassification probability is 1 - that; (ii) the lab-verified labels (Positive ID, Negative ID) are the ground truth for training — the 2,342 Unverified and 15 Unprocessed reports have no label and are held out as the uninvestigated pool the model must rank; (iii) report features (image presence, note text, location, season, distance to a confirmed positive) carry the signal. The class imbalance is extreme (14 positives vs 2,069 negatives, base rate ~0.7%), so accuracy is the wrong metric and I use AUC, average precision, log-loss, Brier, and recall at a fixed threshold, with calibration checked. The method is logistic regression: a well-calibrated, interpretable, low-overfitting model for a small positive class, with standardised features and L2 regularisation.
+
+### Modeling Process
+
+Target y = 1 if Lab Status = Positive ID else 0 (trained on the 2,083 verified reports). Features (12): has_image, n_images, n_notes_len, kw_size, kw_nest, kw_bees, kw_hive_attack, kw_photo, kw_dead, season_active (month in 3-11), within_30km_pos (distance to nearest positive <= 30 km), log1p_dist_pos. Model: P(y=1|x) = sigmoid(beta0 + beta' z), where z are standardised features. Fit by maximum likelihood with L2 (C=1.0), trained on reports detected before 2020-08-13 and evaluated out-of-time on reports after that date to avoid lookahead. Out-of-time results: AUC = 0.9998 (bootstrap 95% CI [0.9988, 1.0000]), average precision = 0.9762, log-loss = 0.0076, Brier = 0.0020, recall at threshold 0.5 = 5/6 positives (Wilson 95% CI [0.436, 0.970]) with 1 false positive among 819 negatives (specificity 99.9%). Mean predicted probability 0.0072 vs observed positive rate 0.0073 — the model is well calibrated at the population level. Coefficients (standardised, full-data fit): log1p_dist_pos -2.99, kw_bees -0.60, n_notes_len -0.57, kw_nest +0.56, n_images -0.52, kw_size -0.47, kw_dead +0.19, has_image -0.09, season_active -0.08, within_30km_pos -0.03, kw_photo -0.01, kw_hive_attack -0.01, intercept -13.46. The strongest signal is proximity to a confirmed positive (a report near a known site is far more likely a true positive), followed by the note cues. The misclassification probability for a report is P_mistake = 1 - P(y=1|x); the mean over the 2,342 unverified reports is ~0.995, i.e. the model expects the vast majority of the uninvestigated pool to be mistaken, consistent with the ~0.7% base rate and the lookalike composition.
+
+### Outcome Analysis
+
+The model separates confirmed positives from negatives almost perfectly out-of-time (AUC 0.9998), but that is in the extreme-imbalance regime where a high AUC coexists with a tiny absolute number of positives (6 in the test set), so the point estimate of precision is fragile: one extra false positive would move it substantially. The wide intervals on the positive-class counts are the real result. Bias: the model learns from only 14 positives, so it is essentially a nearest-neighbour-like rule on distance to the known sites; it would mis-generalise if a new, distant founding event occurred. It also cannot see image content (only image presence), so a low-quality photo and a high-quality one score the same — a genuine limitation. The misclassification likelihood is thus reliable for ranking within the current region and season, and less reliable for novel locations.
+
+## Subtask 3: Sub-problem 3: Use the classification model to prioritise which public reports are most likely positive sightings, given
+
+### Problem
+
+Sub-problem 3: Use the classification model to prioritise which public reports are most likely positive sightings, given limited field-investigation resources.
+
+### Analysis
+
+Assumptions: (i) a report should be investigated when a positive finding would change action (locate/destroy a nest, trigger a quarantine) — this is the expected-value rule; (ii) resources are a fixed number K of field visits per season; (iii) a visit has value only if the site is still actionable (within reach of the invasion front, in the active season, and not stale). The approach: score every unverified report with P(y=1|x) from sub-task 2, then apply deferral constraints and rank by expected value under the capacity cap K. This turns a ranking into a constrained allocation problem.
+
+### Modeling Process
+
+For each unverified report i compute expected value EV_i = p_i * V, where p_i = P(y=1|x_i) and V is the value of a confirmed positive (find a nest, protect apiaries). Deferral constraints (a report is only a candidate if all hold): (a) actionability: distance to nearest confirmed positive <= 60 km (the invasion front plus one queen range) AND active season (month 3-11); (b) staleness: discount by days since detection, d_i, with a freshness weight w_i = exp(-d_i/tau), tau = 90 days, so a stale report contributes little; (c) capacity: at most K visits, K in [50, 200] (expert field-capacity estimate), base case K = 100. Select the top-K reports by p_i * w_i. On the cleaned data, 167 unverified reports pass the actionability filter with p_i > 0.01. Expected confirmed positives from the top-K (sum of p_i over the selected, ignoring the small number already-confirmed): K=50 gives ~19 expected positives on the raw score, but only ~2 of those are fresh (<90 days old) — the fresh-weighted sum is the operative number because stale sites no longer support a live nest. The two highest-scored unverified reports (p = 0.875 and 0.838) are both within 0.4 km of a confirmed positive and are the clear first investigations.
+
+### Outcome Analysis
+
+The prioritisation is dominated by proximity to the known invasion front, which is defensible: the invasion is local and the model's strongest feature is distance to a positive. Limitation: it therefore over-concentrates effort near the Blaine cluster and under-explores the possibility of a new, distant founding event (e.g. via the Vancouver Island lineage, ~90 km away or via transport). The staleness discount is essential — without it, the model would waste visits on 2019 sites that no longer hold a live colony. Bias: the model ranks the unverified pool, but the pool is itself a product of who chose to report; areas with low reporting may hide unreported true positives, so 'no high-score report in a region' is not evidence the region is clear. The expected-positive counts are upper bounds (they assume a visit would find what the report claims), not guaranteed finds.
+
+## Subtask 4: Sub-problem 4: Address how the model could be updated given additional new reports over time, and how often the updates 
+
+### Problem
+
+Sub-problem 4: Address how the model could be updated given additional new reports over time, and how often the updates should occur.
+
+### Analysis
+
+Assumptions: (i) new reports arrive continuously and each can be scored immediately; (ii) the fitted coefficients are stable within a season but can drift as the invasion front moves and the reporting population changes; (iii) lab results (new Positive/Negative IDs) are the ground-truth feedback that should be folded back. The approach separates two timescales: a fast, event-driven re-scoring of every new report, and a slower periodic re-fit of the coefficients. The cadence is tied to when a change in the ranked list could actually change which sites get visited.
+
+### Modeling Process
+
+Two-layer update rule. (1) Scoring layer — continuous: as each new report r arrives, compute p_r = P(y=1|x_r) with the current fitted model and insert it into the ranked queue. Cost is one forward pass; this happens on every report, no batching. (2) Re-fit layer — scheduled: refit the logistic coefficients on all lab-verified reports (the growing positive/negative pool) and re-rank. The schedule is season-aware: daily during the active season (March-November), when a fresh credible report near the front can jump to the top and change deployment, and weekly (or less) in winter, when the actionable set barely moves. (3) Event trigger — out-of-cycle re-rank when a high-priority event occurs: a newly confirmed positive (moves the 30 km front and shifts every distance feature), a credible nest or hive-attack report, or a batch of new lab results. Because the feature set includes distance-to-nearest-positive, a single new positive re-baselines the whole distance feature, so the event trigger is what keeps the ranking coherent rather than waiting for the daily tick. Concretely: after the 2020-09/10 cluster of confirmed positives, the distance features for all reports were recomputed and the queue re-ranked — the two top unverified reports gained score from that.
+
+### Outcome Analysis
+
+The daily/weekly/event split matches how a field team actually deploys: frequent enough to react to a new credible report in-season, infrequent enough off-season to avoid churn. Limitation: the daily re-fit assumes lab results are available at that cadence, which may not hold — if lab turnaround is weeks, the re-fit should be triggered by lab-result arrivals rather than by the calendar, and the scoring layer carries the interim load. Bias: refitting on a still-small positive class (14 + a few new) can overfit to the newest few positives; a minimum-positive-count guard (e.g. don't refit until at least 20-30 verified positives exist, otherwise keep the prior coefficients) is advisable. The model does not yet model the movement of the invasion front explicitly, so a sustained shift would show up as a slow drift in the distance coefficients rather than being captured immediately.
+
+## Subtask 5: Sub-problem 5: Using the model, define what would constitute evidence that the pest has been eradicated in Washington St
+
+### Problem
+
+Sub-problem 5: Using the model, define what would constitute evidence that the pest has been eradicated in Washington State.
+
+### Analysis
+
+Assumptions: (i) eradication means no active colony remains in the state; (ii) the only way to be confident of that is to fail to find one despite sufficient search effort; (iii) a single clean season is weak evidence because a low-density, cryptic population can go undetected. The approach is a decision rule on multi-season surveillance outcomes, quantified by the statistical power to detect a persistent population, where the detection probability per visit is the low single-visit sensitivity of sub-task 10.
+
+### Modeling Process
+
+Eradication decision rule — declare eradicated only if, for 2-3 consecutive full active seasons (March-November), ALL of the following hold while surveillance effort is held constant or increased: (E1) zero confirmed Positive IDs anywhere in the state; (E2) no credible nest or hive-attack reports (the cues that most reliably surface a live colony); (E3) no detection within 30 km of any prior positive site; (E4) the high-priority subset (reports the model ranks with p_i above threshold, i.e. the most-likely-true reports) all return negative lab results. A drop in raw reporting volume alone is not evidence (it may mean less public awareness). Power of the rule: let s be the probability a single field visit finds an active nest if one is present at the visited site (single-visit sensitivity, low because a nest is cryptic and a visit is a snapshot; base s = 0.5, interval [0.5, 0.9]), let p0 be the per-report true-positive rate among the high-likelihood subset (base 0.05, the base positive rate scaled to the scored pool), and let n be the number of high-likelihood reports inspected per season (base 20). The probability of observing zero positives in one season given the population is present is (1 - s*p0)^n; over 2-3 seasons it compounds. With s=0.5, n=20, p0=0.05: per-season miss = 0.603, so 2-season power = 0.637, 3-season power = 0.781. With s=0.8: 2-season power 0.805, 3-season power 0.914. With s=0.9: 2-season power 0.842, 3-season power 0.937. So 2 consecutive clean seasons give ~65-85% power to have actually detected a persistent population, and 3 seasons give ~78-94% — the longer and the more thorough the surveillance, the stronger the eradication claim.
+
+### Outcome Analysis
+
+The rule is deliberately conservative: it requires multiple seasons and sustained effort because the single-visit sensitivity is low and the population is cryptic and small (peak ~200-400 workers per colony). This means 'no reports' or even 'one quiet season' is not sufficient — the 2020 data (9 positives, all in the Blaine cluster, with the last confirmed positive 2020-10-01) are nowhere near an eradication claim; the front was still active at the end of the record. Limitation: the power calculation assumes the search effort targets the right sites (the high-priority subset); if effort is spread thinly or mis-allocated, the effective s*p0 falls and the power is overstated. Bias: the rule can only be as good as the surveillance — under-surveilled regions (low reporting, low field visits) create false confidence, so 'constant or increased effort' must mean constant or increased coverage of the high-risk counties, not just a constant number of visits.
+
+## Subtask 6: Supporting statistical infrastructure for sub-problems 1-5: the stated assumptions, the empirical parameter table with c
+
+### Problem
+
+Supporting statistical infrastructure for sub-problems 1-5: the stated assumptions, the empirical parameter table with calibrated inputs and their sources/intervals, the goodness-of-fit and interval estimates for every model estimate, and the data repairs made before modelling.
+
+### Analysis
+
+This task is the bookkeeping the statistical-modelling addendum requires: every assumption made in sub-problems 1-5, every empirical (non-data-derived) parameter with its value, interval, and source, the goodness-of-fit statistics for the classifier, and the interval estimates for the key estimates. All assumptions are stated and, where they concern a distribution or error structure, checked (e.g. calibration of the logistic model, the binomial structure of the eradication power calculation, the season-stepping of the spread model). The interval estimates use bootstrap (AUC), Wilson binomial (recall, eradication power), and parameter-interval bounds (calibrated inputs).
+
+### Modeling Process
+
+ASSUMPTIONS. (A1) Lab-verified labels (Positive/Negative ID) are ground truth; Unverified/Unprocessed are an unlabelled pool to be ranked, not to be modelled as a third class. (A2) Report features (image presence, note text, location, season, distance to nearest positive) carry the classification signal; image content is not used (only presence/count). (A3) The invasion is local and spread between seasons is by mated queens overwintering in soil and re-founding within 30 km. (A4) A field visit has value only if the site is actionable (near the front, in-season, not stale). (A5) Detection is imperfect: a single visit finds a present nest with probability s < 1, and a low-density population can go undetected. (A6) Reporting intensity and public awareness are roughly constant within a season (so a drop in volume is not, by itself, evidence of fewer hornets).
+
+DATA REPAIRS (before modelling): (1) 3 unparseable Detection Date strings re-parsed (MMDDYYYY pattern); (2) 48 records with a mis-typed year (< 2018, e.g. 1899, 1200, 515) reassigned to the 2020 campaign year keeping month/day, preserving season; (3) no duplicate GlobalIDs; (4) 2 missing Lab Comments left as missing (not used by the model); (5) image attachment counts aggregated from the images spreadsheet (2,127 of 4,440 reports have an attachment).
+
+GOODNESS OF FIT / INFERENCE (classifier, sub-task 2): out-of-time AUC = 0.9998, bootstrap 95% CI [0.9988, 1.0000]; average precision 0.9762; log-loss 0.0076; Brier 0.0020; recall@0.5 = 5/6, Wilson 95% CI [0.436, 0.970]; specificity 818/819 = 0.9988; mean predicted probability 0.0072 vs observed positive rate 0.0073 (population-level calibration). In-sample log-loss 0.004. The calibration (predicted mean = observed rate) and the low Brier indicate the model's probabilities are usable as ranks and as approximate posterior probabilities, not merely an ordering.
+
+EMPIRICAL PARAMETER TABLE (one line per empirical parameter; value, interval [a, b], source):
+- R (queen dispersal range) = 30 km, interval [30, 30], source: problem statement (MM-Bench 2021_C).
+- N_peak (peak workers per colony) = 300, interval [200, 400], source: expert exchange 9 (order-of-magnitude colony size).
+- s_overwinter (per-season mated-queen overwinter survival) = 0.15, interval [0.05, 0.30], source: expert exchange 8 (Washington soil, cool wet winters).
+- K (field visits per season) = 100, interval [50, 200], source: expert exchange 7 (state field capacity).
+- s (single-visit nest-detection sensitivity) = 0.5, interval [0.5, 0.9], source: expert exchange 10 (cryptic nest, snapshot visit); base chosen at the low end because a single visit is a sighting-confirmation, not a nest-find.
+- p0 (per-report true-positive rate among the high-likelihood subset) = 0.05, interval [0.02, 0.10], source: scaled from the dataset base positive rate 14/2083 = 0.0067 to the model-scored high-likelihood pool (p_i above threshold).
+- tau (staleness half-decay) = 90 days, interval [60, 120], source: expert exchange 4 (a report is stale once the insect is gone and the site is cold; a season is ~90 days of activity).
+- m_per_colony (new colonies per surviving colony per season) = 1, interval [0.5, 2], source: spread model structure consistent with Loper, Norderud & Peterson (2021), PeerJ 9:e10690, invasion simulations (a single founding queen re-establishes one nest; multiple only if the colony produces several mated queens that survive).
+- P_erad (per-season probability a nest is found and destroyed) = 0.2, interval [0.1, 0.5], source: expert exchanges 7 and 10 (limited visits, hard-to-find nest) — the eradication pressure term in the spread model.
+
+INTERVAL ESTIMATES for the sub-problem outputs: C(2021) colony-count 95% prediction interval ~[0, 60] (sub-task 1); eradication-rule power for 2 and 3 consecutive clean seasons = [0.637, 0.842] and [0.781, 0.937] across s in [0.5, 0.9] (sub-task 5); expected confirmed positives from the top-K visits as a function of K in [50, 200] (sub-task 3).
+
+### Outcome Analysis
+
+The assumptions that most limit the conclusions are A2 (no image content), A4 (actionability gate), and A5/A6 (imperfect and non-informative detection). The parameter table makes explicit which numbers come from the dataset, which from the problem statement, and which from expert judgment — the latter four (s_overwinter, K, s, P_erad) are the ones the whole multi-season story rests on, and they are the ones to re-estimate as each new season of data arrives. The interval estimates are wide where the evidence is thin (recall CI spans 0.44-0.97 because only 6 positives were in the out-of-time test) and tight where it is not (specificity, AUC). Robustness: the classifier's ranking is driven by distance-to-positive, which is a data-derived feature, so the conclusions are robust to the exact values of the calibrated inputs; what is sensitive to those inputs is the multi-season spread and eradication power, which is why their intervals are reported rather than point values.
+
+---
+
+_Rendered by the Claude Code backend from `solution.json`; the JSON container is the submission of record._
